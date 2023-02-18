@@ -158,6 +158,7 @@ BlkDevSpdk::~BlkDevSpdk() {
 }
 
 int BlkDevSpdk::devInit() {
+  std::cout << "[BENITA]" << __func__ << __LINE__ << std::endl; 
   int rc;
   std::lock_guard<std::mutex> lock(lmtx);
   {
@@ -738,7 +739,10 @@ BlkDevPosix::BlkDevPosix(const std::string &path, uint32_t blockNum,
 BlkDevPosix::~BlkDevPosix() {}
 
 int BlkDevPosix::devInit() {
+  std::cout << "[BENITA] devPath.c_str() = " << devPath << std::endl;
+  std::cout << "[BENITA] devInit() " << std::endl;
   diskFile = fopen(devPath.c_str(), "r+");
+  std::cout << "[BENITA] diskFile = " << diskFile << std::endl;
   if (!diskFile) {
     SPDLOG_WARN("ERROR cannot open DISK_FILE:{}. errStr:{}", devPath,
                 strerror(errno));

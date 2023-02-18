@@ -2,10 +2,12 @@
 #include <unistd.h>
 #include <cassert>
 #include <stdexcept>
+#include <iostream>
 
 #include "FsProc_Messenger.h"
 
 FsProcMsgRing::FsProcMsgRing(size_t capacity) : capacity(capacity) {
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert((capacity > 4) && ((capacity & (capacity - 1)) == 0));
 
   producer = (struct shmipc_mgr *)malloc(sizeof(struct shmipc_mgr));
@@ -24,6 +26,7 @@ FsProcMsgRing::FsProcMsgRing(size_t capacity) : capacity(capacity) {
   memset(ring, 0, sizeof(*ring) * capacity);
   consumer->ring = ring;
   producer->ring = ring;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsProcMsgRing::~FsProcMsgRing() {
@@ -41,6 +44,7 @@ FsProcMsgRing::~FsProcMsgRing() {
 }
 
 void FsProcMsgRing::initShmipcMgr(struct shmipc_mgr *mgr) {
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   mgr->qp = NULL;
   mgr->ring = NULL;
   mgr->xreq = NULL;
@@ -48,10 +52,12 @@ void FsProcMsgRing::initShmipcMgr(struct shmipc_mgr *mgr) {
   mgr->capacity = capacity;
   mgr->mask = capacity - 1;
   mgr->next = 0;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsProcMessenger::FsProcMessenger(size_t n_workers, size_t ring_size)
     : n_workers(n_workers), ring_size(ring_size) {
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (size_t i = 0; i < n_workers; i++) {
     rings[i] = new FsProcMsgRing(ring_size);
   }
@@ -59,6 +65,7 @@ FsProcMessenger::FsProcMessenger(size_t n_workers, size_t ring_size)
     rings[kLmWid + i] = new FsProcMsgRing(ring_size);
   }
   for (size_t i = n_workers; i < NMAX_FSP_WORKER; i++) rings[i] = nullptr;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsProcMessenger::~FsProcMessenger() {

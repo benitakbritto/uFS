@@ -24,6 +24,7 @@ extern FsProc *gFsProcPtr;
 
 void FsProc::getWorkerLogName(std::stringstream &ssLogger,
                               std::stringstream &ssFile, int wid) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   ssLogger.clear();
   ssFile.clear();
   ssLogger.str(std::string());
@@ -34,6 +35,7 @@ void FsProc::getWorkerLogName(std::stringstream &ssLogger,
   ssLogger << "-logger";
   ssFile << ssLogger.rdbuf();
   ssFile << ".out";
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsProc::FsProc(int tNum, int appNum, const char *exitFname)
@@ -42,6 +44,7 @@ FsProc::FsProc(int tNum, int appNum, const char *exitFname)
       numAppProc(appNum),
       workerRunning(new std::atomic_bool[tNum]),
       workerActive(new std::atomic_bool[tNum]) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (int i = 0; i < tNum; i++) {
     workerRunning[i].store(false);
     workerActive[i].store(false);
@@ -51,6 +54,7 @@ FsProc::FsProc(int tNum, int appNum, const char *exitFname)
 #ifdef UFS_SOCK_LISTEN
   sock_listener_ = new fsp_sock::UnixSocketListener(tNum);
 #endif
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsProc::FsProc(bool doInline)
@@ -59,13 +63,16 @@ FsProc::FsProc(bool doInline)
       numAppProc(1),
       workerRunning(new std::atomic_bool[1]),
       workerActive(new std::atomic_bool[1]) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   loadMng = new worker_stats::LoadMngType(1);
 #ifdef UFS_SOCK_LISTEN
   sock_listener_ = new fsp_sock::UnixSocketListener(1);
 #endif
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsProc::workerReady(void) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   const char *readyFile = std::getenv("READY_FILE_NAME");
   if (readyFile == nullptr) {
     fprintf(stderr, "readyFile not specified\n");
@@ -85,9 +92,11 @@ void FsProc::workerReady(void) {
     SPDLOG_ERROR("failed to close ready file {}", readyFile);
     return;
   }
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 uint64_t FsProc::QueryWorkerJournalMngNumWrite(int wid, bool do_reset) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #if CFS_JOURNAL(ON)
   if (JournalManager::kEnableNvmeWriteStats) {
     auto jmr = workerList[wid]->jmgr;
@@ -100,14 +109,18 @@ uint64_t FsProc::QueryWorkerJournalMngNumWrite(int wid, bool do_reset) {
     }
   }
 #endif
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 void FsProc::redirectZombieAppReqs(int wid) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   workerMap[wid]->redirectZombieAppReqsToMaster();
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsProc::cleanup() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   sleep(1);
   SPDLOG_INFO("cleanup ...");
   if (loadMng != nullptr) loadMng->shutDown();
@@ -136,9 +149,11 @@ void FsProc::cleanup() {
   }
 #endif
   SPDLOG_INFO("Bye :)");
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 int AppProc::GetDstWid(int tau_id, cfs_ino_t ino) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto cur_plc_no = gFsProcPtr->getSplitPolicy();
   if (cur_plc_no != SPLIT_POLICY_NO_TWEAK_MOD &&
       cur_plc_no != SPLIT_POLICY_NO_TWEAK_MOD_SHARED) {
@@ -149,11 +164,13 @@ int AppProc::GetDstWid(int tau_id, cfs_ino_t ino) {
   } else {
     return ino % gFsProcPtr->getNumThreads();
   }
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsProc::startWorkers(std::vector<int> &shmOffsetVec,
                           std::vector<CurBlkDev *> &devVec,
                           std::vector<int> &workerCoresVec) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #ifdef TWEAK_SPLIT_DO_MOD
   SPDLOG_WARN("!!!!!!!!!! Using TWEAK_SPLIT_DO_MOD");
 #endif
@@ -306,9 +323,11 @@ void FsProc::startWorkers(std::vector<int> &shmOffsetVec,
     w->redirectZombieAppReqs(true);
   }
   cleanup();
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsProcWorker *FsProc::startInlineWorker(CurBlkDev *dev, bool loadFs) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #if defined SCALE_USE_BUCKETED_DATA
   auto *curWorker = reinterpret_cast<FsProcWorker *>(new FsProcWorkerMaster(
       FsProcWorker::kMasterWidConst, dev, 0, &workerRunning[0],
@@ -328,10 +347,12 @@ FsProcWorker *FsProc::startInlineWorker(CurBlkDev *dev, bool loadFs) {
   cfs_tid_t curTid = cfsGetTid();
   workerMap.emplace(curTid, curWorker);
   widWorkerMap.emplace(curWorker->getWid(), curWorker);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return curWorker;
 }
 
 void FsProc::stop() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_INFO("Stop file system process ...");
   bool expect;
   for (int i = 0; i < numThreads; i++) {
@@ -340,28 +361,34 @@ void FsProc::stop() {
       ;
   }
   SPDLOG_INFO("Signal sent to each workers");
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 int FsProc::submitDevAsyncReadReqCompletion(struct BdevIoContext *ctx) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // SPDLOG_DEBUG("submitDevAsyncReadReqCompletion blockNo:{}", ctx->blockNo);
   auto curWorkerIt = workerMap.find(cfsGetTid());
   if (curWorkerIt == workerMap.end()) {
     SPDLOG_ERROR("Cannot find worker for current thread");
     return -1;
   }
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return curWorkerIt->second->submitDevAsyncReadReqCompletion(ctx);
 }
 
 int FsProc::submitBlkWriteReqCompletion(struct BdevIoContext *ctx) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto curWorkerIt = workerMap.find(cfsGetTid());
   if (curWorkerIt == workerMap.end()) {
     SPDLOG_ERROR("Cannot find worker for current thread");
     return -1;
   }
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return curWorkerIt->second->submitBlkWriteReqCompletion(ctx);
 }
 
 void FsProc::initAppsToWorker(FsProcWorker *worker) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #ifdef UFS_SOCK_LISTEN
   worker->InitEmptyApp(numAppProc);
 #else
@@ -370,10 +397,12 @@ void FsProc::initAppsToWorker(FsProcWorker *worker) {
     worker->initNewApp(cred);
   }
 #endif
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 #if CFS_JOURNAL(ON)
 int FsProc::proposeJournalCheckpointing() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto curWorkerIt = workerMap.find(cfsGetTid());
   if (curWorkerIt == workerMap.end()) {
     SPDLOG_ERROR("Cannot find worker for current thread");
@@ -397,6 +426,7 @@ int FsProc::proposeJournalCheckpointing() { return -1; }
 
 #if CFS_JOURNAL(ON)
 void FsProc::performCheckpointing(int widIdx) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   FsProcWorker *worker = workerList[widIdx];
   assert(worker != nullptr);
   // Ensure each worker can only invoke this on its own behalf
@@ -409,6 +439,7 @@ void FsProc::performCheckpointing(int widIdx) {}
 #endif
 
 void FsProc::CheckNewedInMemInodeDst(int wid, cfs_ino_t ino, int pid, int tid) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (wid == FsProcWorker::kMasterWidConst) {
     auto master = reinterpret_cast<FsProcWorkerMaster *>(workerList[wid]);
     int dst_wid = master->GetPidtidHandlingWid(pid, tid);
@@ -416,6 +447,7 @@ void FsProc::CheckNewedInMemInodeDst(int wid, cfs_ino_t ino, int pid, int tid) {
       (master->pending_newed_inodes)[pid][tid].push_back({ino, dst_wid});
     }
   }
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 /*---- FsReq.h ----*/
@@ -425,6 +457,7 @@ AppProc::AppProc(int appIdx, int shmBaseOffset, AppCredential &credential)
       shmBaseOffset(shmBaseOffset),
       fdIncr(kFdBase),
       fdLock(ATOMIC_FLAG_INIT) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   cred = credential;
   shmKey = FS_SHM_KEY_BASE + shmBaseOffset + appIdx;
   SPDLOG_INFO("AppProc initialized shmKey:{}", shmKey);
@@ -441,15 +474,18 @@ AppProc::AppProc(int appIdx, int shmBaseOffset, AppCredential &credential)
   }
 
   SPDLOG_INFO("AppProc {} control shm accessible at {}", appIdx, shmfile);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 AppProc::~AppProc() { shmipc_mgr_destroy(shmipc_mgr); }
 
 FileObj *AppProc::allocateFd(InMemInode *inodePtr, int openFlags,
                              mode_t openMode) {
-  int curFd = fdIncr++;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // int curFd = fdIncr++;
   auto curFileObj = new FileObj();
-  curFileObj->readOnlyFd = curFd;
+  // curFileObj->readOnlyFd = curFd;
+  curFileObj->readOnlyFd = inodePtr->i_no;
   curFileObj->ip = inodePtr;
   curFileObj->shadow_ino = inodePtr->i_no;
   if (curFileObj->flags & O_APPEND) {
@@ -465,15 +501,19 @@ FileObj *AppProc::allocateFd(InMemInode *inodePtr, int openFlags,
       "off:{}",
       inodePtr->inodeData->size, inodePtr->inodeData->i_no, inodePtr->i_no,
       curFd, curFileObj->off);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return curFileObj;
 }
 
 int AppProc::updateFdIncrByWid(int wid) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   fdIncr = wid * 10000000 + kFdBase;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return fdIncr;
 }
 
 void FsReqIoUnitHelper::addIoUnitReq(cfs_bno_t iouNo, bool isSubmit) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("addIoUnitReq iouNo:{}, isSubmit:{}", iouNo, isSubmit);
   if (ioUnitPendingMap_->find(iouNo) != ioUnitPendingMap_->end()) {
     if (isDebug_) {
@@ -485,30 +525,36 @@ void FsReqIoUnitHelper::addIoUnitReq(cfs_bno_t iouNo, bool isSubmit) {
     return;
   }
   ioUnitPendingMap_->emplace(iouNo, isSubmit);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 BlockReq *FsReqIoUnitHelper::addIoUnitSubmitReq(cfs_bno_t iouNo,
                                                 BlockBufferItem *item,
                                                 char *dst,
                                                 FsBlockReqType type) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                                               
   SPDLOG_DEBUG("addIoUnitSubmitReq iouNo:{} ioSize:{}", iouNo, ioUintSizeByte_);
   addIoUnitReq(iouNo, true);
   auto *req = new BlockReq(iouNo, item, dst, type);
   submitIoUnitReqMap_->insert({iouNo, req});
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return req;
 }
 
 BlockReq *FsReqIoUnitHelper::getIoUnitSubmitReq(cfs_bno_t iouNo) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto it = submitIoUnitReqMap_->find(iouNo);
   if (it != submitIoUnitReqMap_->end()) {
     return it->second;
   }
   SPDLOG_ERROR("Error iouNo is not a submit req. iouNo:{} ioUnitSize:{}", iouNo,
                ioUintSizeByte_);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return nullptr;
 }
 
 void FsReqIoUnitHelper::submittedIoUnitReqDone(cfs_bno_t iouNo) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   BlockReq *bReq = getIoUnitSubmitReq(iouNo);
   if (bReq == nullptr) {
     SPDLOG_INFO("submittedIoUnitReqDone fail");
@@ -516,11 +562,14 @@ void FsReqIoUnitHelper::submittedIoUnitReqDone(cfs_bno_t iouNo) {
   }
   (bReq->getBufferItem())->blockFetchedCallback();
   submitIoUnitReqMap_->erase(iouNo);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   delete bReq;
 }
 
 void FsReqIoUnitHelper::ioUnitWaitReqDone(cfs_bno_t iouNo) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   ioUnitPendingMap_->erase(iouNo);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsReq::~FsReq() {
@@ -555,6 +604,7 @@ std::ostream &operator<<(std::ostream &os, const FsReqType &tp) {
 void FsReq::initReqFromCop(AppProc *curApp, off_t curSlotId,
                            struct clientOp *cop, char *curData,
                            FsProcWorker *worker) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                    
   app = curApp;
   appRingSlotId = curSlotId;
   copPtr = cop;
@@ -565,7 +615,7 @@ void FsReq::initReqFromCop(AppProc *curApp, off_t curSlotId,
     case CFS_OP_READ: {
       setType(FsReqType::READ);
       reqState = FsReqState::READ_FETCH_DATA;
-      fd = cop->op.read.rwOp.fd;
+      fd = cop->op.read.rwOp.fd; 
       rwopPtr = &cop->op.read.rwOp;
       tid = cop->op.read.rwOp.ret;
       break;
@@ -883,9 +933,11 @@ void FsReq::initReqFromCop(AppProc *curApp, off_t curSlotId,
   if (reqType == FsReqType::OPEN || reqType == FsReqType::CREATE)
     SPDLOG_DEBUG("Open flag: {}", copPtr->op.open.flags);
   if (standardFullPath) SPDLOG_DEBUG("path: {}", standardFullPath);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsReq::resetReq() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   free(standardFullPath);
   free(newStandardFullPath);
   standardFullPath = nullptr;
@@ -938,41 +990,52 @@ void FsReq::resetReq() {
     free(copPtr);
     copPtr = nullptr;
   }
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsReq::resetLoadStatsVars() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   recvQWaitCnt = 0;
   recvQLenAccumulate = 0;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 std::string FsReq::getOutputStr() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   std::stringstream ss;
   ss << "appPid:" << app->getPid() << " slotId:" << appRingSlotId
      << " opCode:" << copPtr->opCode;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return ss.str();
 }
 
 void FsReq::markComplete() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // TODO change the member variable type
   off_t ring_idx = (off_t)appRingSlotId;
   struct shmipc_msg *msg = NULL;
   msg = IDX_TO_MSG(app->shmipc_mgr, ring_idx);
   SHMIPC_SET_MSG_STATUS(msg, shmipc_STATUS_READY_FOR_CLIENT);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsReq::addBlockSubmitReq(uint32_t blockNo, BlockBufferItem *item,
                               char *dst, FsBlockReqType type) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // numBlockRead++;
   // By default, we do not track all the bno
   //  if (isDebug_) {
   //    readBnoVec.push_back(blockNo);
   //  }
   blockIoHelper->addIoUnitSubmitReq(blockNo, item, dst, type);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsReq::addSectorSubmitReq(uint32_t sectorNo, BlockBufferItem *bufItem,
                                char *dst, FsBlockReqType type) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   sectorIoHelper->addIoUnitSubmitReq(sectorNo, bufItem, dst, type);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 // Note: It is possible that, during the processing of a FsReq, several
@@ -993,19 +1056,26 @@ void FsReq::addSectorSubmitReq(uint32_t sectorNo, BlockBufferItem *bufItem,
 void FsReq::addSectorWriteReq(uint32_t sectorNo, BlockBufferItem *bufItem,
                               char *src) {
   // TODO (jingliu)
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   throw std::runtime_error("addSectorWriteReq not supportted");
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsReq::submittedBlockReqDone(uint32_t blockNo) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   blockIoHelper->submittedIoUnitReqDone(blockNo);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsReq::submittedSectorReqDone(uint32_t sectorNo) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   sectorIoHelper->submittedIoUnitReqDone(sectorNo);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 bool FsReq::writeReqDone(uint64_t blockNo, uint64_t blockNoSeqNo,
                          bool &allWriteDone) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                     
   // if (isDebug_) {
   //   SPDLOG_DEBUG("FsReq::writeReqDone blockNO {} blockNoSeqNo {}", blockNo,
   //                blockNoSeqNo);
@@ -1024,39 +1094,49 @@ bool FsReq::writeReqDone(uint64_t blockNo, uint64_t blockNoSeqNo,
   //    }
   //  }
   //  allWriteDone = writeReqMap.empty();
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return false;
 }
 
 bool FsReq::writeSectorReqDone(uint64_t sectorNo, uint64_t sectorNoSecNo,
                                bool &allWriteDone) {
   // TODO (jingliu)
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   throw std::runtime_error("writeSectorReqDone not supported");
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsReq::setDirInode(InMemInode *dirInode) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (dirInode == nullptr) {
     SPDLOG_ERROR("setDirInode src is nullptr");
   }
   parDirInodePtr = dirInode;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsReq::setDstDirInode(InMemInode *dstDirInode) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (dstDirInode == nullptr) {
     SPDLOG_ERROR("setDstDirInode to nullptr");
   }
   dstParDirInodePtr = dstDirInode;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 const InMemInode *FsReq::setTargetInode(InMemInode *inode) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return setTargetInodeCommon(inode, fileIno, &targetInodePtr);
 }
 
 const InMemInode *FsReq::setDstTargetInode(InMemInode *inode) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return setTargetInodeCommon(inode, dstFileIno, &dstTargetInodePtr);
 }
 
 const InMemInode *FsReq::setTargetInodeCommon(InMemInode *inode, uint32_t &ino,
                                               InMemInode **inodeAddr) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                                       
   auto origInodePtr = *inodeAddr;
   if (inode == nullptr) {
     SPDLOG_ERROR("setTargetInodeCommon arg-inode is nullptr");
@@ -1068,29 +1148,38 @@ const InMemInode *FsReq::setTargetInodeCommon(InMemInode *inode, uint32_t &ino,
   }
   ino = inode->i_no;
   *inodeAddr = inode;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return origInodePtr;
 }
 
 block_no_t FsReq::getFileDirentryBlockNo(int &idx) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   idx = withinBlockDentryIndex;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return fileDentryDataBlockNo;
 }
 
 void FsReq::setFileDirentryBlockNo(block_no_t blkno, int idx) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("setFileDirentryBlockNo:{} {}", blkno, idx);
   withinBlockDentryIndex = idx;
   fileDentryDataBlockNo = blkno;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 block_no_t FsReq::getDstFileDirentryBlockNo(int &idx) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   idx = dstWithinBlockDentryIndex;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return dstFileDentryDataBlockNo;
 }
 
 void FsReq::setDstFileDirentryBlockNo(block_no_t blkno, int idx) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("setDstFileDirentryBlockNo:{} {}", blkno, idx);
   dstWithinBlockDentryIndex = idx;
   dstFileDentryDataBlockNo = blkno;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 // std::string FsReq::getFileName() {
@@ -1104,17 +1193,22 @@ void FsReq::setDstFileDirentryBlockNo(block_no_t blkno, int idx) {
 // }
 
 std::string FsReq::getStandardFullPath(int &pathDepth) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   pathDepth = standardFullPathDepth;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return std::string(standardFullPath);
 }
 
 std::string FsReq::getNewStandardFullPath(int &pathDepth) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   pathDepth = dstStandardFullPathDepth;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return std::string(newStandardFullPath);
 }
 
 std::string FsReq::getStandardPartialPath(absl::string_view leafName,
                                           int &pathDepth) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                                          
   absl::string_view pathView{standardFullPath};
   int endViewIdx = -1;
   pathDepth = -1;
@@ -1137,48 +1231,58 @@ std::string FsReq::getStandardPartialPath(absl::string_view leafName,
   if (endViewIdx >= 0) {
     return std::string(standardFullPath, endViewIdx + 1);
   }
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return std::string("");
 }
 
 std::string FsReq::getStandardParPath(int &pathDepth) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   pathDepth = standardFullPathDepth - 1;
   if (standardFullPathDepth <= 1) {
     return "";
   }
   int endViewIdx = standardFullPathDelimIdx[standardFullPathDepth - 1] - 1;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return std::string(standardFullPath, endViewIdx);
 }
 
 std::string FsReq::getNewStandardParPath(int &pathDepth) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   pathDepth = dstStandardFullPathDepth - 1;
   if (dstStandardFullPathDepth <= 1) {
     return "";
   }
   int endViewIdx =
       dstStandardFullPathDelimIdx[dstStandardFullPathDepth - 1] - 1;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return std::string(newStandardFullPath, endViewIdx);
 }
 
 uint32_t FsReq::getFileInum() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (targetInodePtr != nullptr && targetInodePtr->inodeData->type == T_FILE &&
       fileIno != targetInodePtr->i_no) {
     SPDLOG_ERROR("FsReq::fileIno:{} does not match InMemInode item ino:{}",
                  fileIno, targetInodePtr->i_no);
   }
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return fileIno;
 }
 
 uint32_t FsReq::getDstFileInum() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (dstTargetInodePtr != nullptr &&
       dstTargetInodePtr->inodeData->type == T_FILE &&
       fileIno != targetInodePtr->i_no) {
     SPDLOG_ERROR("FsReq::dstfileIno:{} does not match InMemInode item ino:{}",
                  dstFileIno, dstTargetInodePtr->i_no);
   }
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return dstFileIno;
 }
 
 std::string FsReq::getErrorMsg() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   switch (errorNo) {
     case FS_REQ_ERROR_FILE_NOT_FOUND:
       return "File Not Found";
@@ -1190,6 +1294,7 @@ std::string FsReq::getErrorMsg() {
 // std::string FsReq::outputReadBnos() {}
 
 void FsReq::setBlockIoDone(char *addr) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   std::uintptr_t dst = reinterpret_cast<std::uintptr_t>(addr);
   assert(blockIoDoneMap.find(dst) == blockIoDoneMap.end());
   // blockIoDoneMap.insert(std::make_pair(dst, true));
@@ -1197,25 +1302,32 @@ void FsReq::setBlockIoDone(char *addr) {
   // NOTE: it turns out that emplace() is not more efficient than insert() in
   // this case. There is no constructor overhead here
   // blockIoDoneMap.emplace(dst, true);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 bool FsReq::getBlockIoDone(char *addr) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   std::uintptr_t dst = reinterpret_cast<std::uintptr_t>(addr);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return blockIoDoneMap.find(dst) != blockIoDoneMap.end();
 }
 
 void FsReq::setBlockIoDoneByBlockIdx(uint32_t blockIdx) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(blockIoBlkIdxDoneMap.find(blockIdx) == blockIoBlkIdxDoneMap.end());
   blockIoBlkIdxDoneMap.insert(std::make_pair(blockIdx, true));
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 bool FsReq::getBlockIoDoneByBlockIdx(uint32_t blockIdx) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return blockIoBlkIdxDoneMap.find(blockIdx) != blockIoBlkIdxDoneMap.end();
 }
 
 char *FsReq::getChannelDataPtr() { return channelDataPtr; }
 
 bool FsReq::isAppCacheAvailable() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(rwopPtr != nullptr);
 #if 0
   SPDLOG_DEBUG("val:{} ENABLE_BUF?{} ENABLE_CACHE?{} BOTH?{}", rwopPtr->flag,
@@ -1224,12 +1336,14 @@ bool FsReq::isAppCacheAvailable() {
                ((rwopPtr->flag & _RWOP_FLAG_FSLIB_ENABLE_APP_BUF_) &&
                 (rwopPtr->flag & _RWOP_FLAG_FSLIB_ENABLE_APP_CACHE_)));
 #endif
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return ((rwopPtr->flag & _RWOP_FLAG_FSLIB_ENABLE_APP_BUF_) &&
           (rwopPtr->flag & _RWOP_FLAG_FSLIB_ENABLE_APP_CACHE_));
 }
 
 void FsReq::extractRwReqPageNos(
     std::unordered_map<off_t, InAppCachedBlock *> &saveTo, bool isWrite) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(rwopPtr->realCount > 0);
   uint32_t numPages = 0;
   off_t startAlignedOff =
@@ -1268,13 +1382,18 @@ void FsReq::extractRwReqPageNos(
     }
     numPages++;
   }
+  
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsReqPool::FsReqPool(int wid) : wid_(wid) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (int i = 0; i < kPerWorkerReqPoolCapacity; i++) {
     auto req = new FsReq(wid);
     fsReqQueue_.push_back(req);
   }
+
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsReqPool::~FsReqPool() {
@@ -1289,6 +1408,7 @@ FsReqPool::~FsReqPool() {
 FsReq *FsReqPool::genNewReq(AppProc *appProc, off_t slotId,
                             struct clientOp *cop, char *data,
                             FsProcWorker *worker) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                          
   if (fsReqQueue_.empty()) {
     return nullptr;
   }
@@ -1296,10 +1416,13 @@ FsReq *FsReqPool::genNewReq(AppProc *appProc, off_t slotId,
   req->initReqFromCop(appProc, slotId, cop, data, worker);
   fsReqQueue_.pop_front();
   req->in_use = true;
+
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return req;
 }
 
 FsReq *FsReqPool::genNewReq() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (fsReqQueue_.empty()) {
     return nullptr;
   }
@@ -1307,16 +1430,20 @@ FsReq *FsReqPool::genNewReq() {
   FsReq *req = fsReqQueue_.front();
   fsReqQueue_.pop_front();
   req->in_use = true;
+
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return req;
 }
 
 void FsReqPool::returnFsReq(FsReq *req) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(!req->isReqBgGC());
   req->resetLoadStatsVars();
   // TODO consider using placement new instead of resetting.
   req->resetReq();
   req->wid = wid_;
   fsReqQueue_.push_back(req);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 // block Req which should be able to translated into BlockDev's API call
 // @param blockNo: on-disk block number
@@ -1335,10 +1462,12 @@ BlockReq::~BlockReq() {
 }
 
 void BlockReq::setBlockNoSeqNo(uint64_t seqNo) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   blockNoSeqNo = seqNo;
   // TODO (jingliu): the way to handle flushing here is hackish
   assert(bufferItem != nullptr);
   bufferItem->setLastFlushBlockReqSeqNo(seqNo);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 uint64_t BlockReq::getBlockNoSeqNo() { return blockNoSeqNo; }
@@ -1350,6 +1479,7 @@ void BlockReq::setSubmitted(bool b) { isSubmitted = b; }
 BlockBufferItem *BlockReq::getBufferItem() { return bufferItem; }
 
 int BufferFlushReq::initFlushReqs(int index) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   bool canFlush = true;
   // std::vector<block_no_t> flushBlockNo;
   if (index > 0) {
@@ -1381,10 +1511,13 @@ int BufferFlushReq::initFlushReqs(int index) {
                             FsBlockReqType::WRITE_NOBLOCKING);
     flushBlockReqMap.emplace(bno, req);
   }
+  
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return toSubmitFlushBlocks.size();
 }
 
 int BufferFlushReq::submitFlushReqs() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int rc;
   if (enableTrace_) {
     submitTs = tapFlushTs();
@@ -1407,19 +1540,25 @@ int BufferFlushReq::submitFlushReqs() {
       submittedFlushBlocks.insert(bno);
     }
   }
+  
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return numSubmit;
 }
 
 bool BufferFlushReq::checkValidFlushReq(block_no_t blockNo, uint64_t seqNo) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto it = flushBlockReqMap.find(blockNo);
   if (it == flushBlockReqMap.end()) {
     // This block no is not in this flushReq
     return false;
   }
+  
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return it->second->getBlockNoSeqNo() == seqNo;
 }
 
 void BufferFlushReq::blockReqFinished(block_no_t blockNo) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // here, we do not delete blockReq, which will be deleted
   // by flushDonePropagate().
   submittedFlushBlocks.erase(blockNo);
@@ -1431,13 +1570,17 @@ void BufferFlushReq::blockReqFinished(block_no_t blockNo) {
     toSubmitFlushBlocks.pop_front();
     submittedFlushBlocks.insert(bno);
   }
+
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 bool BufferFlushReq::flushDone() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return submittedFlushBlocks.empty() && toSubmitFlushBlocks.empty();
 }
 
 void BufferFlushReq::flushDonePropagate() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   std::vector<block_no_t> doneBlocks(flushBlockReqMap.size());
   int i = 0;
   for (auto bnoReqPair : flushBlockReqMap) {
@@ -1489,13 +1632,16 @@ void BufferFlushReq::flushDonePropagate() {
     srcBuf->setIfBgFlushInflight(false);
   }
   assert(rc >= 0);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void BufferFlushReq::setFsReq(FsReq *req) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (isAssociatedWithFsReq()) {
     SPDLOG_WARN("This BufferFlushReq already has a fsReq associated with it");
   }
   fsReq = req;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 /*---- FsLibProc.h ----*/
@@ -1503,6 +1649,7 @@ void BufferFlushReq::setFsReq(FsReq *req) {
 // TODO: delete after switching to new inode reassignment
 int AppProc::findAllOpenedFiles4Ino(uint32_t ino,
                                     std::vector<FileObj *> &files) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                                    
   int numOpened = 0;
   FileObj *newFileObj;
   // Here, the issue is: for openedFiles, when inode is out of this worker
@@ -1518,12 +1665,15 @@ int AppProc::findAllOpenedFiles4Ino(uint32_t ino,
       numOpened++;
     }
   }
+  
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return numOpened;
 }
 
 // TODO: delete after switching to new inode reassignment
 int AppProc::overwriteOpenedFiles(std::vector<FileObj *> &files,
                                   bool directUseVec) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                               
   int rt = 0;
   for (auto ele : files) {
     int curFd = ele->readOnlyFd;
@@ -1562,10 +1712,12 @@ int AppProc::overwriteOpenedFiles(std::vector<FileObj *> &files,
     if (curFd >= fdIncr) fdIncr = curFd + 1;
   }
 
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return rt;
 }
 
 int AppProc::addInAppAllocOpDataBlocks(FsReq *req, bool isWrite) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto inode = req->getTargetInode();
   assert(inode != nullptr);
   uint32_t ino = inode->inodeData->i_no;
@@ -1579,11 +1731,14 @@ int AppProc::addInAppAllocOpDataBlocks(FsReq *req, bool isWrite) {
   if (kIsDebug) {
     dumpInoCachedBlocks(ino);
   }
+  
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 int AppProc::retrieveInAppAllocOpDataBlocks(FsReq *req, bool &allInApp,
                                             uint64_t &maxSeq) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                                           
   auto inode = req->getTargetInode();
   assert(inode != nullptr);
   uint32_t ino = inode->inodeData->i_no;
@@ -1650,10 +1805,14 @@ int AppProc::retrieveInAppAllocOpDataBlocks(FsReq *req, bool &allInApp,
     allInApp = false;
   }
 
+
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 void AppProc::dumpInoCachedBlocks(uint32_t ino) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+
   auto it = pendingInAppBlocks.find(ino);
   if (it == pendingInAppBlocks.end()) {
     SPDLOG_INFO("cannot find ino");
@@ -1668,12 +1827,15 @@ void AppProc::dumpInoCachedBlocks(uint32_t ino) {
     fprintf(stdout, "\n");
   }
   fprintf(stdout, "======= END =======\n");
+
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void *AppProc::getDataPtrByShmNameAndDataId(
     std::string &shmName, fslib_malloc_block_cnt_t dataId,
     fslib_malloc_block_sz_t shmBlockSize,
     fslib_malloc_block_cnt_t shmNumBlocks) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int err;
   auto it = shmNameMemArrMap.find(shmName);
   SingleSizeMemBlockArr *memArrPtr = nullptr;
@@ -1702,11 +1864,14 @@ void *AppProc::getDataPtrByShmNameAndDataId(
   assert(memArrPtr != nullptr);
   // fprintf(stderr, "dataId:%u startDataPtrVal:%c\n", dataId);
   void *rtPtr = memArrPtr->getDataPtrFromId(dataId);
+
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return rtPtr;
 }
 
 void *AppProc::getDataPtrByShmIdAndDataId(uint8_t shmId,
                                           fslib_malloc_block_cnt_t dataId) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                                          
   auto it = shmIdArrMap.find(shmId);
   SingleSizeMemBlockArr *memArrPtr = nullptr;
   //    SPDLOG_INFO("number of shmId in server:{} recvedID:{} aid:{}",
@@ -1727,12 +1892,15 @@ void *AppProc::getDataPtrByShmIdAndDataId(uint8_t shmId,
   }
 
   void *rtPtr = memArrPtr->getDataPtrFromId(dataId);
+  
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return rtPtr;
 }
 
 std::pair<uint8_t, void *> AppProc::initNewAllocatedShm(
     std::string &shmName, fslib_malloc_block_sz_t shmBlockSize,
     fslib_malloc_block_cnt_t shmNumBlocks) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // fprintf(stderr, "===AppProc: initNewAllocatedShm shmName:%s\n",
   // shmName.c_str());
   // FIXME (jingliu), not sure if this is strictly necessary, but I see
@@ -1780,29 +1948,37 @@ std::pair<uint8_t, void *> AppProc::initNewAllocatedShm(
   } else {
     SPDLOG_WARN("shm attach error name:{} bytes:{}", shmName, totalBytes);
   }
+  
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return {curShmId, static_cast<void *>(arr_ptr)};
 }
 
 int AppProc::invalidateAppShm() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_INFO("invalidateAppShmByName size:{}", shmNameMemArrMap.size());
   SPDLOG_INFO("invalidateAppShmById size:{}", shmIdArrMap.size());
   shmNameMemArrMap.clear();
   shmIdArrMap.clear();
   shmipc_mgr_server_reset(shmipc_mgr);
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 const std::unordered_set<cfs_ino_t> AppProc::_empty_{};
 const std::unordered_set<cfs_ino_t> &AppProc::GetAccessedInos(int tid) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto it = accessed_ino.find(tid);
   if (it == accessed_ino.end() || it->second.empty()) {
     return _empty_;
   }
+  
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return (it->second);
 }
 
 void AppProc::GetAccessedInoAndErase(int tid,
                                      std::unordered_set<cfs_ino_t> &inos) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto it = accessed_ino.find(tid);
   assert(inos.empty());
   if (it == accessed_ino.end()) {
@@ -1812,23 +1988,31 @@ void AppProc::GetAccessedInoAndErase(int tid,
     std::swap(inos, it->second);
   }
   accessed_ino.erase(it);
+
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 CommuChannelFsSide::CommuChannelFsSide(pid_t id, key_t shmKey)
     : CommuChannel(id, shmKey) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   initChannelMemLayout();
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 CommuChannelFsSide::~CommuChannelFsSide() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   cleanupSharedMemory();
   delete ringBufferPtr;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 int CommuChannelFsSide::recvSlot(int &dstSid) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return ringBufferPtr->dequeue(dstSid);
 }
 
 void *CommuChannelFsSide::attachSharedMemory() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(ringBufferPtr != nullptr);
   shmId = shmget(shmKey, totalSharedMemSize, IPC_CREAT | 0666);
   if (shmId == -1) {
@@ -1840,10 +2024,13 @@ void *CommuChannelFsSide::attachSharedMemory() {
   assert(totalSharedMemPtr != nullptr);
   // FS is in charge of zero the buffer
   memset(totalSharedMemPtr, 0, totalSharedMemSize);
+
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return totalSharedMemPtr;
 }
 
 void CommuChannelFsSide::cleanupSharedMemory() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int rc;
   struct shmid_ds shmbuf;
   rc = shmdt(totalSharedMemPtr);
@@ -1856,6 +2043,8 @@ void CommuChannelFsSide::cleanupSharedMemory() {
     std::cerr << "ERROR FS cannot remove shmID" << std::endl;
     exit(1);
   }
+
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 struct clientOp *MockAppProc::emulateGetClientOp(int sid) {

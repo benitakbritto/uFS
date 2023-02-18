@@ -31,6 +31,7 @@ void handle_sigint(int sig);
 int fsMain(int numWorkers, int numAppProc, std::vector<int> &shmBaseOffsets,
            const char *exitSignalFileName, const char *configFileName,
            bool isSpdk, std::vector<int> &workerCores) {
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #if CFS_JOURNAL(OFF)
   fprintf(stdout, "Journal is disabled\n");
 #else
@@ -92,6 +93,7 @@ int fsMain(int numWorkers, int numAppProc, std::vector<int> &shmBaseOffsets,
   signal(SIGINT, handle_sigint);
   // start workers
   gFsProcPtr->startWorkers(shmBaseOffsets, devVec, workerCores);
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 

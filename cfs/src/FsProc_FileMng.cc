@@ -828,7 +828,7 @@ void FileMng::processWrite(FsReq *req) {
 void FileMng::processPwrite(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::PWRITE_MODIFY) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.pwrite.rwOp.count;
     uint64_t fobjStartOff = req->getClientOp()->op.pwrite.offset;
     SPDLOG_DEBUG("processPWrite offset:{} count:{}\n", fobjStartOff, reqCount);
@@ -836,8 +836,9 @@ void FileMng::processPwrite(FsReq *req) {
       req->setState(FsReqState::PWRITE_RET_ERR);
       return;
     }
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // if (fileObj != nullptr) {
+    if (true) {
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       while (!fileInode->tryLock()) {
         // spin
       }
@@ -865,14 +866,15 @@ void FileMng::processPwrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::PWRITE_UPDATE_INODE) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.pwrite.rwOp.count;
     if (reqCount > RING_DATA_ITEM_SIZE || reqCount <= 0) {
       req->setState(FsReqState::PWRITE_RET_ERR);
       return;
     }
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // if (fileObj != nullptr) {
+    if (true) {
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       while (!fileInode->tryLock()) {
         // spin
       }
@@ -958,27 +960,32 @@ void FileMng::processRead(FsReq *req) {
 void FileMng::processPread(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::PREAD_FETCH_DATA) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.pread.rwOp.count;
     uint64_t fobjStartOff = req->getClientOp()->op.pread.offset;
-    SPDLOG_DEBUG(
-        "processPread - fd:{} offset: {} count:{} fsize:{} wid:{} "
-        "isAppCacheAvailable:{}",
-        req->getClientOp()->op.pread.rwOp.fd, fobjStartOff, reqCount,
-        fileObj->ip->inodeData->size, fsWorker_->getWid(),
-        req->isAppCacheAvailable());
+    // SPDLOG_DEBUG(
+    //     "processPread - fd:{} offset: {} count:{} fsize:{} wid:{} "
+    //     "isAppCacheAvailable:{}",
+    //     req->getClientOp()->op.pread.rwOp.fd, fobjStartOff, reqCount,
+    //     fileObj->ip->inodeData->size, fsWorker_->getWid(),
+    //     req->isAppCacheAvailable());
 
-    if (fileObj != nullptr) {
-      fsWorker_->onTargetInodeFiguredOut(req, fileObj->ip);
+    // if (fileObj != nullptr) {
+    InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
+    if (true) {
+      // fsWorker_->onTargetInodeFiguredOut(req, fileObj->ip);
+      fsWorker_->onTargetInodeFiguredOut(req, fileInode);
     }
 
-    if (fobjStartOff + reqCount > fileObj->ip->inodeData->size) {
+    // if (fobjStartOff + reqCount > fileObj->ip->inodeData->size) {
+    if (fobjStartOff + reqCount > fileInode->inodeData->size) {
       req->setState(FsReqState::PREAD_RET_ERR);
       goto PREAD_ERR_PROCESS;
     }
 
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // if (fileObj != nullptr) {
+    if (true) {
+      // InMemInode *fileInode = fileObj->ip;
       while (!fileInode->tryLock()) {
         // spin
       }

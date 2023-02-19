@@ -136,6 +136,7 @@ struct rwOpCommon {
   uint8_t flag;
   size_t count;
   ssize_t ret;
+  off_t offset;
   // NOTE: realOffset is used to save the timestamp (rdtsc() value)
   // This is an temporary hack, yet since offset is going to be maintained by
   // FsLib, it is okay

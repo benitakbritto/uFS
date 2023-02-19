@@ -2272,25 +2272,6 @@ ssize_t fs_read_internal(FsService *fsServ, int fd, void *buf, size_t count) {
   return rc;
 }
 
-ssize_t fs_read(int fd, void *buf, size_t count) {
-  int wid = -1;
-#ifdef CFS_LIB_SAVE_API_TS
-  int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_READ);
-#endif
-retry:
-  auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_read_internal(service, fd, buf, count);
-  if (rc < 0) {
-    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
-    bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
-    if (should_retry) goto retry;
-  }
-#ifdef CFS_LIB_SAVE_API_TS
-  tFsApiTs->addApiNormalDone(FsApiType::FS_READ, tsIdx);
-#endif
-  return rc;
-}
-
 static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
                                  size_t count, off_t offset) {
   ssize_t rc;
@@ -2326,6 +2307,29 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
     // For now, this only support < RING_DATA_ITEM_SIZE
     rc = -1;
   }
+  return rc;
+}
+
+ssize_t fs_read(int fd, void *buf, size_t count) {
+  int wid = -1;
+#ifdef CFS_LIB_SAVE_API_TS
+  int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_READ);
+#endif
+retry:
+  auto service = getFsServiceForFD(fd, wid);
+  // ssize_t rc = fs_read_internal(service, fd, buf, count);
+  auto prevOffset = service->getOffset(fd);
+  ssize_t rc = fs_pread_internal(service, fd, buf, count, prevOffset);
+  if (rc < 0) {
+    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
+    bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
+    if (should_retry) goto retry;
+  } else {
+    service->updateOffset(fd, prevOffset + rc);
+  }
+#ifdef CFS_LIB_SAVE_API_TS
+  tFsApiTs->addApiNormalDone(FsApiType::FS_READ, tsIdx);
+#endif
   return rc;
 }
 
@@ -2429,27 +2433,6 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
   return rc;
 }
 
-ssize_t fs_write(int fd, const void *buf, size_t count) {
-  if (count == 0) return 0;
-#ifdef CFS_LIB_SAVE_API_TS
-  int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_WRITE);
-#endif
-  int wid = -1;
-retry:
-  auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_write_internal(service, fd, buf, count);
-  if (rc < 0) {
-    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
-    bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
-    if (should_retry) goto retry;
-  }
-#ifdef CFS_LIB_SAVE_API_TS
-  tFsApiTs->addApiNormalDone(FsApiType::FS_WRITE, tsIdx);
-#endif
-
-  return rc;
-}
-
 static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
                                   size_t count, off_t offset) {
   ssize_t total_rc = 0;
@@ -2492,6 +2475,30 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
   }
   return total_rc;
+}
+
+ssize_t fs_write(int fd, const void *buf, size_t count) {
+  if (count == 0) return 0;
+#ifdef CFS_LIB_SAVE_API_TS
+  int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_WRITE);
+#endif
+  int wid = -1;
+retry:
+  auto service = getFsServiceForFD(fd, wid);
+  auto prevOffset = service->getOffset(fd);
+  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, prevOffset);
+  if (rc < 0) {
+    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
+    bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
+    if (should_retry) goto retry;
+  } else {
+    service->updateOffset(fd, prevOffset + rc);
+  }
+#ifdef CFS_LIB_SAVE_API_TS
+  tFsApiTs->addApiNormalDone(FsApiType::FS_WRITE, tsIdx);
+#endif
+
+  return rc;
 }
 
 ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset) {

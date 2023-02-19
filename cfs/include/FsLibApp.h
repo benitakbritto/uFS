@@ -98,12 +98,21 @@ class FsService {
   struct shmipc_mgr *shmipc_mgr = NULL;
   bool inUse = false;
 
+  void updateOffset(ino_t inode, off_t offset) {
+    inodeOffsetMap[inode] += offset;
+  }
+
+  off_t getOffset(ino_t inode) {
+    return inodeOffsetMap.count(inode) == 0 ? 0 : inodeOffsetMap[inode];
+  }
+
  private:
   std::list<int> unusedRingSlots;
   std::atomic_flag unusedSlotsLock;
   key_t shmKey;
   int wid;
   CommuChannelAppSide *channelPtr;
+  std::unordered_map<ino_t, off_t> inodeOffsetMap;
 };
 
 struct FsLibServiceMng {

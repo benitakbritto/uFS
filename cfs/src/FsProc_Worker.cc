@@ -961,9 +961,9 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
           cop->op.open.size = fsReq->getTargetInode()->inodeData->size;
           fsReq->getTargetInode()->leased_app.insert(fsReq->getApp()->getPid());
         }
-        auto fobj = it->second->allocateFd(
-            fsReq->getTargetInode(), cop->op.open.flags, cop->op.open.mode);
-        fileManager->addFdMappingOnOpen(fsReq->getPid(), fobj);
+        // auto fobj = it->second->allocateFd(
+        //     fsReq->getTargetInode(), cop->op.open.flags, cop->op.open.mode);
+        // fileManager->addFdMappingOnOpen(fsReq->getPid(), fobj);
         fsReq->getApp()->AccessIno(fsReq->getTid(), fsReq->getFileInum());
         // fill the return
         // TODO [BENITA] change here?
@@ -1857,18 +1857,18 @@ void FsProcWorker::ownerProcessFdReq(FsReq *req) {
                req->getType());
   // If we are able to convert the file descriptor to an inode, then we
   // are the owner.
-  auto fobj = fileManager->getFileObjForFd(req->getPid(), req->fd);
-  if (fobj == nullptr) {
-    // Either fd is invalid or the inode has been reassigned. Only primary can
-    // resolve this problem. If primary cannot, then it is invalid.
-    primaryHandleUnknownFdReq(req);
-    return;
-  }
+  // auto fobj = fileManager->getFileObjForFd(req->getPid(), req->fd);
+  // if (fobj == nullptr) {
+  //   // Either fd is invalid or the inode has been reassigned. Only primary can
+  //   // resolve this problem. If primary cannot, then it is invalid.
+  //   primaryHandleUnknownFdReq(req);
+  //   return;
+  // }
 
   SPDLOG_DEBUG("WID:{} successfully resolved fd", getWid());
-  req->setFileObj(fobj);
-  req->setTargetInode(fobj->ip);
-  recordInProgressFsReq(req, fobj->ip);
+  // req->setFileObj(fobj);
+  // req->setTargetInode(FsImpl_);
+  // recordInProgressFsReq(req, fobj->ip); // TODO [BENITA]
   fileManager->processReq(req);
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }

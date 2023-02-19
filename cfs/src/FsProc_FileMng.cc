@@ -754,17 +754,21 @@ void FileMng::processOpen(FsReq *req) {
 void FileMng::processWrite(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::WRITE_MODIFY) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.write.rwOp.count;
-    if (fileObj != nullptr) {
+    // if (fileObj != nullptr) {
+    if (true) {
+      // SPDLOG_DEBUG("processWrite size:{} writeCounter:{} offSet:{}", reqCount,
+      //              dbgWriteCounter, fileObj->off);
       SPDLOG_DEBUG("processWrite size:{} writeCounter:{} offSet:{}", reqCount,
-                   dbgWriteCounter, fileObj->off);
-      InMemInode *fileInode = fileObj->ip;
+                   dbgWriteCounter, 0);
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       while (!fileInode->tryLock()) {
         // spin
       }
       fsWorker_->onTargetInodeFiguredOut(req, fileInode);
-      uint64_t fobjStartOff = fileObj->off;
+      // uint64_t fobjStartOff = fileObj->off;
+      uint64_t fobjStartOff = 0; // TODO [BENITA]
       char *src = req->getChannelDataPtr();
       int64_t nWrite =
           fsImpl_->writeInode(req, fileInode, src, fobjStartOff, reqCount);
@@ -774,7 +778,7 @@ void FileMng::processWrite(FsReq *req) {
         if (req->numTotalPendingIoReq() == 0) {
           // success
           req->getClientOp()->op.write.rwOp.ret = nWrite;
-          fileObj->off += nWrite;
+          // fileObj->off += nWrite;
           req->setState(FsReqState::WRITE_UPDATE_INODE);
         } else {
           submitFsGeneratedRequests(req);
@@ -787,14 +791,15 @@ void FileMng::processWrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::WRITE_UPDATE_INODE) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.write.rwOp.count;
     if (reqCount > RING_DATA_ITEM_SIZE || reqCount <= 0) {
       req->setState(FsReqState::WRITE_RET_ERR);
       return;
     }
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // if (fileObj != nullptr) {
+    if (true) {
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       while (!fileInode->tryLock()) {
         // spin
       }
@@ -898,7 +903,7 @@ void FileMng::processPwrite(FsReq *req) {
 void FileMng::processRead(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::READ_FETCH_DATA) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.read.rwOp.count;
     // check here to avoid that, malicious or buggy client directly to our
     // shared memory which bypass the FsLib's check, could be removed for
@@ -907,13 +912,16 @@ void FileMng::processRead(FsReq *req) {
       req->setState(FsReqState::READ_RET_ERR);
       return;
     }
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // if (fileObj != nullptr) {
+    if (true) {
+      // InMemInode *fileInode = fileObj->ip;
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       while (!fileInode->tryLock()) {
         // spin
       }
       fsWorker_->onTargetInodeFiguredOut(req, fileInode);
-      uint64_t fobjStartOff = fileObj->off;
+      // uint64_t fobjStartOff = fileObj->off;
+      uint64_t fobjStartOff = 0; // TODO [BENITA] Set correctly
       char *dst = req->getChannelDataPtr();
       int64_t nRead =
           fsImpl_->readInode(req, fileInode, dst, fobjStartOff, reqCount);
@@ -924,7 +932,7 @@ void FileMng::processRead(FsReq *req) {
           // req success, set the return value, set state
           req->getClientOp()->op.read.rwOp.ret = nRead;
           // update offset
-          fileObj->off += nRead;
+          // fileObj->off += nRead; // TODO [BENITA] Set correctly
           req->setState(FsReqState::READ_FETCH_DONE);
         } else {
           submitFsGeneratedRequests(req);

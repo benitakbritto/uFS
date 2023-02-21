@@ -276,6 +276,7 @@ struct pwriteOp {
 struct lseekOp {
   int fd;
   long int offset;
+  long int current_file_offset;
   int whence;
   int ret;
 };
@@ -324,6 +325,7 @@ struct fsyncOp {
 struct wsyncOp {
   int fd;
   int ret;
+  int off;
   struct wsyncAlloc alloc;
   size_t array_size;
   size_t file_size;

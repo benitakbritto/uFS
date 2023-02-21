@@ -963,6 +963,7 @@ void FileMng::processPread(FsReq *req) {
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.pread.rwOp.count;
     uint64_t fobjStartOff = req->getClientOp()->op.pread.offset;
+    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << "\t" << fobjStartOff << std::endl;
     // SPDLOG_DEBUG(
     //     "processPread - fd:{} offset: {} count:{} fsize:{} wid:{} "
     //     "isAppCacheAvailable:{}",
@@ -971,14 +972,26 @@ void FileMng::processPread(FsReq *req) {
     //     req->isAppCacheAvailable());
 
     // if (fileObj != nullptr) {
-    InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
-    if (true) {
+    bool io_done = false;
+    InMemInode *fileInode = fsImpl_->BlockingGetInodeHelper(req->fd, io_done, fsWorker_); // TODO: Need a way to rewrite this
+    if (fileInode != nullptr) {
       // fsWorker_->onTargetInodeFiguredOut(req, fileObj->ip);
+      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       fsWorker_->onTargetInodeFiguredOut(req, fileInode);
+    } else {
+      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+      req->setState(FsReqState::PREAD_RET_ERR);
+      goto PREAD_ERR_PROCESS;
     }
 
+    std::cout << "[BENITA] " << "\t" << "fobjStartOff = " << fobjStartOff << std::endl;
+    std::cout << "[BENITA] " << "\t" << "reqCount = " << reqCount << std::endl;
+    std::cout << "[BENITA] " << "\t" << "fileInode->inodeData->size = " << fileInode->inodeData->size << std::endl;
+
+    // TODO [BENITA] size is 0 on restart
     // if (fobjStartOff + reqCount > fileObj->ip->inodeData->size) {
     if (fobjStartOff + reqCount > fileInode->inodeData->size) {
+      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       req->setState(FsReqState::PREAD_RET_ERR);
       goto PREAD_ERR_PROCESS;
     }
@@ -993,8 +1006,10 @@ void FileMng::processPread(FsReq *req) {
       int64_t nRead =
           fsImpl_->readInode(req, fileInode, dst, fobjStartOff, reqCount);
       if (nRead < 0) {
+        std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
         req->setState(FsReqState::PREAD_RET_ERR);
       } else {
+        std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
         if (req->numTotalPendingIoReq() == 0) {
           // req success, set the return value, set state
           req->getClientOp()->op.pread.rwOp.ret = nRead;
@@ -1003,21 +1018,25 @@ void FileMng::processPread(FsReq *req) {
           req->setState(FsReqState::PREAD_FETCH_DONE);
           SPDLOG_DEBUG("===> readInode CACHE HIT wid:{}", fsWorker_->getWid());
         } else {
+          std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
           SPDLOG_DEBUG("===> readInode CACHE MISS wid:{}", fsWorker_->getWid());
           submitFsGeneratedRequests(req);
         }
       }
       fileInode->unLock();
     } else {
+      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       req->setState(FsReqState::PREAD_RET_ERR);
     }
   }
 
   if (req->getState() == FsReqState::PREAD_FETCH_DONE) {
+    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     fsWorker_->submitFsReqCompletion(req);
   }
 
 PREAD_ERR_PROCESS:
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::PREAD_RET_ERR) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
@@ -1029,25 +1048,27 @@ void FileMng::processPreadUC(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::UCPREAD_GEN_READ_PLAN) {
 #ifdef USE_UC_PAGE_CACHE
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
+    InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
     size_t reqCount = req->getClientOp()->op.pread.rwOp.count;
     uint64_t fobjStartOff = req->getClientOp()->op.pread.offset;
     SPDLOG_DEBUG("fobjStartOff:{} reqCount:{} realCountInit:{}", fobjStartOff,
                  reqCount, req->getClientOp()->op.pread.rwOp.realCount);
     // when use UC, this must be aligned
     assert(fobjStartOff % (BSIZE) == 0);
-    if (fileObj != nullptr) {
-      fsWorker_->onTargetInodeFiguredOut(req, fileObj->ip);
-      if (fobjStartOff == fileObj->ip->inodeData->size) {
+    // if (fileObj != nullptr) {
+    if (true) {
+      fsWorker_->onTargetInodeFiguredOut(req, fileInode);
+      if (fobjStartOff == fileInode->inodeData->size) {
         req->getClientOp()->op.pread.rwOp.ret = 0;
         fsWorker_->submitFsReqCompletion(req);
-      } else if (fobjStartOff > fileObj->ip->inodeData->size) {
+      } else if (fobjStartOff > fileOb
         req->setState(FsReqState::UCPREAD_RET_ERR);
       } else {
-        if (fileObj->ip->inodeData->size - fobjStartOff < reqCount) {
-          reqCount = fileObj->ip->inodeData->size - fobjStartOff;
+        if (fileInode->inodeData->size - fobjStartOff < reqCount) {
+          reqCount = fileInode->inodeData->size - fobjStartOff;
         }
-        InMemInode *fileInode = fileObj->ip;
+        // InMemInode *fileInode = fileObj->ip;
         // figure out the pages that need to read from disk/hugepage
         auto &pageCache = fileInode->inodePageCache;
         uint64_t curOff;
@@ -1183,12 +1204,13 @@ void FileMng::processAllocWrite(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // req->incrNumFsm();
   if (req->getState() == FsReqState::ALLOCWRITE_TOCACHE_MODIFY) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.allocwrite.rwOp.count;
     SPDLOG_DEBUG("ALLOCWRITE_TOCACHE_MODIFY size:{} writeCounter:{}", reqCount,
                  dbgWriteCounter);
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // if (fileObj != nullptr) {
+    if (true) {
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       fsWorker_->onTargetInodeFiguredOut(req, fileInode);
       // first check if this inode is already in some other app
       if (fsWorker_->checkInodeInOtherApp(fileInode->inodeData->i_no,
@@ -1201,7 +1223,7 @@ void FileMng::processAllocWrite(FsReq *req) {
           SPDLOG_ERROR("processAllocWrite cannot setInodeInShareMode");
         }
       }
-      uint64_t fobjStartOff = fileObj->off;
+      uint64_t fobjStartOff = req->getClientOp()->op.allocwrite.rwOp.offset;
       auto nNumBlocks = fsImpl_->writeInodeAllocDataBlock(
           req, fileInode, fobjStartOff, reqCount);
       if (nNumBlocks < 0) {
@@ -1214,9 +1236,11 @@ void FileMng::processAllocWrite(FsReq *req) {
               std::max(fobjStartOff + reqCount, fileInode->inodeData->size);
           fileInode->logEntry->set_size(fileInode->inodeData->size);
           // update fileObj's (fd) offset
-          req->getClientOp()->op.allocwrite.rwOp.realOffset = fileObj->off;
+          // req->getClientOp()->op.allocwrite.rwOp.realOffset = fileObj->off;
+          req->getClientOp()->op.allocwrite.rwOp.realOffset = 
+            req->getClientOp()->op.allocwrite.rwOp.offset;
           req->getClientOp()->op.allocwrite.rwOp.realCount = reqCount;
-          fileObj->off += reqCount;
+          // fileObj->off += reqCount;
           req->setState(FsReqState::ALLOCWRITE_UPDATE_INODE);
         } else {
           submitFsGeneratedRequests(req);
@@ -1229,15 +1253,18 @@ void FileMng::processAllocWrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::ALLOCWRITE_UNCACHE_MODIFY) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.allocwrite.rwOp.count;
     SPDLOG_DEBUG("processAllocWrite size:{} writeCounter:{}", reqCount,
                  dbgWriteCounter);
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // if (fileObj != nullptr) {
+    if (true) {
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       fsWorker_->onTargetInodeFiguredOut(req, fileInode);
-      uint64_t fobjStartOff = fileObj->off;
-      if (fileObj->flags & O_APPEND) {
+      uint64_t fobjStartOff = req->getClientOp()->op.allocwrite.rwOp.offset;
+      // TODO [BENITA] Need to handle this correctly
+      // if (fileObj->flags & O_APPEND) {
+      if (O_APPEND) {
         auto cur_append_off =
             std::max(fileInode->inodeData->size, fileInode->next_append_offset);
         auto cur_req_append_off = req->GetAppendOffOrInit(cur_append_off);
@@ -1256,9 +1283,9 @@ void FileMng::processAllocWrite(FsReq *req) {
         if (req->numTotalPendingIoReq() == 0) {
           // success
           req->getClientOp()->op.allocwrite.rwOp.ret = nWrite;
-          req->getClientOp()->op.allocwrite.rwOp.realOffset = fileObj->off;
+          // req->getClientOp()->op.allocwrite.rwOp.realOffset = fileObj->off;
           req->getClientOp()->op.allocwrite.rwOp.realCount = nWrite;
-          fileObj->off += nWrite;
+          // fileObj->off += nWrite;
           req->setState(FsReqState::ALLOCWRITE_UPDATE_INODE);
         } else {
           submitFsGeneratedRequests(req);
@@ -1271,10 +1298,11 @@ void FileMng::processAllocWrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::ALLOCWRITE_UPDATE_INODE) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.allocwrite.rwOp.count;
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // if (fileObj != nullptr) {
+    if (true) {
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       int rc = fsImpl_->writeFileInode(req, fileInode->i_no);
       if (rc > 0) {
         // AllocWrite Process Done
@@ -1319,12 +1347,13 @@ void FileMng::processAllocPwrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::ALLOCPWRITE_UNCACHE_MODIFY) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.allocpwrite.rwOp.count;
     SPDLOG_DEBUG("processAllocPWrite size:{} writeCounter:{}", reqCount,
                  dbgWriteCounter);
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // if (fileObj != nullptr) {
+    if (true) {
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       fsWorker_->onTargetInodeFiguredOut(req, fileInode);
       uint64_t fobjStartOff = req->getClientOp()->op.allocpwrite.offset;
       assert(req->isAppBufferAvailable());
@@ -1352,14 +1381,15 @@ void FileMng::processAllocPwrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::ALLOCPWRITE_UPDATE_INODE) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.allocpwrite.rwOp.count;
     if (reqCount <= 0) {
       req->setState(FsReqState::ALLOCPWRITE_RET_ERR);
       return;
     }
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // if (fileObj != nullptr) {
+    if (true) {
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       int rc = fsImpl_->writeFileInode(req, fileInode->i_no);
       if (rc > 0) {
         // AllocPWrite Process Done
@@ -1382,12 +1412,13 @@ void FileMng::processAllocPwrite(FsReq *req) {
 void FileMng::processAllocRead(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::ALLOCREAD_FETCH_DATA) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.allocread.rwOp.count;
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // if (fileObj != nullptr) {
+    if (true) {
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       fsWorker_->onTargetInodeFiguredOut(req, fileInode);
-      uint64_t fobjStartOff = fileObj->off;
+      uint64_t fobjStartOff = req->getClientOp()->op.allocread.rwOp.offset;
       char *dst = req->getMallocedDataPtr();
       int64_t nRead =
           fsImpl_->readInode(req, fileInode, dst, fobjStartOff, reqCount);
@@ -1398,7 +1429,7 @@ void FileMng::processAllocRead(FsReq *req) {
           // req success, set the return value, set state
           req->getClientOp()->op.allocread.rwOp.ret = nRead;
           // update offset
-          fileObj->off += nRead;
+          // fileObj->off += nRead;
 #ifdef FSP_ENABLE_ALLOC_READ_RA
           if (fileInode->readaheadBgReqNum == 0) {
             fileInode->readaheadBgReqNum = 1;
@@ -1421,10 +1452,12 @@ void FileMng::processAllocRead(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::ALLOCREAD_DO_READAHEAD) {
-    InMemInode *fileInode = req->getTargetInode();
-    FileObj *fileObj = req->getFileObj();
+    // InMemInode *fileInode = req->getTargetInode();
+    InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
+    // FileObj *fileObj = req->getFileObj();
     assert(fileInode != nullptr);
-    if (fileObj != nullptr && fileInode != nullptr) {
+    // if (fileObj != nullptr && fileInode != nullptr) {
+    if (fileInode != nullptr) {
       if (fileInode->readaheadInflight) {
         assert(req->numTotalPendingIoReq() == 0);
         fileInode->readaheadInflight = false;
@@ -1472,32 +1505,35 @@ void FileMng::processAllocRead(FsReq *req) {
 void FileMng::processAllocPread(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::ALLOCPREAD_UNCACHE_FETCH_DATA) {
-    FileObj *fileObj = req->getFileObj();
+    // FileObj *fileObj = req->getFileObj();
     req->getRwOp()->realOffset = req->getClientOp()->op.allocpread.offset;
     size_t reqCount = req->getClientOp()->op.allocpread.rwOp.count;
     uint64_t fobjStartOff = req->getClientOp()->op.allocpread.offset;
-    if (fileObj != nullptr) {
-      SPDLOG_DEBUG(
-          "processAllocPread - wid:{} fd:{} offset:{} count:{} fsize:{} "
-          "wid:{} ",
-          req->getClientOp()->op.allocpread.rwOp.fd, fsWorker_->getWid(),
-          fobjStartOff, reqCount, fileObj->ip->inodeData->size,
-          fsWorker_->getWid());
-      assert(fileObj->ip != nullptr);
+    // if (fileObj != nullptr) {
+    if (true) {
+      // SPDLOG_DEBUG(
+      //     "processAllocPread - wid:{} fd:{} offset:{} count:{} fsize:{} "
+      //     "wid:{} ",
+      //     req->getClientOp()->op.allocpread.rwOp.fd, fsWorker_->getWid(),
+      //     fobjStartOff, reqCount, fileObj->ip->inodeData->size,
+      //     fsWorker_->getWid());
+      
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
+      assert(fileInode != nullptr);
 
-      fsWorker_->onTargetInodeFiguredOut(req, fileObj->ip);
-      if (fobjStartOff == fileObj->ip->inodeData->size) {
+      fsWorker_->onTargetInodeFiguredOut(req, fileInode);
+      if (fobjStartOff == fileInode->inodeData->size) {
         req->getClientOp()->op.allocpread.rwOp.ret = 0;
         fsWorker_->submitFsReqCompletion(req);
-      } else if (fobjStartOff > fileObj->ip->inodeData->size) {
+      } else if (fobjStartOff > fileInode->inodeData->size) {
         req->setState(FsReqState::ALLOCPREAD_RET_ERR);
         // should directly go to ALLOCPREAD_RET_ERR's code
       } else {
-        if (fileObj->ip->inodeData->size - fobjStartOff < reqCount) {
-          reqCount = fileObj->ip->inodeData->size - fobjStartOff;
+        if (fileInode->inodeData->size - fobjStartOff < reqCount) {
+          reqCount = fileInode->inodeData->size - fobjStartOff;
         }
         int64_t nRead = 0;
-        InMemInode *fileInode = fileObj->ip;
+        // InMemInode *fileInode = fileObj->ip;
         char *dst = req->getMallocedDataPtr();
         SPDLOG_DEBUG("mem_start_offset:{} startOff:{} reqcount:{}",
                      req->getMemOffset(), fobjStartOff, reqCount);
@@ -1559,10 +1595,12 @@ void FileMng::processAllocPread(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::ALLOCPREAD_DO_READAHEAD) {
-    InMemInode *fileInode = req->getTargetInode();
-    FileObj *fileObj = req->getFileObj();
+    // InMemInode *fileInode = req->getTargetInode();
+    InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
+    // FileObj *fileObj = req->getFileObj();
     assert(fileInode != nullptr);
-    if (fileObj != nullptr && fileInode != nullptr) {
+    // if (fileObj != nullptr && fileInode != nullptr) {
+    if (fileInode != nullptr) {
       if (fileInode->readaheadInflight) {
         assert(req->numTotalPendingIoReq() == 0);
         fileInode->readaheadInflight = false;
@@ -1662,9 +1700,10 @@ int FileMng::_renewLeaseForRead(FsReq *req) {
 void FileMng::processLseek(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::LSEEK_INIT) {
-    FileObj *fileObj = req->getFileObj();
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // FileObj *fileObj = req->getFileObj();
+    // if (fileObj != nullptr) {
+    if (true) {
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);;
       lseekOp *lop = &req->getClientOp()->op.lseek;
       while (!fileInode->tryLock()) {
         // spin
@@ -1672,28 +1711,33 @@ void FileMng::processLseek(FsReq *req) {
       size_t file_size = fileInode->inodeData->size;
       fileInode->unLock();
 
+      long int resultingOffset = 0;
       switch (lop->whence) {
         case SEEK_SET:
-          fileObj->off = lop->offset;
+          // fileObj->off = lop->offset;
+          resultingOffset = lop->offset;
           break;
         case SEEK_CUR:
-          fileObj->off += lop->offset;
+          // fileObj->off += lop->offset;
+          resultingOffset = lop->current_file_offset + lop->offset;
           break;
         case SEEK_END:
-          fileObj->off = file_size + lop->offset;
+          // fileObj->off = file_size + lop->offset;
+          resultingOffset = file_size + lop->offset;
           break;
         default:
           req->setState(FsReqState::LSEEK_RET_ERR);
       }
 
-      if (fileObj->off < 0 || fileObj->off > file_size) {
+      if (resultingOffset < 0 || resultingOffset > file_size) {
         req->setState(FsReqState::LSEEK_RET_ERR);
       }
 
       if (req->getState() == FsReqState::LSEEK_RET_ERR) {
         req->setError(FS_REQ_ERROR_POSIX_EINVAL);
       } else {
-        lop->ret = fileObj->off;
+        // lop->ret = fileObj->off;
+        lop->ret = resultingOffset;
       }
       fsWorker_->submitFsReqCompletion(req);
       return;
@@ -1713,12 +1757,14 @@ void FileMng::processLseek(FsReq *req) {
 void FileMng::processClose(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::CLOSE_INIT) {
-    FileObj *fileObj = req->getFileObj();
-    if (fileObj != nullptr) {
+    // FileObj *fileObj = req->getFileObj();
+    // if (fileObj != nullptr) {
+    if (true) {
       req->getClientOp()->op.close.ret = 0;
 
-      InMemInode *fileInode = fileObj->ip;
-      delFdMappingOnClose(req->getPid(), fileObj);
+      // InMemInode *fileInode = fileObj->ip;
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
+      // delFdMappingOnClose(req->getPid(), fileObj);
       fsWorker_->submitFsReqCompletion(req);
       if ((fileInode->unlinkDeallocResourcesOnClose) &&
           fileInode->noAppReferring()) {
@@ -1887,9 +1933,11 @@ void FileMng::processStat(FsReq *req) {
 void FileMng::processFstat(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::FSTAT_INIT) {
-    FileObj *fileObj = req->getFileObj();
-    if (fileObj != nullptr) {
-      InMemInode *fileInode = fileObj->ip;
+    // FileObj *fileObj = req->getFileObj();
+    // if (fileObj != nullptr) {
+    if (true) {
+      // InMemInode *fileInode = fileObj->ip;
+      InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
       while (!fileInode->tryLock()) {
         // spin
       }
@@ -2745,8 +2793,9 @@ void FileMng::processLdbWsync(FsReq *req) {
       }
     }
 
-    FileObj *fileobj = req->getFileObj();
-    assert(fileobj->off == 0);
+    // FileObj *fileobj = req->getFileObj();
+    assert(req->getClientOp()->op.wsync.off == 0);
+    // assert(fileobj->off == 0);
     struct wsyncOp *op_ptr = &(req->getClientOp()->op.wsync);
     InMemInode *fileInode = req->getTargetInode();
     assert(fileInode != nullptr);

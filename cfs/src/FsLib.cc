@@ -433,11 +433,12 @@ static inline void prepare_pwriteOp(struct shmipc_msg *msg,
 }
 
 static inline void prepare_lseekOp(struct shmipc_msg *msg, struct lseekOp *op,
-                                   int fd, long int offset, int whence) {
+                                   int fd, long int offset, int whence, off_t file_offset) {
   msg->type = CFS_OP_LSEEK;
   op->fd = fd;
   op->offset = offset;
   op->whence = whence;
+  op->current_file_offset = file_offset;
   EmbedThreadIdToAsOpRet(op->ret);
 }
 
@@ -2564,29 +2565,6 @@ static ssize_t fs_allocated_read_internal(FsService *fsServ, int fd, void *buf,
   return rc;
 }
 
-ssize_t fs_allocated_read(int fd, void *buf, size_t count) {
-#ifdef LDB_PRINT_CALL
-  print_read(fd, buf, count);
-#endif
-  int wid = -1;
-  if (count == 0) return 0;
-#ifdef CFS_LIB_SAVE_API_TS
-  int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_READ);
-#endif
-retry:
-  auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_allocated_read_internal(service, fd, buf, count);
-  if (rc < 0) {
-    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
-    bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
-    if (should_retry) goto retry;
-  }
-#ifdef CFS_LIB_SAVE_API_TS
-  tFsApiTs->addApiNormalDone(FsApiType::FS_READ, tsIdx);
-#endif
-  return rc;
-}
-
 static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
                                            size_t count, off_t offset) {
   struct shmipc_msg msg;
@@ -2632,6 +2610,33 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
 #endif
 
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
+  return rc;
+}
+
+ssize_t fs_allocated_read(int fd, void *buf, size_t count) {
+#ifdef LDB_PRINT_CALL
+  print_read(fd, buf, count);
+#endif
+  int wid = -1;
+  if (count == 0) return 0;
+#ifdef CFS_LIB_SAVE_API_TS
+  int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_READ);
+#endif
+retry:
+  auto service = getFsServiceForFD(fd, wid);
+  // ssize_t rc = fs_allocated_read_internal(service, fd, buf, count);
+  auto offset = service->getOffset(fd);
+  ssize_t rc = fs_allocated_pread_internal(service, fd, buf, count, offset);
+  if (rc < 0) {
+    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
+    bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
+    if (should_retry) goto retry;
+  } else {
+    service->updateOffset(fd, offset + rc);
+  }
+#ifdef CFS_LIB_SAVE_API_TS
+  tFsApiTs->addApiNormalDone(FsApiType::FS_READ, tsIdx);
+#endif
   return rc;
 }
 
@@ -2706,57 +2711,6 @@ static ssize_t fs_allocated_write_internal(FsService *fsServ, int fd, void *buf,
   return rc;
 }
 
-ssize_t fs_allocated_write(int fd, void *buf, size_t count) {
-#ifdef LDB_PRINT_CALL
-  print_write(fd, buf, count);
-#endif
-  if (OpenLease::IsLocalFd(fd)) {
-    int base_fd = OpenLease::FindBaseFd(fd);
-    OpenLeaseMapEntry *entry = LeaseRef(base_fd);
-    // we are currently not handling revoked lease case
-    assert(entry);
-
-    ssize_t rc = -1;
-    {
-      std::unique_lock<std::shared_mutex> guard(entry->lock);
-      int fd_offset = OpenLease::FindOffset(fd);
-      LocalFileObj &file_object = entry->lease->GetFileObjects()[fd_offset];
-      int offset = file_object.offset;
-
-      rc = fs_allocated_pwrite(base_fd, buf, count, offset);
-      if (rc >= 0) {
-        size_t current_size = offset + rc;
-        if (current_size > entry->lease->size)
-          entry->lease->size = current_size;
-        file_object.offset += rc;
-      }
-    }
-    LeaseUnref(entry);
-    return rc;
-  }
-
-#ifdef CFS_LIB_SAVE_API_TS
-  int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_WRITE);
-#endif
-  int wid = -1;
-retry:
-  auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_allocated_write_internal(service, fd, buf, count);
-#ifdef _CFS_LIB_PRINT_REQ_
-  fprintf(stdout, "fs_allocated_write fd:%d count:%ld rc:%ld\n", fd, count, rc);
-#endif
-  if (rc < 0) {
-    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
-    bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
-    if (should_retry) goto retry;
-  }
-
-#ifdef CFS_LIB_SAVE_API_TS
-  tFsApiTs->addApiNormalDone(FsApiType::FS_WRITE, tsIdx);
-#endif
-  return rc;
-}
-
 static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
                                             void *buf, size_t count,
                                             off_t offset) {
@@ -2800,6 +2754,61 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
   rc = apwop_p->rwOp.ret;
 
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
+  return rc;
+}
+
+ssize_t fs_allocated_write(int fd, void *buf, size_t count) {
+#ifdef LDB_PRINT_CALL
+  print_write(fd, buf, count);
+#endif
+  if (OpenLease::IsLocalFd(fd)) {
+    int base_fd = OpenLease::FindBaseFd(fd);
+    OpenLeaseMapEntry *entry = LeaseRef(base_fd);
+    // we are currently not handling revoked lease case
+    assert(entry);
+
+    ssize_t rc = -1;
+    {
+      std::unique_lock<std::shared_mutex> guard(entry->lock);
+      int fd_offset = OpenLease::FindOffset(fd);
+      LocalFileObj &file_object = entry->lease->GetFileObjects()[fd_offset];
+      int offset = file_object.offset;
+
+      rc = fs_allocated_pwrite(base_fd, buf, count, offset);
+      if (rc >= 0) {
+        size_t current_size = offset + rc;
+        if (current_size > entry->lease->size)
+          entry->lease->size = current_size;
+        file_object.offset += rc;
+      }
+    }
+    LeaseUnref(entry);
+    return rc;
+  }
+
+#ifdef CFS_LIB_SAVE_API_TS
+  int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_WRITE);
+#endif
+  int wid = -1;
+retry:
+  auto service = getFsServiceForFD(fd, wid);
+  auto offset = service->getOffset(fd);
+  // ssize_t rc = fs_allocated_write_internal(service, fd, buf, count);
+  ssize_t rc = fs_allocated_pwrite_internal(service, fd, buf, count, offset);
+#ifdef _CFS_LIB_PRINT_REQ_
+  fprintf(stdout, "fs_allocated_write fd:%d count:%ld rc:%ld\n", fd, count, rc);
+#endif
+  if (rc < 0) {
+    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
+    bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
+    if (should_retry) goto retry;
+  } else {
+    service->updateOffset(fd, offset + rc);
+  }
+
+#ifdef CFS_LIB_SAVE_API_TS
+  tFsApiTs->addApiNormalDone(FsApiType::FS_WRITE, tsIdx);
+#endif
   return rc;
 }
 
@@ -3545,7 +3554,7 @@ ssize_t fs_uc_pread(int fd, void *buf, size_t count, off_t offset) {
 }
 
 off_t fs_lseek_internal(FsService *fsServ, int fd, long int offset,
-                        int whence) {
+                        int whence, off_t file_offset) {
   struct shmipc_msg msg;
   struct lseekOp *op;
   off_t ring_idx;
@@ -3554,7 +3563,7 @@ off_t fs_lseek_internal(FsService *fsServ, int fd, long int offset,
   memset(&msg, 0, sizeof(msg));
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   op = (struct lseekOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
-  prepare_lseekOp(&msg, op, fd, offset, whence);
+  prepare_lseekOp(&msg, op, fd, offset, whence, file_offset);
   shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
 
   ret = op->ret;
@@ -3606,9 +3615,13 @@ off_t fs_lseek(int fd, long int offset, int whence) {
 retry:
   int wid = -1;
   auto service = getFsServiceForFD(fd, wid);
-  int rc = fs_lseek_internal(service, fd, offset, whence);
+  auto file_offset = service->getOffset(fd);
+  int rc = fs_lseek_internal(service, fd, offset, whence, file_offset);
 
-  if (rc >= 0) return rc;
+  if (rc >= 0) {
+    service->updateOffset(fd, rc);
+    return rc;
+  }
   if (handle_inode_in_transfer(rc)) goto retry;
 
   bool should_retry = checkUpdateFdWid(rc, fd);
@@ -3912,7 +3925,7 @@ retry:
   return rc;
 }
 
-int fs_wsync_internal(FsService *fsServ, int fd, bool isDataSync) {
+int fs_wsync_internal(FsService *fsServ, int fd, bool isDataSync, off_t offset) {
   struct shmipc_msg msg;
   struct wsyncOp *wsyncOp;
   off_t ring_idx;
@@ -3934,6 +3947,7 @@ int fs_wsync_internal(FsService *fsServ, int fd, bool isDataSync) {
 
   msg.type = CFS_OP_WSYNC;
   wsyncOp->fd = fd;
+  wsyncOp->off = offset;
   EmbedThreadIdToAsOpRet(wsyncOp->ret);
   void *data_array = lease->GetData(threadMemBuf, &(wsyncOp->array_size),
                                     &(wsyncOp->file_size));
@@ -3962,7 +3976,8 @@ int fs_wsync(int fd) {
 #endif
 retry:
   auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_wsync_internal(service, fd, true);
+  auto offset = service->getOffset(fd);
+  ssize_t rc = fs_wsync_internal(service, fd, true, offset);
   if (rc < 0) {
     if (handle_inode_in_transfer(rc)) goto retry;
     bool should_retry = checkUpdateFdWid(rc, fd);

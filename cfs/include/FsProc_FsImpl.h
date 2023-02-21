@@ -632,6 +632,8 @@ class FsImpl {
   // because it's better to keep "fsWorker_" as const
   InMemInode *BlockingGetInode(cfs_ino_t ino, bool &io_done,
                                FsProcWorker *worker_handler);
+  InMemInode *BlockingGetInodeHelper(cfs_ino_t ino, bool &io_done, 
+                                      FsProcWorker *worker_handler);
   // get inode according to inode number
   // in the normal case, the inode will be fetched from the disk into inodeBuf
   // @param doSubmit: for new-allocated inode, we do not fetch it into memory

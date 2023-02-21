@@ -1355,6 +1355,15 @@ int FsImpl::BlockingInitRootInode(FsProcWorker *worker_handler) {
   return 0;
 }
 
+InMemInode *FsImpl::BlockingGetInodeHelper(cfs_ino_t ino, bool &io_done, FsProcWorker *worker_handler) {
+  auto it = inodeMap_.find(ino);
+  if (it != inodeMap_.end() && (it->second)->isInodeValid()) {
+    return it->second;
+  } else {
+    return BlockingGetInode(ino, io_done, worker_handler);
+  }
+}
+
 InMemInode *FsImpl::BlockingGetInode(cfs_ino_t ino, bool &io_done,
                                      FsProcWorker *worker_handler) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;

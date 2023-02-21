@@ -1697,7 +1697,6 @@ void FsProcWorker::RefillAppMap() {
 }
 
 int FsProcWorker::pollReqFromApps() {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int numAppReqPolled = 0;
   AppProc *app;
   FsReq *reqPtr = nullptr;
@@ -1725,12 +1724,10 @@ int FsProcWorker::pollReqFromApps() {
       recvReadyReqQueue.push(reqPtr);
     } while (true);
   }
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return numAppReqPolled;
 }
 
 void FsProcWorker::processReqOnRecv(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int reqFlags = req->getReqTypeFlags();
   // every request should have some flags
   assert(reqFlags != FsReqFlags::no_flags);
@@ -1778,7 +1775,6 @@ void FsProcWorker::processReqOnRecv(FsReq *req) {
       std::cerr << "reqType cannot find handle" << req->getType() << std::endl;
       throw std::runtime_error("unknown request category");
   }
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 int FsProcWorker::processInternalReadyQueue() {
@@ -1820,16 +1816,18 @@ void FsProcWorker::primaryHandleUnknownFdReq(FsReq *req) {
   }
 
   auto master = static_cast<FsProcWorkerMaster *>(this);
+  
   // unknown fd may belong to recently assigned inode
-  auto ino = master->getRecentlyReassignedInodeFromFd(req->getPid(), req->fd);
-  if (ino == 0) {
-    SPDLOG_INFO("POSIX_EBADF getWid:{} pid:{} fd:{} reqType:{} ino:{}",
-                getWid(), req->getPid(), req->fd, req->getType(), ino);
-    // fd not found
-    req->setError(FS_REQ_ERROR_POSIX_EBADF);
-    submitFsReqCompletion(req);
-    return;
-  }
+  // TODO [BENITA] Don't know if we need this
+  // auto ino = master->getRecentlyReassignedInodeFromFd(req->getPid(), req->fd);
+  // if (ino == 0) {
+  //   SPDLOG_INFO("POSIX_EBADF getWid:{} pid:{} fd:{} reqType:{} ino:{}",
+  //               getWid(), req->getPid(), req->fd, req->getType(), ino);
+  //   // fd not found
+  //   req->setError(FS_REQ_ERROR_POSIX_EBADF);
+  //   submitFsReqCompletion(req);
+  //   return;
+  // }
 
   // primaryRouteToOwner calls submitFsReqCompletion which invalidates req obj.
   // Therefore, saving the necessary arguments for future processing
@@ -1838,7 +1836,7 @@ void FsProcWorker::primaryHandleUnknownFdReq(FsReq *req) {
   // primaryRouteToOwner calls submitFsReqCompletion which invalidates req.
   // NOTE: if primary was the owner, then it would have resolved the inode and
   // this function would not have been called.
-  auto req_errno = master->primaryRouteToOwner(req, ino);
+  auto req_errno = master->primaryRouteToOwner(req, fd);
   if (req_errno == FS_REQ_ERROR_INODE_REDIRECT) {
     // successful inode redirect, fd has been notified of the redirect so no
     // more notifications will be given to this fd.
@@ -1865,10 +1863,16 @@ void FsProcWorker::ownerProcessFdReq(FsReq *req) {
   //   return;
   // }
 
+  auto inodePtr = fileManager->getInodePtr(req->fd);
+  if (inodePtr == nullptr) {
+    primaryHandleUnknownFdReq(req);
+    return;
+  }
+
   SPDLOG_DEBUG("WID:{} successfully resolved fd", getWid());
   // req->setFileObj(fobj);
-  // req->setTargetInode(FsImpl_);
-  // recordInProgressFsReq(req, fobj->ip); // TODO [BENITA]
+  req->setTargetInode(inodePtr);
+  recordInProgressFsReq(req, inodePtr);
   fileManager->processReq(req);
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
@@ -1876,9 +1880,17 @@ void FsProcWorker::ownerProcessFdReq(FsReq *req) {
 int FsProcWorkerMaster::primaryRouteToOwner(FsReq *req, cfs_ino_t i_no) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto owner = getInodeOwner(i_no);
-  // This function will only be called when we need to route to owner.
-  // If primary was the owner, it would never have called this function.
-  assert(owner != FsProcWorker::kMasterWidConst);
+
+
+  // // This function will only be called when we need to route to owner.
+  // // If primary was the owner, it would never have called this function.
+  // assert(owner != FsProcWorker::kMasterWidConst);
+
+  // restart
+  if (owner == kMasterWidConst) {
+    fileManager->blockingStoreInode(req->fd);
+  }
+
   if (owner == -1) {
     req->setError(FS_REQ_ERROR_INODE_IN_TRANSFER);
   } else {
@@ -3589,6 +3601,7 @@ void FsProcWorkerMaster::delRecentlyReassignedInodeEntries(pid_t app_id,
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
+// TODO [BENITA] Do we need this now?
 cfs_ino_t FsProcWorkerMaster::getRecentlyReassignedInodeFromFd(pid_t app_id,
                                                                int fd) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;

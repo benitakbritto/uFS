@@ -88,6 +88,9 @@ class FileMng {
 
   uint64_t dbgWriteCounter = 0;
 
+  InMemInode *getInodePtr(cfs_ino_t inum);
+  void blockingStoreInode(cfs_ino_t inum);
+
  private:
   using iou_map_t = FsReqIoUnitHelper::pendingIoUnit_map_t;
   // data plane

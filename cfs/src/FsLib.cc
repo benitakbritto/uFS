@@ -759,6 +759,8 @@ inline FsService *getFsServiceForFD(int fd, int &wid) {
   // TODO (ask jing) - do fd's also default to primary if they aren't in the
   // map?
   wid = gPrimaryServWid;
+  // add new entry; TODO [BENITA] Needed due to client retries
+  gLibSharedContext->fdWidMap[fd] = wid;
   return gServMngPtr->primaryServ;
 }
 

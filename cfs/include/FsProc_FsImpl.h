@@ -372,6 +372,8 @@ class FsImpl {
   char *getDataBlockMemPtr() { return dataBlockMemPtr_; }
   block_no_t getOnDiskNumBmapBlocksTotal() { return numBmapOnDiskBlocksTotal_; }
 
+  InMemInode *getInodePtrIfExists(cfs_ino_t ino);
+
   // Get the root directory's inode ("/")
   InMemInode *rootDirInode(FsReq *fsReq);
   // Lookup a file (or directory) in a directory (not recursively)

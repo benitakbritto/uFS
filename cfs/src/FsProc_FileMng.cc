@@ -395,6 +395,16 @@ FileObj *FileMng::getFileObjForFd(pid_t pid, int fd) {
   return inner_search->second;
 }
 
+InMemInode *FileMng::getInodePtr(cfs_ino_t inum) {
+  return fsImpl_->getInodePtrIfExists(inum);
+}
+
+void FileMng::blockingStoreInode(cfs_ino_t inum) {
+  bool io_done = false;
+  fsImpl_->BlockingGetInodeHelper(inum, io_done, fsWorker_);
+  return;
+}
+
 bool FileMng::exportInode(cfs_ino_t inum, ExportedInode &exp) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // NOTE: exportInode only exports the inode and removes all state related to
@@ -973,7 +983,7 @@ void FileMng::processPread(FsReq *req) {
 
     // if (fileObj != nullptr) {
     bool io_done = false;
-    InMemInode *fileInode = fsImpl_->BlockingGetInodeHelper(req->fd, io_done, fsWorker_); // TODO: Need a way to rewrite this
+    InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
     if (fileInode != nullptr) {
       // fsWorker_->onTargetInodeFiguredOut(req, fileObj->ip);
       std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;

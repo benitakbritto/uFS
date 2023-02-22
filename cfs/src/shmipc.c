@@ -35,10 +35,12 @@ struct shmipc_qp *shmipc_qp_get(const char *name, size_t size, int create) {
   // the fd. That way, only processes that have the fd can access the
   // shared memory.
   old_mask = umask((mode_t)0);
-  if (create)
-    qp->fd = shm_open(name, O_RDWR | O_CREAT, 0666);
-  else
-    qp->fd = shm_open(name, O_RDWR, 0666);
+  // if (create)
+  //   qp->fd = shm_open(name, O_RDWR | O_CREAT, 0666);
+  // else
+  //   qp->fd = shm_open(name, O_RDWR, 0666);
+
+  qp->fd = shm_open(name, O_RDWR | O_CREAT, 0666);
 
   tmp_mask = umask(old_mask);  // reset umask
 
@@ -206,6 +208,7 @@ struct shmipc_msg *shmipc_mgr_get_msg_nowait(struct shmipc_mgr *mgr,
 }
 
 off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
+  printf("[BENITA] shmipc_mgr_alloc_slot begin\n");
   struct shmipc_msg *rmsg;
   off_t ring_idx;
 
@@ -213,6 +216,7 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   ring_idx = ring_idx & mgr->mask;
   rmsg = IDX_TO_MSG(mgr, ring_idx);
 
+  printf("[BENITA] shmipc_mgr_alloc_slot before loop\n");
   // NOTE: If the buffer is not large enough and we happen to
   // circle back onto a slot that is still in use, we will have to wait
   // till it is free. Further, if some task ahead in the ring gets done
@@ -222,6 +226,8 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   // when slots are available.
   while (__builtin_expect(rmsg->status != shmipc_STATUS_EMPTY, 0))
     ;
+  
+  printf("[BENITA] shmipc_mgr_alloc_slot after while\n");
 
   // NOTE: This (below) might cause cache invalidations slowing down
   // server poll. Maybe client side should have a bitmap for the
@@ -258,6 +264,32 @@ void shmipc_mgr_put_msg(struct shmipc_mgr *mgr, off_t ring_idx,
 
   // server finished operation. zero out rmsg after copying into msg.
   memcpy(msg, rmsg, 64);  // 40 cycles
+}
+
+// TODO [BENITA] make macros/config
+// If -1 is returned it means that server did not respond
+int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off_t ring_idx,
+                        struct shmipc_msg *msg) {
+  printf("[BENITA] shmipc_mgr_put_msg_retry_exponential_backoff begin\n");
+  
+  int sleep_time = 1;
+  int retry_count = 5;
+  int ret = -1;
+  int count = 0;
+
+  while (ret == -1 && count < retry_count) {
+    printf("[BENITA] shmipc_mgr_put_msg_retry_exponential_backoff loop\n");
+    shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg);
+    
+    usleep(sleep_time);
+
+    ret = shmipc_mgr_poll_msg(mgr, ring_idx, msg);
+
+    count++;
+    sleep_time = sleep_time * (count + 1);
+  }
+
+  return ret;
 }
 
 void shmipc_mgr_put_msg_nowait(struct shmipc_mgr *mgr, off_t ring_idx,

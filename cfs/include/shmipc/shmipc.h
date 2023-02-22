@@ -120,6 +120,9 @@ void shmipc_mgr_dealloc_slot(struct shmipc_mgr *mgr, off_t ring_idx);
 void shmipc_mgr_put_msg(struct shmipc_mgr *mgr, off_t ring_idx,
                         struct shmipc_msg *msg);
 
+int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off_t ring_idx,
+                        struct shmipc_msg *msg);
+
 // Similar to put_msg but returns immediately without waiting for server to
 // respond. Returns the index of the ring that was used.
 // NOTE: The nowait here applies to waiting for the server to respond. This

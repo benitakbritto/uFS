@@ -2277,6 +2277,7 @@ ssize_t fs_read_internal(FsService *fsServ, int fd, void *buf, size_t count) {
 
 static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
                                  size_t count, off_t offset) {
+  std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
   ssize_t rc;
 #ifdef _CFS_LIB_PRINT_REQ_
   pid_t curPid = syscall(__NR_gettid);
@@ -2284,15 +2285,23 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
           offset, curPid);
 #endif
   if (count < RING_DATA_ITEM_SIZE) {
+    std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
     struct shmipc_msg msg;
     struct preadOpPacked *prop_p;
     off_t ring_idx;
 
     memset(&msg, 0, sizeof(msg));
     ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
+    std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
     prop_p = (struct preadOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
     prepare_preadOp(&msg, prop_p, fd, count, offset);
-    shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+    std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
+    // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+    std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
+    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
 #ifndef MIMIC_APP_ZC
     void *curDataPtr = (void *)IDX_TO_DATA(fsServ->shmipc_mgr, ring_idx);
@@ -2342,6 +2351,7 @@ ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset) {
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_PREAD);
 #endif
 retry:
+  std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
   auto service = getFsServiceForFD(fd, wid);
   ssize_t rc = fs_pread_internal(service, fd, buf, count, offset);
   if (rc < 0) {

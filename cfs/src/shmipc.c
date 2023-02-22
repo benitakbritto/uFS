@@ -197,10 +197,11 @@ struct shmipc_msg *shmipc_mgr_get_msg_nowait(struct shmipc_mgr *mgr,
 
   ring_idx = (mgr->next & mgr->mask);
   msg = IDX_TO_MSG(mgr, ring_idx);
+  mgr->next++;
   if (msg->status != shmipc_STATUS_READY_FOR_SERVER) return NULL;
 
   *idx = ring_idx;
-  mgr->next++;
+  // mgr->next++;
   return msg;
 }
 
@@ -251,6 +252,7 @@ void shmipc_mgr_put_msg(struct shmipc_mgr *mgr, off_t ring_idx,
   // We then wait until the server rings the client doorbell.
   memcpy((char *)rmsg + 9, (char *)msg + 9, 55);
   SHMIPC_SET_MSG_STATUS(rmsg, shmipc_STATUS_READY_FOR_SERVER);
+  
   while (rmsg->status != shmipc_STATUS_READY_FOR_CLIENT)
     ;
 

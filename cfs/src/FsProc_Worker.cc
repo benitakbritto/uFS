@@ -1704,6 +1704,7 @@ int FsProcWorker::pollReqFromApps() {
   off_t ringIdx;
   char *dataBufPtr = NULL;
   struct clientOp *copPtr = NULL;
+  off_t count = 0;
   // pull request from Apps
   // TODO: how many requests we should poll here?
   // considering the multi-threading apps?
@@ -1711,18 +1712,24 @@ int FsProcWorker::pollReqFromApps() {
     app = ele.second;
     do {
       msgPtr = shmipc_mgr_get_msg_nowait(app->shmipc_mgr, &ringIdx);
-      if (msgPtr == nullptr) break;
-      msgPtr->status = shmipc_STATUS_IN_PROGRESS;
-      numAppReqPolled++;
-      copPtr = getClientOpForMsg(app, msgPtr, ringIdx);
-      dataBufPtr = (char *)IDX_TO_DATA(app->shmipc_mgr, ringIdx);
-      reqPtr = fsReqPool_->genNewReq(app, ringIdx, copPtr, dataBufPtr, this);
-      if (reqPtr == nullptr) {
-        fflush(stdout);
-        SPDLOG_ERROR("Cannot generate request\n");
+      // std::cout << "[BENITA] " << __func__ << ringIdx << std::endl;
+      count++;
+      // if (msgPtr == nullptr) break;
+      if (msgPtr == nullptr) {
+        continue;
+      } else {
+        msgPtr->status = shmipc_STATUS_IN_PROGRESS;
+        numAppReqPolled++;
+        copPtr = getClientOpForMsg(app, msgPtr, ringIdx);
+        dataBufPtr = (char *)IDX_TO_DATA(app->shmipc_mgr, ringIdx);
+        reqPtr = fsReqPool_->genNewReq(app, ringIdx, copPtr, dataBufPtr, this);
+        if (reqPtr == nullptr) {
+          fflush(stdout);
+          SPDLOG_ERROR("Cannot generate request\n");
+        }
+        recvReadyReqQueue.push(reqPtr);
       }
-      recvReadyReqQueue.push(reqPtr);
-    } while (true);
+    } while (count < RING_SIZE);
   }
   return numAppReqPolled;
 }

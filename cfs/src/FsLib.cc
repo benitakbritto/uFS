@@ -681,7 +681,11 @@ static int send_noargop(FsService *fsServ, CfsOpCode opcode) {
   msg.type = opcode;
 
   // send msg
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   // extract result
   ret = op->ret;
@@ -865,6 +869,8 @@ uint8_t fs_notify_server_new_shm(const char *shmFname,
   nowarn_strncpy(aop->shmFname, shmFname, MULTI_DIRSIZE);
   aop->shmBlockSize = block_sz;
   aop->shmNumBlocks = block_cnt;
+
+  // TODO: Not sure if exponential backoff is needed
   shmipc_mgr_put_msg(gServMngPtr->primaryServ->shmipc_mgr, ring_idx, &msg);
 
   ret = aop->shmid;
@@ -1156,6 +1162,7 @@ int fs_exit() {
     eop = (struct exitOp *)IDX_TO_XREQ(service->shmipc_mgr, ring_idx);
     prepare_exitOp(&msg, eop);
     // fprintf(stdout, "fs_exit: for wid %d\n", wid);
+    // TODO: Not sure if exponential backoff is needed here
     shmipc_mgr_put_msg(service->shmipc_mgr, ring_idx, &msg);
     ret = eop->ret;
     shmipc_mgr_dealloc_slot(service->shmipc_mgr, ring_idx);
@@ -1191,6 +1198,7 @@ int fs_ping() {
     ring_idx = shmipc_mgr_alloc_slot_dbg(service->shmipc_mgr);
     eop = (struct pingOp *)IDX_TO_XREQ(service->shmipc_mgr, ring_idx);
     prepare_pingOp(&msg, eop);
+    // TODO: Not sure if exponential backoff
     shmipc_mgr_put_msg(service->shmipc_mgr, ring_idx, &msg);
     ret = eop->ret;
     shmipc_mgr_dealloc_slot(service->shmipc_mgr, ring_idx);
@@ -1243,6 +1251,7 @@ int fs_checkpoint() {
   cop = (struct chkptOp *)IDX_TO_XREQ(gServMngPtr->primaryServ->shmipc_mgr,
                                       ring_idx);
   prepare_chkptOp(&msg, cop);
+  // TODO: Not sure if exponential backoff is need here
   shmipc_mgr_put_msg(gServMngPtr->primaryServ->shmipc_mgr, ring_idx, &msg);
 
   ret = cop->ret;
@@ -1263,6 +1272,7 @@ int fs_migrate(int fd, int *dstWid) {
   ring_idx = shmipc_mgr_alloc_slot_dbg(service->shmipc_mgr);
   mop = (struct migrateOp *)IDX_TO_XREQ(service->shmipc_mgr, ring_idx);
   prepare_migrateOp(&msg, mop, fd);
+  // TODO: Not sure if exponential backoff is need here
   shmipc_mgr_put_msg(service->shmipc_mgr, ring_idx, &msg);
 
   ret = mop->ret;
@@ -1319,6 +1329,7 @@ int fs_admin_inode_reassignment(int type, uint32_t inode, int curOwner,
   ring_idx = shmipc_mgr_alloc_slot_dbg(service->shmipc_mgr);
   irop = (decltype(irop))IDX_TO_XREQ(service->shmipc_mgr, ring_idx);
   prepare_inodeReassignmentOp(&msg, irop, type, inode, curOwner, newOwner);
+  // TODO: Not sure if exponential backoff is need here
   shmipc_mgr_put_msg(service->shmipc_mgr, ring_idx, &msg);
 
   ret = irop->ret;
@@ -1367,6 +1378,7 @@ int fs_admin_thread_reassign(int src_wid, int dst_wid, int flag) {
   irop = (decltype(irop))IDX_TO_XREQ(serv_it->second->shmipc_mgr, ring_idx);
 
   prepare_threadReassignOp(&msg, irop, cur_tid, src_wid, dst_wid, flag);
+  // TODO: Not sure if exponential backoff is need here
   shmipc_mgr_put_msg(serv_it->second->shmipc_mgr, ring_idx, &msg);
 
   ret = irop->ret;
@@ -1386,6 +1398,7 @@ int fs_admin_thread_reassign(int src_wid, int dst_wid, int flag) {
     pri_irop =
         (decltype(pri_irop))IDX_TO_XREQ(pri_serv->shmipc_mgr, pri_ring_idx);
     prepare_threadReassignOp(&pri_msg, pri_irop, cur_tid, src_wid, dst_wid);
+    // TODO: Not sure if exponential backoff is need here
     shmipc_mgr_put_msg(pri_serv->shmipc_mgr, pri_ring_idx, &pri_msg);
     if (pri_irop->ret < 0) {
       fprintf(stderr, "Error from pri orig_ret:%d ret:%d\n", ret,
@@ -1422,7 +1435,11 @@ int fs_stat_internal(FsService *fsServ, const char *pathname,
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   statOp = (struct statOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_statOp(&msg, statOp, pathname);
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   ret = statOp->ret;
   if (ret != 0) goto cleanup;
@@ -1482,7 +1499,11 @@ int fs_fstat_internal(FsService *fsServ, int fd, struct stat *statbuf) {
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   fstatOp = (struct fstatOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_fstatOp(&msg, fstatOp, fd);
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   ret = fstatOp->ret;
   if (ret != 0) goto cleanup;
@@ -1518,7 +1539,11 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   oop = (struct openOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_openOp(&msg, oop, path, flags, mode, size);
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   // TODO make sure this doesn't get optimized out?
   ret = oop->ret;
@@ -1566,6 +1591,7 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
   return ret;
 }
 
+// TODO [BENITA] Should set offset correctly
 int fs_open(const char *path, int flags, mode_t mode) {
   int delixArr[32];
   int dummy;
@@ -1623,7 +1649,11 @@ int fs_close_internal(FsService *fsServ, int fd) {
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   cloOp = (struct closeOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_closeOp(&msg, cloOp, fd);
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   ret = cloOp->ret;
 
@@ -1655,6 +1685,7 @@ int fs_close_internal(FsService *fsServ, int fd) {
   return ret;
 }
 
+// TODO [BENITA] Should del inode<->offset mapping
 int fs_close(int fd) {
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_CLOSE);
@@ -1829,7 +1860,11 @@ int fs_unlink_internal(FsService *fsServ, const char *pathname) {
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   unlkop = (struct unlinkOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_unlinkOp(&msg, unlkop, pathname);
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   ret = unlkop->ret;
 #ifdef _CFS_LIB_PRINT_REQ_
@@ -1880,6 +1915,8 @@ int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode) {
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   mop = (struct mkdirOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_mkdirOp(&msg, mop, pathname, mode);
+
+  // Note: Do not use exponential backoff here, as non-idempotent
   shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
 
   ret = mop->ret;
@@ -1931,7 +1968,10 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name) {
   odop->alOp.dataPtrId = dataPtrId;
 
   // send request
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return nullptr;
+    }
 
   // TODO ensure that the operation was successful
   numTotalDentry = odop->numDentry;
@@ -2032,7 +2072,10 @@ int fs_rmdir_internal(FsService *fsServ, const char *pathname) {
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   rmdOp = (struct rmdirOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_rmdirOp(&msg, rmdOp, pathname);
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   ret = rmdOp->ret;
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
@@ -2066,7 +2109,10 @@ int fs_rename_internal(FsService *fsServ, const char *oldpath,
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   rnmOp = (struct renameOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_renameOp(&msg, rnmOp, oldpath, newpath);
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   ret = rnmOp->ret;
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
@@ -2105,7 +2151,10 @@ int fs_fsync_internal(FsService *fsServ, int fd, bool isDataSync) {
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   fsyncOp = (struct fsyncOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_fsyncOp(&msg, fsyncOp, fd, isDataSync);
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   ret = fsyncOp->ret;
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
@@ -2247,7 +2296,10 @@ ssize_t fs_read_internal(FsService *fsServ, int fd, void *buf, size_t count) {
     ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
     rop_p = (struct readOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
     prepare_readOp(&msg, rop_p, fd, count);
-    shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
     // NOTE: FIXME This doesn't look right. If MIMIC_APP_ZC is defined, then we
     // don't copy into buf? That would mean that it is still in the ring
@@ -2393,7 +2445,11 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
     memcpy(curDataPtr, buf, count);
 #endif
 
-    shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+    // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
     rc = wop_p->rwOp.ret;
     shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
@@ -2427,7 +2483,12 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
       memcpy(curDataPtr, ((char *)buf + bytes), tmpBytes);
 #endif
 
-      shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+      // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+      if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
+      
 
       rc += wop_p->rwOp.ret;
       if (wop_p->rwOp.ret < 0) {
@@ -2475,7 +2536,11 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     memcpy(curDataPtr, ((char *)buf + bytes), tmpBytes);
 #endif
 
-    shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+    // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
     ssize_t rc = pwop_p->rwOp.ret;
     if (rc < 0) {
       shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
@@ -2565,7 +2630,11 @@ static ssize_t fs_allocated_read_internal(FsService *fsServ, int fd, void *buf,
   arop_p->alOp.shmid = shmid;
   arop_p->alOp.dataPtrId = dataPtrId;
 
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+  }
   unpack_allocatedReadOp(arop_p, &arop);
   rc = arop_p->rwOp.ret;
 
@@ -2613,7 +2682,11 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
   aprop_p->alOp.perAppSeqNo = 0;
   aprop_p->rwOp.realCount = 0;
 
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
   unpack_allocatedPreadOp(aprop_p, &aprop);
   rc = aprop.rwOp.ret;
 
@@ -2710,7 +2783,11 @@ static ssize_t fs_allocated_write_internal(FsService *fsServ, int fd, void *buf,
   awop_p->alOp.shmid = shmid;
   awop_p->alOp.dataPtrId = dataPtrId;
 
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
   unpack_allocatedWriteOp(awop_p, &awop);
   rc = awop.rwOp.ret;
 
@@ -2762,7 +2839,11 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
   apwop_p->alOp.shmid = shmid;
   apwop_p->alOp.dataPtrId = dataPtrId;
 
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
   rc = apwop_p->rwOp.ret;
 
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
@@ -3015,6 +3096,7 @@ static ssize_t fs_rw_renew_lease(FsService *fsServ, int fd, void *buf,
   }
 
   // send request
+  // TODO: Not sure if exponential backoff should be used here
   shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
 
   T1 top;
@@ -3428,7 +3510,11 @@ ssize_t fs_uc_pread_renewonly_internal(FsService *fsServ, int fd,
   prop_p = (struct preadOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_preadOpForUC(&msg, prop_p, fd, 0, 0);
   setLeaseOpRenewOnly(prop_p);
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
   unpack_preadOp(prop_p, &prop);
   rc = prop.rwOp.ret;
 
@@ -3456,7 +3542,11 @@ ssize_t fs_uc_pread_internal(FsService *fsServ, int fd, void *buf,
   prepare_preadOpForUC(&msg, prop_p, fd, count_from_aligned, offset_aligned);
   setLeaseOpForReadUC<preadOpPacked>(prop_p);
 
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   unpack_preadOp(prop_p, &prop);
   rc = prop.rwOp.ret;
@@ -3576,7 +3666,11 @@ off_t fs_lseek_internal(FsService *fsServ, int fd, long int offset,
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   op = (struct lseekOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_lseekOp(&msg, op, fd, offset, whence, file_offset);
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   ret = op->ret;
 
@@ -3829,7 +3923,11 @@ static ssize_t fs_allocated_pread_internal_ldb(FsService *fsServ, int fd,
   aprop_p->alOp.perAppSeqNo = 0;
   aprop_p->rwOp.realCount = mem_offset;
 
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
   unpack_allocatedPreadOp(aprop_p, &aprop);
   rc = aprop.rwOp.ret;
 
@@ -3968,7 +4066,11 @@ int fs_wsync_internal(FsService *fsServ, int fd, bool isDataSync, off_t offset) 
                                   wsyncOp->alloc.dataPtrId, err);
   }
 
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      std::cout << "[BENITA] Server unavailable" << std::endl;
+      return -1;
+    }
 
   ret = wsyncOp->ret;
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);

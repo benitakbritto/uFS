@@ -778,7 +778,7 @@ void FileMng::processWrite(FsReq *req) {
       }
       fsWorker_->onTargetInodeFiguredOut(req, fileInode);
       // uint64_t fobjStartOff = fileObj->off;
-      uint64_t fobjStartOff = 0; // TODO [BENITA]
+      uint64_t fobjStartOff = req->getClientOp()->op.write.rwOp.offset;
       char *src = req->getChannelDataPtr();
       int64_t nWrite =
           fsImpl_->writeInode(req, fileInode, src, fobjStartOff, reqCount);

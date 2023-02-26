@@ -208,7 +208,6 @@ struct shmipc_msg *shmipc_mgr_get_msg_nowait(struct shmipc_mgr *mgr,
 }
 
 off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
-  printf("[BENITA] shmipc_mgr_alloc_slot begin\n");
   struct shmipc_msg *rmsg;
   off_t ring_idx;
 
@@ -216,7 +215,6 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   ring_idx = ring_idx & mgr->mask;
   rmsg = IDX_TO_MSG(mgr, ring_idx);
 
-  printf("[BENITA] shmipc_mgr_alloc_slot before loop\n");
   // NOTE: If the buffer is not large enough and we happen to
   // circle back onto a slot that is still in use, we will have to wait
   // till it is free. Further, if some task ahead in the ring gets done
@@ -227,8 +225,6 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   while (__builtin_expect(rmsg->status != shmipc_STATUS_EMPTY, 0))
     ;
   
-  printf("[BENITA] shmipc_mgr_alloc_slot after while\n");
-
   // NOTE: This (below) might cause cache invalidations slowing down
   // server poll. Maybe client side should have a bitmap for the
   // ring slots to ensure that it is free?
@@ -269,19 +265,16 @@ void shmipc_mgr_put_msg(struct shmipc_mgr *mgr, off_t ring_idx,
 // TODO [BENITA] make macros/config
 // If -1 is returned it means that server did not respond
 int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off_t ring_idx,
-                        struct shmipc_msg *msg) {
-  printf("[BENITA] shmipc_mgr_put_msg_retry_exponential_backoff begin\n");
-  
-  int sleep_time = 1;
+                        struct shmipc_msg *msg) {  
+  int sleep_time = 3;
   int retry_count = 5;
   int ret = -1;
   int count = 0;
 
   while (ret == -1 && count < retry_count) {
-    printf("[BENITA] shmipc_mgr_put_msg_retry_exponential_backoff loop\n");
     shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg);
     
-    usleep(sleep_time);
+    sleep(sleep_time);
 
     ret = shmipc_mgr_poll_msg(mgr, ring_idx, msg);
 

@@ -458,6 +458,7 @@ AppProc::AppProc(int appIdx, int shmBaseOffset, AppCredential &credential)
       fdIncr(kFdBase),
       fdLock(ATOMIC_FLAG_INIT) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  std::cout << "[BENITA]" << shmBaseOffset << std::endl;
   cred = credential;
   shmKey = FS_SHM_KEY_BASE + shmBaseOffset + appIdx;
   SPDLOG_INFO("AppProc initialized shmKey:{}", shmKey);

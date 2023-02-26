@@ -44,47 +44,76 @@
 
 // if enabled, will print each api invocation
 // #define _CFS_LIB_PRINT_REQ_
-// #define LDB_PRINT_CALL
+#define LDB_PRINT_CALL
+
+void print_server_unavailable(const char *func_name) {
+  fprintf(stderr, "[WARN] Server is unavailable for function %s. \
+          Retry operation later.\n", func_name);
+}
+
+void print_admin_inode_reassignment(int type, uint32_t inode, int curOwner,
+                                int newOwner) {
+  fprintf(stderr, "-- fs_admin_inode_reassignment(%d, %d, %d, %d) --\n", type, inode,
+          curOwner, newOwner);                         
+}
 
 void print_open(const char *path, int flags, mode_t mode, bool ldb = false) {
-  fprintf(stderr, "open%s(%s, %d, %d) from tid %d\n", ldb ? "_ldb" : "", path,
+  fprintf(stderr, "-- open%s(%s, %d, %d) from tid %d --\n", ldb ? "_ldb" : "", path,
           flags, mode, threadFsTid);
 }
 
 void print_close(int fd, bool ldb = false) {
-  fprintf(stderr, "close%s(%d) from tid %d\n", ldb ? "_ldb" : "", fd,
+  fprintf(stderr, "-- close%s(%d) from tid %d --\n", ldb ? "_ldb" : "", fd,
           threadFsTid);
 }
 
 void print_pread(int fd, void *buf, size_t count, off_t offset,
                  bool ldb = false) {
-  fprintf(stderr, "pread%s(%d, %p, %lu, %ld) from tid %d\n", ldb ? "_ldb" : "",
+  fprintf(stderr, "-- pread%s(%d, %p, %lu, %ld) from tid %d --\n", ldb ? "_ldb" : "",
           fd, buf, count, offset, threadFsTid);
 }
 
 void print_read(int fd, void *buf, size_t count, bool ldb = false) {
-  fprintf(stderr, "read%s(%d, %p, %lu) from tid %d\n", ldb ? "_ldb" : "", fd,
+  fprintf(stderr, "-- read%s(%d, %p, %lu) from tid %d --\n", ldb ? "_ldb" : "", fd,
           buf, count, threadFsTid);
 }
 
 void print_write(int fd, const void *buf, size_t count, bool ldb = false) {
-  fprintf(stderr, "write%s(%d, %p, %lu) from tid %d\n", ldb ? "_ldb" : "", fd,
-          buf, count, threadFsTid);
+  fprintf(stderr, "-- write%s(%d, %s, %lu) from tid %d --\n", ldb ? "_ldb" : "", fd,
+          (char *) buf, count, threadFsTid);
+}
+
+void print_pwrite(int fd, const void *buf, size_t count, off_t offset) {
+  fprintf(stderr, "-- pwrite(%d, %s, %lu, %ld)\n --",
+          fd, (char *)buf, count, offset);
 }
 
 void print_fsync(int fd, bool ldb = false) {
-  fprintf(stderr, "fsync%s(%d) from tid %d\n", ldb ? "_ldb" : "", fd,
+  fprintf(stderr, "-- fsync%s(%d) from tid %d --\n", ldb ? "_ldb" : "", fd,
           threadFsTid);
 }
 
 void print_unlink(const char *path) {
-  fprintf(stderr, "unlink(%s) from tid %d\n", path, threadFsTid);
+  fprintf(stderr, "-- unlink(%s) from tid %d --\n", path, threadFsTid);
 }
 
 void print_rename(const char *oldpath, const char *newpath) {
-  fprintf(stderr, "rename(%s, %s) from tid %d\n", oldpath, newpath,
+  fprintf(stderr, "-- rename(%s, %s) from tid %d --\n", oldpath, newpath,
           threadFsTid);
 }
+
+void print_opendir(const char *path) {
+  fprintf(stderr, "-- opendir(%s) --\n", path);
+}
+
+void print_stat(const char *path) {
+  fprintf(stderr, "-- stat(%s) --\n", path);
+}
+
+void print_fstat(int fd) {
+  fprintf(stderr, "-- fstat(%d) --\n", fd);
+}
+
 
 //
 // helper functions to dump rbtree to stdout
@@ -683,7 +712,7 @@ static int send_noargop(FsService *fsServ, CfsOpCode opcode) {
   // send msg
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -1314,6 +1343,10 @@ static inline void prepare_inodeReassignmentOp(struct shmipc_msg *msg,
 //      Returning 0 indicates successful migration.
 int fs_admin_inode_reassignment(int type, uint32_t inode, int curOwner,
                                 int newOwner) {
+#ifdef LDB_PRINT_CALL
+  print_admin_inode_reassignment(type, inode, curOwner, newOwner);
+#endif
+  
   auto search = gServMngPtr->multiFsServMap.find(curOwner);
   if (search == gServMngPtr->multiFsServMap.end()) {
     throw std::runtime_error("Wid not found in multiFsServMap");
@@ -1329,6 +1362,7 @@ int fs_admin_inode_reassignment(int type, uint32_t inode, int curOwner,
   ring_idx = shmipc_mgr_alloc_slot_dbg(service->shmipc_mgr);
   irop = (decltype(irop))IDX_TO_XREQ(service->shmipc_mgr, ring_idx);
   prepare_inodeReassignmentOp(&msg, irop, type, inode, curOwner, newOwner);
+
   // TODO: Not sure if exponential backoff is need here
   shmipc_mgr_put_msg(service->shmipc_mgr, ring_idx, &msg);
 
@@ -1437,7 +1471,7 @@ int fs_stat_internal(FsService *fsServ, const char *pathname,
   prepare_statOp(&msg, statOp, pathname);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -1456,6 +1490,9 @@ cleanup:
 }
 
 int fs_stat(const char *pathname, struct stat *statbuf) {
+#ifdef LDB_PRINT_CALL
+  print_stat(pathname);
+#endif
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_STAT);
 #endif
@@ -1501,7 +1538,7 @@ int fs_fstat_internal(FsService *fsServ, int fd, struct stat *statbuf) {
   prepare_fstatOp(&msg, fstatOp, fd);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -1515,6 +1552,9 @@ cleanup:
 }
 
 int fs_fstat(int fd, struct stat *statbuf) {
+#ifdef LDB_PRINT_CALL
+  print_fstat(fd);
+#endif
   auto widIt = gLibSharedContext->fdWidMap.find(fd);
   if (widIt != gLibSharedContext->fdWidMap.end()) {
     return fs_fstat_internal(gServMngPtr->multiFsServMap[widIt->second], fd,
@@ -1541,7 +1581,7 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
   prepare_openOp(&msg, oop, path, flags, mode, size);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -1651,7 +1691,7 @@ int fs_close_internal(FsService *fsServ, int fd) {
   prepare_closeOp(&msg, cloOp, fd);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -1862,7 +1902,7 @@ int fs_unlink_internal(FsService *fsServ, const char *pathname) {
   prepare_unlinkOp(&msg, unlkop, pathname);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -1969,7 +2009,7 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name) {
 
   // send request
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return nullptr;
     }
 
@@ -2007,6 +2047,9 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name) {
 }
 
 CFS_DIR *fs_opendir(const char *name) {
+#ifdef LDB_PRINT_CALL
+  print_opendir(name);
+#endif
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_OPENDIR);
 #endif
@@ -2073,7 +2116,7 @@ int fs_rmdir_internal(FsService *fsServ, const char *pathname) {
   rmdOp = (struct rmdirOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_rmdirOp(&msg, rmdOp, pathname);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -2110,7 +2153,7 @@ int fs_rename_internal(FsService *fsServ, const char *oldpath,
   rnmOp = (struct renameOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_renameOp(&msg, rnmOp, oldpath, newpath);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -2152,7 +2195,7 @@ int fs_fsync_internal(FsService *fsServ, int fd, bool isDataSync) {
   fsyncOp = (struct fsyncOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_fsyncOp(&msg, fsyncOp, fd, isDataSync);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -2297,7 +2340,7 @@ ssize_t fs_read_internal(FsService *fsServ, int fd, void *buf, size_t count) {
     rop_p = (struct readOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
     prepare_readOp(&msg, rop_p, fd, count);
     if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -2329,7 +2372,6 @@ ssize_t fs_read_internal(FsService *fsServ, int fd, void *buf, size_t count) {
 
 static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
                                  size_t count, off_t offset) {
-  std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
   ssize_t rc;
 #ifdef _CFS_LIB_PRINT_REQ_
   pid_t curPid = syscall(__NR_gettid);
@@ -2337,21 +2379,17 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
           offset, curPid);
 #endif
   if (count < RING_DATA_ITEM_SIZE) {
-    std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
     struct shmipc_msg msg;
     struct preadOpPacked *prop_p;
     off_t ring_idx;
 
     memset(&msg, 0, sizeof(msg));
     ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
-    std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
     prop_p = (struct preadOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
     prepare_preadOp(&msg, prop_p, fd, count, offset);
-    std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-    std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
     if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -2375,6 +2413,9 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
 }
 
 ssize_t fs_read(int fd, void *buf, size_t count) {
+#ifdef LDB_PRINT_CALL
+  print_read(fd, buf, count);
+#endif
   int wid = -1;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_READ);
@@ -2398,12 +2439,14 @@ retry:
 }
 
 ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset) {
+#ifdef LDB_PRINT_CALL
+  print_pread(fd, buf, count, offset);
+#endif
   int wid = -1;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_PREAD);
 #endif
 retry:
-  std::cout << "[BENITA] " << __func__ << "\t" << __LINE__ << std::endl;
   auto service = getFsServiceForFD(fd, wid);
   ssize_t rc = fs_pread_internal(service, fd, buf, count, offset);
   if (rc < 0) {
@@ -2447,7 +2490,7 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
 
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
     if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -2485,7 +2528,7 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
 
       // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
       if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
       
@@ -2538,7 +2581,7 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
 
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
     if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
     ssize_t rc = pwop_p->rwOp.ret;
@@ -2556,6 +2599,9 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
 }
 
 ssize_t fs_write(int fd, const void *buf, size_t count) {
+#ifdef LDB_PRINT_CALL
+  print_write(fd, buf, count);
+#endif
   if (count == 0) return 0;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_WRITE);
@@ -2580,6 +2626,9 @@ retry:
 }
 
 ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset) {
+#ifdef LDB_PRINT_CALL
+  print_pwrite(fd, buf, count, offset);
+#endif
   if (count == 0) return 0;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_PWRITE);
@@ -2632,7 +2681,7 @@ static ssize_t fs_allocated_read_internal(FsService *fsServ, int fd, void *buf,
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
   }
   unpack_allocatedReadOp(arop_p, &arop);
@@ -2684,7 +2733,7 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
   unpack_allocatedPreadOp(aprop_p, &aprop);
@@ -2785,7 +2834,7 @@ static ssize_t fs_allocated_write_internal(FsService *fsServ, int fd, void *buf,
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
   unpack_allocatedWriteOp(awop_p, &awop);
@@ -2841,7 +2890,7 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
   rc = apwop_p->rwOp.ret;
@@ -3512,7 +3561,7 @@ ssize_t fs_uc_pread_renewonly_internal(FsService *fsServ, int fd,
   setLeaseOpRenewOnly(prop_p);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
   unpack_preadOp(prop_p, &prop);
@@ -3544,7 +3593,7 @@ ssize_t fs_uc_pread_internal(FsService *fsServ, int fd, void *buf,
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -3668,7 +3717,7 @@ off_t fs_lseek_internal(FsService *fsServ, int fd, long int offset,
   prepare_lseekOp(&msg, op, fd, offset, whence, file_offset);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 
@@ -3925,7 +3974,7 @@ static ssize_t fs_allocated_pread_internal_ldb(FsService *fsServ, int fd,
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
   unpack_allocatedPreadOp(aprop_p, &aprop);
@@ -4068,7 +4117,7 @@ int fs_wsync_internal(FsService *fsServ, int fd, bool isDataSync, off_t offset) 
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      std::cout << "[BENITA] Server unavailable" << std::endl;
+      print_server_unavailable(__func__);
       return -1;
     }
 

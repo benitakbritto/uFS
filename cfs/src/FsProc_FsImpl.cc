@@ -883,6 +883,7 @@ int64_t FsImpl::writeInodeAndSaveDataBlockInfo(FsReq *req, InMemInode *inode,
     uint32_t curBlockIdx = off / BSIZE;
     m = std::min(realBytes - tot, BSIZE - off % BSIZE);
     if (req->getBlockIoDone(srcPtr)) {
+      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       continue;
     }
     int curExtentArrIdx = getCurrentExtentArrIdx(
@@ -932,6 +933,7 @@ int64_t FsImpl::writeInodeAndSaveDataBlockInfo(FsReq *req, InMemInode *inode,
     }
 
     if (doWrite) {
+      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       if (first_byte_blkno == 0) {
         first_byte_blkno = dataBlockNo;
         first_byte_inblkoff = (off % BSIZE);
@@ -945,6 +947,7 @@ int64_t FsImpl::writeInodeAndSaveDataBlockInfo(FsReq *req, InMemInode *inode,
       dinodePtr->size = std::max(dinodePtr->size, off + m);
       inode->logEntry->set_size(dinodePtr->size);
       if (!itemPtr->isInMem()) {
+        std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
         SPDLOG_DEBUG("This write does not do RIO, but set it to inMem anyway");
         // If the writing does not require fetch block data in memory, set its
         // in memory here blockFetchedCallback() will releaseBlock
@@ -1233,11 +1236,13 @@ int64_t FsImpl::checkAndFlushDirty(FsProcWorker *worker) {
   int64_t numFlushed = 0;
   // flush DataBuffer
   if (dataBlockBuf_->checkIfNeedBgFlush()) {
+    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #if defined(_EXTENT_FOR_LDB_) || defined(_EXTENT_FOR_FILEBENCH_)
     throw std::runtime_error("Error, we don't want bg flush at all!");
 #endif
     // SPDLOG_INFO("[BG_FLUSH] flush dirty buffer (BG)");
     if (isDebug) {
+      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       // worker->writeToWorkerLog("will do flushToDisk");
       SPDLOG_DEBUG("checkAndFlushDirty, will do flush");
     }
@@ -1262,6 +1267,7 @@ int64_t FsImpl::checkAndFlushDirty(FsProcWorker *worker) {
       dataBlockBuf_->doFlushDone(emptyVec);
     }
   } else {
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     numFlushed = -1;
   }
   

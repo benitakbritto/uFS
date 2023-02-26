@@ -764,6 +764,7 @@ void FileMng::processOpen(FsReq *req) {
 void FileMng::processWrite(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::WRITE_MODIFY) {
+    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.write.rwOp.count;
     // if (fileObj != nullptr) {
@@ -786,11 +787,13 @@ void FileMng::processWrite(FsReq *req) {
         req->setState(FsReqState::WRITE_RET_ERR);
       } else {
         if (req->numTotalPendingIoReq() == 0) {
+          std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
           // success
           req->getClientOp()->op.write.rwOp.ret = nWrite;
           // fileObj->off += nWrite;
           req->setState(FsReqState::WRITE_UPDATE_INODE);
         } else {
+          std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
           submitFsGeneratedRequests(req);
         }
       }
@@ -801,6 +804,7 @@ void FileMng::processWrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::WRITE_UPDATE_INODE) {
+    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.write.rwOp.count;
     if (reqCount > RING_DATA_ITEM_SIZE || reqCount <= 0) {
@@ -825,10 +829,12 @@ void FileMng::processWrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::WRITE_MODIFY_DONE) {
+    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     fsWorker_->submitFsReqCompletion(req);
   }
 
   if (req->getState() == FsReqState::WRITE_RET_ERR) {
+    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
@@ -838,6 +844,7 @@ void FileMng::processWrite(FsReq *req) {
 void FileMng::processPwrite(FsReq *req) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::PWRITE_MODIFY) {
+    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.pwrite.rwOp.count;
     uint64_t fobjStartOff = req->getClientOp()->op.pwrite.offset;
@@ -860,12 +867,14 @@ void FileMng::processPwrite(FsReq *req) {
         req->setState(FsReqState::PWRITE_RET_ERR);
       } else {
         if (req->numTotalPendingIoReq() == 0) {
+          std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
           // success
           req->getClientOp()->op.pwrite.rwOp.ret = nWrite;
           //// do not update offset fo pwrite
           //// fileObj->off += nWrite;
           req->setState(FsReqState::PWRITE_UPDATE_INODE);
         } else {
+          std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
           submitFsGeneratedRequests(req);
         }
       }
@@ -876,6 +885,7 @@ void FileMng::processPwrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::PWRITE_UPDATE_INODE) {
+    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.pwrite.rwOp.count;
     if (reqCount > RING_DATA_ITEM_SIZE || reqCount <= 0) {
@@ -902,6 +912,7 @@ void FileMng::processPwrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::PWRITE_MODIFY_DONE) {
+    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     fsWorker_->submitFsReqCompletion(req);
   }
 

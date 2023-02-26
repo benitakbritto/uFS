@@ -1,0 +1,4 @@
+lsdir /
+statall /
+stat /t0
+fstat 2

@@ -1718,6 +1718,7 @@ int FsProcWorker::pollReqFromApps() {
       if (msgPtr == nullptr) {
         continue;
       } else {
+        std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
         msgPtr->status = shmipc_STATUS_IN_PROGRESS;
         numAppReqPolled++;
         copPtr = getClientOpForMsg(app, msgPtr, ringIdx);
@@ -1735,6 +1736,7 @@ int FsProcWorker::pollReqFromApps() {
 }
 
 void FsProcWorker::processReqOnRecv(FsReq *req) {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int reqFlags = req->getReqTypeFlags();
   // every request should have some flags
   assert(reqFlags != FsReqFlags::no_flags);
@@ -1775,6 +1777,7 @@ void FsProcWorker::processReqOnRecv(FsReq *req) {
       primaryProcessPathReq(req);
       return;
     case FsReqFlags::client_control_plane:
+      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       processClientControlPlaneReq(req);
       return;
     default:
@@ -2104,6 +2107,7 @@ void FsProcWorker::processClientControlPlaneReq(FsReq *req) {
       goto submit_completion;
 
     case FsReqType::INODE_REASSIGNMENT: {
+      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       // Might be the case the worker has not been waken up yet
       // So check and set here.
       // Might be some chance for race, but this is a test-purpose op
@@ -3751,7 +3755,7 @@ void FsProcWorkerServant::recvJoinAll(fsp_lm::PerWorkerLoadAllowance *allow) {
 }
 
 int FsProcWorkerServant::checkSplitJoinComm() {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   WorkerCommMessage *msg = nullptr;
   WorkerCommMessage *sendMsg = nullptr;
   msg = commBridgeWithMaster_->Get(this, &sendMsg, logger);
@@ -3777,7 +3781,7 @@ int FsProcWorkerServant::checkSplitJoinComm() {
     }
   }  // end of processing message (msg != nullptr)
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return numMsg;
 }
 

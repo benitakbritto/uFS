@@ -1,0 +1,4 @@
+create fileA
+write 13 hello_world
+pread 13 11 0
+unlink fileA

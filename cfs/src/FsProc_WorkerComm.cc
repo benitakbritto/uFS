@@ -6,30 +6,30 @@
 
 WorkerCommMessage *genFileInodeOutMsg(WorkerCommMessageType tp,
                                       InMemInode *inodePtr, FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto msgPtr = new WorkerCommMessage(tp);
   msgPtr->targetInode = inodePtr;
   msgPtr->sendMsg = nullptr;
   msgPtr->req = req;
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return msgPtr;
 }
 
 WorkerCommMessage *genFileInodeOutReplyMsg(WorkerCommMessageType tp,
                                            WorkerCommMessage *sendMsg) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto msgPtr = new WorkerCommMessage(tp);
   assert(checkWkCommMsgReplyTypeMatchSent(sendMsg->msgType, tp));
   msgPtr->targetInode = sendMsg->targetInode;
   msgPtr->sendMsg = sendMsg;
   msgPtr->req = sendMsg->req;
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return msgPtr;
 }
 
 bool WorkerCommBridge::Put(FsProcWorker *putter_worker, WorkerCommMessage *msg,
                            std::shared_ptr<spdlog::logger> curLogger) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto curSendQueue = getWorkerSendQueue(putter_worker);
   if (curSendQueue == nullptr) {
     const char *warnMsg = "Put() cannot find corresponding sending worker";
@@ -40,14 +40,14 @@ bool WorkerCommBridge::Put(FsProcWorker *putter_worker, WorkerCommMessage *msg,
   if (rc) {
     waitForReplyMsg_[getWorkerIdx(putter_worker)].emplace(msg);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return rc;
 }
 
 WorkerCommMessage *WorkerCommBridge::Get(
     FsProcWorker *getter_worker, WorkerCommMessage **msg,
     std::shared_ptr<spdlog::logger> curLogger) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(msg != nullptr);
   *msg = nullptr;
   auto curRecvQueue = getWorkerRecvQueue(getter_worker);
@@ -68,6 +68,6 @@ WorkerCommMessage *WorkerCommBridge::Get(
       assert(eraseNum);
     }
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return msg_ptr;
 }

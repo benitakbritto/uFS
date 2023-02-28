@@ -2623,7 +2623,6 @@ void FsProcWorker::notifyWriteOps() {
         off_t ring_idx;
         memset(&msg, 0, sizeof(msg));
         ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr); // Is this correct?
-        std::cout << "[BENITA] ring_idx = " << ring_idx << std::endl;
         msg.retval = reqId;
         shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
       }

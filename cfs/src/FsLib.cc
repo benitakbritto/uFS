@@ -234,14 +234,14 @@ FsService::FsService(int wid, key_t key)
 
   // TODO: Fix, thread not working -> causing seg fault
   // Maybe due to using the same ring buf
-  // notificationListener_ = new std::thread(&FsService::notificationListenerLoop, this);
+  notificationListener_ = new std::thread(&FsService::notificationListenerLoop, this);
 }
 
 // TODO
 // TODO: Not sure if the same ring should be used
 // TODO: revert it to loop when used in thread
 void FsService::notificationListenerLoop() {
-  // while(true) {
+  while(true) {
     uint8_t count = 0;
     shmipc_msg msg;
     off_t ringIdx = 0;
@@ -250,21 +250,32 @@ void FsService::notificationListenerLoop() {
     do {
       memset(&msg, 0, sizeof(struct shmipc_msg));
       auto ret = shmipc_mgr_poll_notify_msg(shmipc_mgr, ringIdx, &msg);
-      std::cout << "[BENITA] ringIdx = " << ringIdx << std::endl;
-      if (ret != -1) {                
-        std::cout << "[BENITA] request id = " << msg.retval << std::endl;
-        
-        // TODO: handle the msg
-
-        // TODO: deallocate msg
-        shmipc_mgr_dealloc_slot(shmipc_mgr, ringIdx);
-        
+      if (ret != -1) {                        
+        handleServerNotification(msg.retval);
+        shmipc_mgr_dealloc_slot(shmipc_mgr, ringIdx);        
       }
       ringIdx++;
     } while (ringIdx < RING_SIZE);
 
     sleep(5); // TODO: configure this
- // };
+ };
+}
+
+void FsService::handleServerNotification(int64_t requestId) {
+  auto type = gPendingRequestMap[requestId]->type;
+
+  switch(type) {
+    case CfsOpCode::CFS_OP_OPEN:
+      throw std::runtime_error("Unimplemented");
+      break;
+    case CfsOpCode::CFS_OP_PWRITE:
+    case CfsOpCode::CFS_OP_WRITE:
+      updatePendingRequestMapStatus(requestId, FS_SPECULATIVE_STATUS);
+      break;
+    default:
+      throw std::runtime_error("Request type not supported");
+      break;
+  }
 }
 
 void FsService::cleanupNotificationListener() {

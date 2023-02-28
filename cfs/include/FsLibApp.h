@@ -110,6 +110,8 @@ class FsService {
 
   void cleanupNotificationListener();
 
+  void handleServerNotification(int64_t requestId);
+
  private:
   std::list<int> unusedRingSlots;
   std::atomic_flag unusedSlotsLock;

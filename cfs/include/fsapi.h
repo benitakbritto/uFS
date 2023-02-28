@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <unordered_map>
 
 #include "fs_defs.h"
 
@@ -59,6 +60,8 @@ int fs_stop_dump_load_stats();
 
 // dump all inodes to /tmp
 int fs_dumpinodes(int wid);
+
+int fs_dump_pendingops();
 ////////////////////////////////////////////////////////////////////////////////
 // POSIX API
 

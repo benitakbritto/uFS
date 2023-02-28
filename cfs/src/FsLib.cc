@@ -46,6 +46,65 @@
 // #define _CFS_LIB_PRINT_REQ_
 #define LDB_PRINT_CALL
 
+// TODO: Lock over gRequestId
+uint64_t gRequestId = 0;
+
+/// Pending ops state 
+typedef struct RequestDetailsStruct {
+  uint8_t type; 
+  const char *path;
+  int flags;
+  mode_t mode;
+  int fd;
+  size_t count; 
+  off_t offset;
+  uint8_t status;
+} RequestDetails;
+
+std::unordered_map<uint64_t, RequestDetails*> gPendingRequestMap;
+
+void addOpenToPendingRequestMap(uint64_t id, const char *path, int flags, mode_t mode) {
+  // TODO: Lock
+
+  RequestDetails* details = (RequestDetails*) malloc(sizeof(RequestDetails));
+  details->type = CFS_OP_OPEN;
+  details->path = path;
+  details->flags = flags;
+  details->mode = mode;
+  details->fd = -1;
+  details->count = 0;
+  details->offset = 0;
+  details->status = FS_PENDING_STATUS;
+  gPendingRequestMap[id] = details;
+}
+
+void addPwriteToPendingRequestMap(uint64_t id, int fd, size_t count,
+  off_t offset) {
+  RequestDetails* details = (RequestDetails*) malloc(sizeof(RequestDetails));
+  details->type = CFS_OP_PWRITE;
+  details->path = nullptr;
+  details->flags = 0;
+  details->mode = 0;
+  details->fd = fd;
+  details->count = count;
+  details->offset = offset;
+  details->status = FS_PENDING_STATUS;
+  gPendingRequestMap[id] = details;
+}
+
+void updatePendingRequestMapStatus(uint64_t id, uint8_t status) {
+  // TODO: Lock
+  gPendingRequestMap[id]->status = status; 
+}
+
+void clearPendingRequestFromMap(uint64_t id) {
+  // TODO: Lock
+  free(gPendingRequestMap[id]);
+  gPendingRequestMap.erase(id);
+}
+
+///////
+
 void print_server_unavailable(const char *func_name) {
   fprintf(stderr, "[WARN] Server is unavailable for function %s. \
           Retry operation later.\n", func_name);
@@ -113,7 +172,6 @@ void print_stat(const char *path) {
 void print_fstat(int fd) {
   fprintf(stderr, "-- fstat(%d) --\n", fd);
 }
-
 
 //
 // helper functions to dump rbtree to stdout
@@ -458,7 +516,10 @@ static inline void prepare_pwriteOp(struct shmipc_msg *msg,
                                     size_t count, off_t offset) {
   msg->type = CFS_OP_PWRITE;
   op->offset = offset;
+  op->requestId = gRequestId++;
   prepare_rwOpCommon(&(op->rwOp), fd, count);
+
+  addPwriteToPendingRequestMap(op->requestId, fd, count, offset);
 }
 
 static inline void prepare_lseekOp(struct shmipc_msg *msg, struct lseekOp *op,
@@ -488,12 +549,15 @@ struct openOp *fillOpenOp(struct clientOp *curCop, const char *path, int flags,
 static inline void prepare_openOp(struct shmipc_msg *msg, struct openOp *op,
                                   const char *path, int flags, mode_t mode,
                                   uint64_t *size = nullptr) {
+  op->requestId = gRequestId++;
   msg->type = CFS_OP_OPEN;
   op->flags = flags;
   op->mode = mode;
   op->lease = size != nullptr;
   EmbedThreadIdToAsOpRet(op->ret);
   adjustPath(path, &(op->path[0]));
+
+  addOpenToPendingRequestMap(op->requestId, path, flags, mode);
 }
 
 struct closeOp *fillCloseOp(struct clientOp *curCop, int fd) {
@@ -1448,6 +1512,22 @@ int fs_admin_thread_reassign(int src_wid, int dst_wid, int flag) {
 int fs_dumpinodes_internal(FsService *fsServ) {
   int ret = send_noargop<dumpinodesOp>(fsServ, CFS_OP_DUMPINODES);
   return ret;
+}
+
+// TODO: Lock
+// NOTE: For testing purposes only
+int fs_dump_pendingops() {
+  for (auto &[key, val]: gPendingRequestMap) {
+    if (val->status == FS_PENDING_STATUS) {
+      std::cout << "req #" << key << " " << "pending" << std::endl;
+    } else if (val->status == FS_SPECULATIVE_STATUS) {
+      std::cout << "req #" << key << " " << "speculative" << std::endl;
+    } else if (val->status == FS_COMPLETED_STATUS) {
+      std::cout << "req #" << key << " " << "completed" << std::endl;
+    }
+  }
+
+  return 0;
 }
 
 int fs_dumpinodes(int wid) {
@@ -2588,6 +2668,8 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     if (rc < 0) {
       shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
       return rc;
+    } else {
+      updatePendingRequestMapStatus(pwop_p->requestId, FS_SPECULATIVE_STATUS);
     }
 
     total_rc += rc;
@@ -2595,6 +2677,7 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     toWrite -= tmpBytes;
     shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
   }
+
   return total_rc;
 }
 

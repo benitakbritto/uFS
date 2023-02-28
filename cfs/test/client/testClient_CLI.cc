@@ -102,6 +102,8 @@ void printHelp() {
                           " <inode> <curOwner> <newOwner>\n");
   printf(ANSI_COLOR_GREEN "thread_reassign" ANSI_COLOR_RESET
                           " <src_wid> <dst_wid>\n");
+  printf(ANSI_COLOR_GREEN "view_pending_ops" ANSI_COLOR_RESET
+                          "\n");
 }
 
 void printReturnValue(std::string const &cmd, ssize_t v) {
@@ -614,7 +616,17 @@ void process(std::string const &line) {
 #endif
       }
 
-    } else {
+    } else if (tokens[0] == "view_pending_ops") {
+      if (tokens.size() != 1) {
+        printHelp();
+      } else {
+        #ifndef TEST_VFS_INSTEAD
+        int ret = fs_dump_pendingops();
+        printReturnValue(tokens[0], ret);
+        #endif
+      }
+    }
+    else {
       printHelp();
     }
   }

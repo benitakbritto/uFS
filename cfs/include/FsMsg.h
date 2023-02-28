@@ -47,6 +47,7 @@ struct writeOpPacked {
 struct pwriteOpPacked {
   struct rwOpCommonPacked rwOp;
   off_t offset;
+  uint64_t requestId;
 };
 
 #pragma pack(1)

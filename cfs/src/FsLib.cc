@@ -65,7 +65,6 @@ std::unordered_map<uint64_t, RequestDetails*> gPendingRequestMap;
 
 void inline addCreateToPendingRequestMap(uint64_t id, const char *path, int flags, mode_t mode) {
   // TODO: Lock
-  std::cout << "[BENITA] " << __func__ << std::endl;
   RequestDetails* details = (RequestDetails*) malloc(sizeof(RequestDetails));
   details->type = CFS_OP_OPEN;
   details->path = path;
@@ -76,12 +75,10 @@ void inline addCreateToPendingRequestMap(uint64_t id, const char *path, int flag
   details->offset = 0;
   details->status = FS_PENDING_STATUS;
   gPendingRequestMap[id] = details;
-  std::cout << "[BENITA] " << __func__ << std::endl;
 }
 
 void inline addPwriteToPendingRequestMap(uint64_t id, int fd, size_t count,
   off_t offset) {
-  std::cout << "[BENITA] " << __func__ << std::endl;
   RequestDetails* details = (RequestDetails*) malloc(sizeof(RequestDetails));
   details->type = CFS_OP_PWRITE;
   details->path = nullptr;
@@ -92,7 +89,6 @@ void inline addPwriteToPendingRequestMap(uint64_t id, int fd, size_t count,
   details->offset = offset;
   details->status = FS_PENDING_STATUS;
   gPendingRequestMap[id] = details;
-  std::cout << "[BENITA] " << __func__ << std::endl;
 }
 
 void inline updatePendingRequestMapStatus(uint64_t id, uint8_t status) {
@@ -242,7 +238,6 @@ FsService::FsService(int wid, key_t key)
   notificationListener_ = new std::thread(&FsService::notificationListenerLoop, this);
 }
 
-// TODO
 // TODO: Not sure if the same ring should be used
 void FsService::notificationListenerLoop() {
   while(true) {

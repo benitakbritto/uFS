@@ -850,7 +850,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         SPDLOG_DEBUG("pwrite-err set return value to:{}",
                      cop->op.pwrite.rwOp.ret);
       } else {
-        flushPendingDataOpMap[app->getPid()].push_back(
+        flushPendingDataOpMap[app->getPid()][fsReq->fd].push_back(
           fsReq->getClientOp()->op.pwrite.rwOp.requestId);
       }
 
@@ -979,7 +979,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         do_check_inode_migration = true;
 
         if (curType == FsReqType::CREATE) {
-          flushPendingMetadataOpMap[app->getPid()].push_back(cop->op.open.requestId);
+          flushPendingMetadataOpMap[app->getPid()][fsReq->getTargetInode()->i_no].push_back(cop->op.open.requestId);
         }
       }
       cop->opStatus = OP_DONE;
@@ -1100,6 +1100,9 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
       }
       cop->opStatus = OP_DONE;
       copy_msg(fsync);
+
+      notifyFileWriteOps(FS_COMPLETED_STATUS, fsReq->fd); 
+      notifyFileMetadataOps(FS_COMPLETED_STATUS, fsReq->fd);
     }
   } else if (curType == FsReqType::WSYNC) {
     SPDLOG_DEBUG("submitFsReqCompletion for wsync ret:{}");
@@ -1132,6 +1135,9 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
       }
       cop->opStatus = OP_DONE;
       copy_msg(syncall);
+
+      notifyAllMetadataOps(FS_COMPLETED_STATUS);
+      notifyAllWriteOps(FS_COMPLETED_STATUS);
     }
   } else if (curType == FsReqType::SYNCUNLINKED) {
     SPDLOG_DEBUG("submitFsReqCompletion for Syncunlinked");
@@ -2613,51 +2619,115 @@ void FsProcWorker::opStatsAccountSingleOpDone(FsReqType reqType, size_t bytes) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
+// TODO: rewrite
 // TODO: Maybe Use a different shmipc_msg structure
-void FsProcWorker::notifyWriteOps(uint8_t type) {
+void FsProcWorker::notifyAllWriteOps(uint8_t type) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
-  for (auto &[appPid, reqIdList]: flushPendingDataOpMap) {
+  for (auto &[appPid, inodeReqMap]: flushPendingDataOpMap) {
+    for (auto &[inodeNum, reqIdList]: inodeReqMap) {
       for (auto reqId: reqIdList) {
         // put msg in ring buff
         struct shmipc_msg msg;
         off_t ring_idx;
         memset(&msg, 0, sizeof(msg));
-        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr); // Is this correct?
+        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
         msg.retval = reqId;
+        std::cout << "[BENITA] reqId = " << reqId << std::endl;
         msg.type = type;
         shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
       }
-      // causing seg fault
-      // if (type == FS_COMPLETED_STATUS) {
-      //   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
-      //   flushPendingDataOpMap.erase(appPid);
-      //   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
-      // }
+    }
   } 
+
+  if (type == FS_COMPLETED_STATUS) {
+    // cleanup
+    flushPendingDataOpMap.clear();
+  }
+  
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
-void FsProcWorker::notifyMetadataOps(uint8_t type) {
+// TODO: Rewrite
+void FsProcWorker::notifyAllMetadataOps(uint8_t type) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
-  for (auto &[appPid, reqIdList]: flushPendingMetadataOpMap) {
+  for (auto &[appPid, inodeReqMap]: flushPendingMetadataOpMap) {
+    for (auto &[inodeNum, reqIdList]: inodeReqMap) {
       for (auto reqId: reqIdList) {
         // put msg in ring buff
         struct shmipc_msg msg;
         off_t ring_idx;
         memset(&msg, 0, sizeof(msg));
-        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr); // Is this correct?
+        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
+        msg.retval = reqId;
+        msg.type = type;
+        std::cout << "[BENITA] reqId = " << reqId << std::endl;
+        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
+      }
+    }
+  } 
+
+  if (type == FS_COMPLETED_STATUS) {
+    // cleanup
+    flushPendingMetadataOpMap.clear();
+  }
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+}
+
+void FsProcWorker::notifyFileWriteOps(uint8_t type, cfs_ino_t inodeNum) {
+  for (auto &[appPid, inodeReqMap]: flushPendingDataOpMap) {
+    auto itr = inodeReqMap.find(inodeNum);
+    if (itr != inodeReqMap.end()) {
+      for (auto reqId: itr->second) {
+        // put msg in ring buff
+        struct shmipc_msg msg;
+        off_t ring_idx;
+        memset(&msg, 0, sizeof(msg));
+        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
         msg.retval = reqId;
         msg.type = type;
         shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
       }
+    } else {
+      return;
+    }
+  }
 
-      // causing seg fault
-      // if (type == FS_COMPLETED_STATUS) {
-      //   flushPendingMetadataOpMap.erase(appPid);
-      // }
-  } 
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  if (type == FS_COMPLETED_STATUS) {
+    // cleanup
+    for (auto &[appPid, inodeReqMap]: flushPendingDataOpMap) {
+      flushPendingDataOpMap[appPid].erase(inodeNum);
+    }
+  }
 }
+
+void FsProcWorker::notifyFileMetadataOps(uint8_t type, cfs_ino_t inodeNum) {
+  for (auto &[appPid, inodeReqMap]: flushPendingMetadataOpMap) {
+    auto itr = inodeReqMap.find(inodeNum);
+    if (itr != inodeReqMap.end()) {
+      for (auto reqId: itr->second) {
+        // put msg in ring buff
+        struct shmipc_msg msg;
+        off_t ring_idx;
+        memset(&msg, 0, sizeof(msg));
+        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
+        msg.retval = reqId;
+        msg.type = type;
+        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
+      }
+    } else {
+      return;
+    }
+  }
+
+  if (type == FS_COMPLETED_STATUS) {
+    // cleanup
+    for (auto &[appPid, inodeReqMap]: flushPendingMetadataOpMap) {
+      flushPendingMetadataOpMap[appPid].erase(inodeNum);
+    }
+  }
+}
+
+
 
 FsProcWorkerMaster::FsProcWorkerMaster(int w, CurBlkDev *d, int shmBaseOffset,
                                        std::atomic_bool *workerRunning,
@@ -4057,8 +4127,8 @@ void FsProcWorker::blockingFlushBufferOnExit() {
 #endif
 
   // notify
-  notifyMetadataOps(FS_COMPLETED_STATUS);
-  notifyWriteOps(FS_COMPLETED_STATUS);
+  notifyAllMetadataOps(FS_COMPLETED_STATUS);
+  notifyAllWriteOps(FS_COMPLETED_STATUS);
 
   // SPDLOG_INFO("wid:{} All buffers successfully flushed to disk ~~~", getWid());
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;

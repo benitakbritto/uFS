@@ -64,7 +64,7 @@ int64_t FileMng::checkAndFlushBufferDirtyItems() {
   // TODO: Move ti FsProc_Worker
   // notify clients
   if (ret > 0) {
-    fsWorker_->notifyWriteOps(FS_SPECULATIVE_STATUS);
+    fsWorker_->notifyAllWriteOps(FS_SPECULATIVE_STATUS);
   }
 
   return ret;

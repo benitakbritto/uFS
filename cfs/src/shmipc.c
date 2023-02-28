@@ -323,7 +323,6 @@ int shmipc_mgr_poll_notify_msg(struct shmipc_mgr *mgr, off_t idx,
   rmsg = IDX_TO_MSG(mgr, idx);
   if (rmsg->status != shmipc_STATUS_NOTIFY_FOR_CLIENT) return -1;
 
-  printf("[BENITA] got notify message\n");
   memcpy(msg, rmsg, 64);
   return 0;          
 }

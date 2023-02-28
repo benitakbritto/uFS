@@ -59,13 +59,12 @@ FileMng::~FileMng() { delete fsImpl_; }
 void FileMng::flushMetadataOnExit() { fsImpl_->flushMetadataOnExit(fsWorker_); }
 
 int64_t FileMng::checkAndFlushBufferDirtyItems() {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto ret = fsImpl_->checkAndFlushDirty(fsWorker_);
   
   // TODO: Move ti FsProc_Worker
   // notify clients
   if (ret > 0) {
-    fsWorker_->notifyWriteOps();
+    fsWorker_->notifyWriteOps(FS_SPECULATIVE_STATUS);
   }
 
   return ret;

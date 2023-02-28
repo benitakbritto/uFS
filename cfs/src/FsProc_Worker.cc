@@ -2613,8 +2613,8 @@ void FsProcWorker::opStatsAccountSingleOpDone(FsReqType reqType, size_t bytes) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
-// TODO: Use a different shmipc_msg
-void FsProcWorker::notifyWriteOps() {
+// TODO: Maybe Use a different shmipc_msg structure
+void FsProcWorker::notifyWriteOps(uint8_t type) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (auto &[appPid, reqIdList]: flushPendingDataOpMap) {
       for (auto reqId: reqIdList) {
@@ -2624,15 +2624,20 @@ void FsProcWorker::notifyWriteOps() {
         memset(&msg, 0, sizeof(msg));
         ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr); // Is this correct?
         msg.retval = reqId;
+        msg.type = type;
         shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
       }
-
-      flushPendingDataOpMap.erase(appPid);
+      // causing seg fault
+      // if (type == FS_COMPLETED_STATUS) {
+      //   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+      //   flushPendingDataOpMap.erase(appPid);
+      //   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+      // }
   } 
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
-void FsProcWorker::notifyMetadataOps() {
+void FsProcWorker::notifyMetadataOps(uint8_t type) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (auto &[appPid, reqIdList]: flushPendingMetadataOpMap) {
       for (auto reqId: reqIdList) {
@@ -2642,14 +2647,17 @@ void FsProcWorker::notifyMetadataOps() {
         memset(&msg, 0, sizeof(msg));
         ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr); // Is this correct?
         msg.retval = reqId;
+        msg.type = type;
         shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
       }
 
-      flushPendingMetadataOpMap.erase(appPid);
+      // causing seg fault
+      // if (type == FS_COMPLETED_STATUS) {
+      //   flushPendingMetadataOpMap.erase(appPid);
+      // }
   } 
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
-
 
 FsProcWorkerMaster::FsProcWorkerMaster(int w, CurBlkDev *d, int shmBaseOffset,
                                        std::atomic_bool *workerRunning,
@@ -4049,8 +4057,8 @@ void FsProcWorker::blockingFlushBufferOnExit() {
 #endif
 
   // notify
-  notifyMetadataOps();
-  notifyWriteOps();
+  notifyMetadataOps(FS_COMPLETED_STATUS);
+  notifyWriteOps(FS_COMPLETED_STATUS);
 
   // SPDLOG_INFO("wid:{} All buffers successfully flushed to disk ~~~", getWid());
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;

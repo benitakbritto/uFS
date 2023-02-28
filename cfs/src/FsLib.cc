@@ -63,9 +63,9 @@ typedef struct RequestDetailsStruct {
 
 std::unordered_map<uint64_t, RequestDetails*> gPendingRequestMap;
 
-void addOpenToPendingRequestMap(uint64_t id, const char *path, int flags, mode_t mode) {
+void inline addCreateToPendingRequestMap(uint64_t id, const char *path, int flags, mode_t mode) {
   // TODO: Lock
-
+  std::cout << "[BENITA] " << __func__ << std::endl;
   RequestDetails* details = (RequestDetails*) malloc(sizeof(RequestDetails));
   details->type = CFS_OP_OPEN;
   details->path = path;
@@ -76,10 +76,12 @@ void addOpenToPendingRequestMap(uint64_t id, const char *path, int flags, mode_t
   details->offset = 0;
   details->status = FS_PENDING_STATUS;
   gPendingRequestMap[id] = details;
+  std::cout << "[BENITA] " << __func__ << std::endl;
 }
 
-void addPwriteToPendingRequestMap(uint64_t id, int fd, size_t count,
+void inline addPwriteToPendingRequestMap(uint64_t id, int fd, size_t count,
   off_t offset) {
+  std::cout << "[BENITA] " << __func__ << std::endl;
   RequestDetails* details = (RequestDetails*) malloc(sizeof(RequestDetails));
   details->type = CFS_OP_PWRITE;
   details->path = nullptr;
@@ -90,19 +92,24 @@ void addPwriteToPendingRequestMap(uint64_t id, int fd, size_t count,
   details->offset = offset;
   details->status = FS_PENDING_STATUS;
   gPendingRequestMap[id] = details;
+  std::cout << "[BENITA] " << __func__ << std::endl;
 }
 
-void updatePendingRequestMapStatus(uint64_t id, uint8_t status) {
+void inline updatePendingRequestMapStatus(uint64_t id, uint8_t status) {
   // TODO: Lock
   gPendingRequestMap[id]->status = status; 
 }
 
-void clearPendingRequestFromMap(uint64_t id) {
+void inline clearPendingRequestFromMap(uint64_t id) {
   // TODO: Lock
   free(gPendingRequestMap[id]);
   gPendingRequestMap.erase(id);
 }
 
+// TODO: Lock
+uint64_t inline getNewRequestId() {
+  return gRequestId++;
+}
 ///////
 
 void print_server_unavailable(const char *func_name) {
@@ -232,14 +239,11 @@ FsService::FsService(int wid, key_t key)
   }
   initService();
 
-  // TODO: Fix, thread not working -> causing seg fault
-  // Maybe due to using the same ring buf
   notificationListener_ = new std::thread(&FsService::notificationListenerLoop, this);
 }
 
 // TODO
 // TODO: Not sure if the same ring should be used
-// TODO: revert it to loop when used in thread
 void FsService::notificationListenerLoop() {
   while(true) {
     uint8_t count = 0;
@@ -251,7 +255,7 @@ void FsService::notificationListenerLoop() {
       memset(&msg, 0, sizeof(struct shmipc_msg));
       auto ret = shmipc_mgr_poll_notify_msg(shmipc_mgr, ringIdx, &msg);
       if (ret != -1) {                        
-        handleServerNotification(msg.retval);
+        handleServerNotification(msg.retval, msg.type);
         shmipc_mgr_dealloc_slot(shmipc_mgr, ringIdx);        
       }
       ringIdx++;
@@ -261,25 +265,12 @@ void FsService::notificationListenerLoop() {
  };
 }
 
-void FsService::handleServerNotification(int64_t requestId) {
-  auto type = gPendingRequestMap[requestId]->type;
-
-  switch(type) {
-    case CfsOpCode::CFS_OP_OPEN:
-      throw std::runtime_error("Unimplemented");
-      break;
-    case CfsOpCode::CFS_OP_PWRITE:
-    case CfsOpCode::CFS_OP_WRITE:
-      updatePendingRequestMapStatus(requestId, FS_SPECULATIVE_STATUS);
-      break;
-    default:
-      throw std::runtime_error("Request type not supported");
-      break;
-  }
+void FsService::handleServerNotification(int64_t requestId, uint8_t type) {
+  updatePendingRequestMapStatus(requestId, type);
 }
 
 void FsService::cleanupNotificationListener() {
-  // notificationListener_->join();
+  notificationListener_->join();
 }
 
 // Assume 0 means no shmKey available
@@ -414,11 +405,11 @@ static inline void fillRwOpCommon(struct rwOpCommon *opc, int fd,
 /* The following prepare_* functions are used to prepare a struct to be sent
  * over shmipc */
 static inline void prepare_rwOpCommon(struct rwOpCommonPacked *op, int fd,
-                                      size_t count) {
+                                      size_t count, uint64_t requestId = 0) {
   op->fd = fd;
   op->count = count;
   op->flag = 0;
-  op->requestId = gRequestId++; // TODO: Lock
+  op->requestId = requestId;
   EmbedThreadIdToAsOpRet(op->ret);
   if (FS_LIB_USE_APP_BUF) op->flag |= _RWOP_FLAG_FSLIB_ENABLE_APP_BUF_;
 }
@@ -563,12 +554,11 @@ struct pwriteOp *fillPWriteOp(struct clientOp *curCop, int fd, size_t count,
 
 static inline void prepare_pwriteOp(struct shmipc_msg *msg,
                                     struct pwriteOpPacked *op, int fd,
-                                    size_t count, off_t offset) {
+                                    size_t count, off_t offset, 
+                                    uint64_t requestId) {
   msg->type = CFS_OP_PWRITE;
   op->offset = offset;
-  prepare_rwOpCommon(&(op->rwOp), fd, count);
-
-  addPwriteToPendingRequestMap(op->rwOp.requestId, fd, count, offset);
+  prepare_rwOpCommon(&(op->rwOp), fd, count, requestId);
 }
 
 static inline void prepare_lseekOp(struct shmipc_msg *msg, struct lseekOp *op,
@@ -597,16 +587,14 @@ struct openOp *fillOpenOp(struct clientOp *curCop, const char *path, int flags,
  * TODO: find packed representations for the following structs as well */
 static inline void prepare_openOp(struct shmipc_msg *msg, struct openOp *op,
                                   const char *path, int flags, mode_t mode,
-                                  uint64_t *size = nullptr) {
-  op->requestId = gRequestId++;
+                                  uint64_t *size = nullptr, uint64_t requestId = 0) {
+  op->requestId = requestId;
   msg->type = CFS_OP_OPEN;
   op->flags = flags;
   op->mode = mode;
   op->lease = size != nullptr;
   EmbedThreadIdToAsOpRet(op->ret);
   adjustPath(path, &(op->path[0]));
-
-  addOpenToPendingRequestMap(op->requestId, path, flags, mode);
 }
 
 struct closeOp *fillCloseOp(struct clientOp *curCop, int fd) {
@@ -1713,7 +1701,7 @@ int fs_fstat(int fd, struct stat *statbuf) {
 }
 
 static int fs_open_internal(FsService *fsServ, const char *path, int flags,
-                            mode_t mode, uint64_t *size = nullptr) {
+                            mode_t mode, uint64_t requestId, uint64_t *size = nullptr) {
   struct shmipc_msg msg;
   struct openOp *oop;
   off_t ring_idx;
@@ -1727,7 +1715,7 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
   memset(&msg, 0, sizeof(msg));
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   oop = (struct openOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
-  prepare_openOp(&msg, oop, path, flags, mode, size);
+  prepare_openOp(&msg, oop, path, flags, mode, size, requestId);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
       print_server_unavailable(__func__);
@@ -1796,11 +1784,13 @@ int fs_open(const char *path, int flags, mode_t mode) {
   // So, it is important for any user (thread) to invoke this
   //(void) check_app_thread_mem_buf_ready();
   assert(threadFsTid != 0);
-
+  uint64_t requestId = getNewRequestId();
+  // TODO: how to know if new file was created Only for create
+  addCreateToPendingRequestMap(requestId, path, flags, mode);
 retry:
   int wid = -1;
   auto service = getFsServiceForPath(standardPath, wid);
-  int rc = fs_open_internal(service, standardPath, flags, mode);
+  int rc = fs_open_internal(service, standardPath, flags, mode, requestId);
 
   if (rc > 0) {
     gLibSharedContext->fdWidMap[rc] = wid;
@@ -1945,7 +1935,7 @@ int fs_open_lease(const char *path, int flags, mode_t mode) {
   retry:
     int wid = -1;
     auto service = getFsServiceForPath(standardPath, wid);
-    int rc = fs_open_internal(service, standardPath, flags, mode, &size);
+    int rc = fs_open_internal(service, standardPath, flags, mode, 0 /*requestId*/, &size);
 
     if (rc > 0) {
       gLibSharedContext->fdWidMap[rc] = wid;
@@ -2700,7 +2690,7 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
 }
 
 static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
-                                  size_t count, off_t offset) {
+                                  size_t count, off_t offset, uint64_t requestId) {
   ssize_t total_rc = 0;
   size_t bytes = 0;
   size_t toWrite = count;
@@ -2721,7 +2711,7 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     memset(&msg, 0, sizeof(msg));
     ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
     pwop_p = (struct pwriteOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
-    prepare_pwriteOp(&msg, pwop_p, fd, tmpBytes, offset);
+    prepare_pwriteOp(&msg, pwop_p, fd, tmpBytes, offset, requestId);
 
 #ifndef MIMIC_APP_ZC
     void *curDataPtr = (void *)IDX_TO_DATA(fsServ->shmipc_mgr, ring_idx);
@@ -2756,11 +2746,14 @@ ssize_t fs_write(int fd, const void *buf, size_t count) {
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_WRITE);
 #endif
+  auto requestId = getNewRequestId();
   int wid = -1;
 retry:
   auto service = getFsServiceForFD(fd, wid);
   auto prevOffset = service->getOffset(fd);
-  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, prevOffset);
+  addPwriteToPendingRequestMap(requestId, fd, count, prevOffset);
+  
+  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, prevOffset, requestId);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
@@ -2784,14 +2777,16 @@ ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset) {
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_PWRITE);
 #endif
   int wid = -1;
+  auto requestId = getNewRequestId();
+  addPwriteToPendingRequestMap(requestId, fd, count, offset);
 retry:
   auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, offset);
+  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, offset, requestId);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
     if (should_retry) goto retry;
-  }
+  } 
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_PWRITE, tsIdx);
 #endif
@@ -4040,7 +4035,7 @@ retry:
   int wid = -1;
   auto service = getFsServiceForPath(standardPath, wid);
   size_t file_size;
-  int rc = fs_open_internal(service, standardPath, flags, mode, &file_size);
+  int rc = fs_open_internal(service, standardPath, flags, mode, 0/*requestId*/, &file_size);
 
   if (rc > 0) {
     gLibSharedContext->fdWidMap[rc] = wid;
@@ -4060,8 +4055,7 @@ retry:
 
 free_and_return:
   if (rc > 0) {
-    LDBLease *lease = nullptr;
-    std::string path_string(standardPath);
+    LDBLease *lease = nullptr;    std::string path_string(standardPath);
     auto it = gLibSharedContext->pathLDBLeaseMap.find(path_string);
     if (it == gLibSharedContext->pathLDBLeaseMap.end()) {
       lease = new LDBLease(file_size);

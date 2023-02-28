@@ -231,6 +231,44 @@ FsService::FsService(int wid, key_t key)
     unusedRingSlots.push_back(i);
   }
   initService();
+
+  // TODO: Fix, thread not working -> causing seg fault
+  // Maybe due to using the same ring buf
+  // notificationListener_ = new std::thread(&FsService::notificationListenerLoop, this);
+}
+
+// TODO
+// TODO: Not sure if the same ring should be used
+// TODO: revert it to loop when used in thread
+void FsService::notificationListenerLoop() {
+  // while(true) {
+    uint8_t count = 0;
+    shmipc_msg msg;
+    off_t ringIdx = 0;
+    assert(shmipc_mgr != nullptr);
+    // go over entire ring once
+    do {
+      memset(&msg, 0, sizeof(struct shmipc_msg));
+      auto ret = shmipc_mgr_poll_notify_msg(shmipc_mgr, ringIdx, &msg);
+      std::cout << "[BENITA] ringIdx = " << ringIdx << std::endl;
+      if (ret != -1) {                
+        std::cout << "[BENITA] request id = " << msg.retval << std::endl;
+        
+        // TODO: handle the msg
+
+        // TODO: deallocate msg
+        shmipc_mgr_dealloc_slot(shmipc_mgr, ringIdx);
+        
+      }
+      ringIdx++;
+    } while (ringIdx < RING_SIZE);
+
+    sleep(5); // TODO: configure this
+ // };
+}
+
+void FsService::cleanupNotificationListener() {
+  // notificationListener_->join();
 }
 
 // Assume 0 means no shmKey available
@@ -369,6 +407,7 @@ static inline void prepare_rwOpCommon(struct rwOpCommonPacked *op, int fd,
   op->fd = fd;
   op->count = count;
   op->flag = 0;
+  op->requestId = gRequestId++; // TODO: Lock
   EmbedThreadIdToAsOpRet(op->ret);
   if (FS_LIB_USE_APP_BUF) op->flag |= _RWOP_FLAG_FSLIB_ENABLE_APP_BUF_;
 }
@@ -516,10 +555,9 @@ static inline void prepare_pwriteOp(struct shmipc_msg *msg,
                                     size_t count, off_t offset) {
   msg->type = CFS_OP_PWRITE;
   op->offset = offset;
-  op->requestId = gRequestId++;
   prepare_rwOpCommon(&(op->rwOp), fd, count);
 
-  addPwriteToPendingRequestMap(op->requestId, fd, count, offset);
+  addPwriteToPendingRequestMap(op->rwOp.requestId, fd, count, offset);
 }
 
 static inline void prepare_lseekOp(struct shmipc_msg *msg, struct lseekOp *op,
@@ -1321,15 +1359,26 @@ int fs_cleanup() {
     if (gMultiFsServLock.test_and_set(std::memory_order_acquire)) {
       for (auto ele : gServMngPtr->multiFsServMap) {
         // fprintf(stderr, "fs_cleanup: key:%d\n", ele.first);
-        delete ele.second;
-        ele.second = nullptr;
+        auto server = ele.second;
+        server->cleanupNotificationListener();
+        delete server;
+        server = nullptr;
       }
       gServMngPtr->multiFsServMap.clear();
       gLibSharedContext = nullptr;
       gServMngPtr->primaryServ = nullptr;
-      gCleanedUpDone = true;
       gMultiFsServLock.clear(std::memory_order_release);
     }
+
+    // TODO: Locks
+    // Pending requests
+    for (auto ele: gPendingRequestMap) {
+      free(ele.second);
+      ele.second = nullptr;
+    }
+    
+    gPendingRequestMap.clear();
+    gCleanedUpDone = true;
   }
   return 0;
 }
@@ -1525,6 +1574,15 @@ int fs_dump_pendingops() {
     } else if (val->status == FS_COMPLETED_STATUS) {
       std::cout << "req #" << key << " " << "completed" << std::endl;
     }
+  }
+
+  return 0;
+}
+
+// Test function
+int fs_poll_notification() {
+  for (auto &[wid, service]: gServMngPtr->multiFsServMap) {
+    service->notificationListenerLoop();
   }
 
   return 0;
@@ -2668,9 +2726,7 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     if (rc < 0) {
       shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
       return rc;
-    } else {
-      updatePendingRequestMapStatus(pwop_p->requestId, FS_SPECULATIVE_STATUS);
-    }
+    } 
 
     total_rc += rc;
     bytes += tmpBytes;

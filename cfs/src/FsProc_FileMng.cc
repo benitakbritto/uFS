@@ -60,7 +60,15 @@ void FileMng::flushMetadataOnExit() { fsImpl_->flushMetadataOnExit(fsWorker_); }
 
 int64_t FileMng::checkAndFlushBufferDirtyItems() {
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
-  return fsImpl_->checkAndFlushDirty(fsWorker_);
+  auto ret = fsImpl_->checkAndFlushDirty(fsWorker_);
+  
+  // TODO: Move ti FsProc_Worker
+  // notify clients
+  if (ret > 0) {
+    fsWorker_->notifyWriteOps();
+  }
+
+  return ret;
 }
 
 int FileMng::processReq(FsReq *req) {

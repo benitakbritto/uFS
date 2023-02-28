@@ -37,6 +37,7 @@ extern "C" {
 #define shmipc_STATUS_READY_FOR_SERVER 2
 #define shmipc_STATUS_IN_PROGRESS 3
 #define shmipc_STATUS_READY_FOR_CLIENT 4
+#define shmipc_STATUS_NOTIFY_FOR_CLIENT 5
 
 // queuepair for shared memory
 struct shmipc_qp {
@@ -130,11 +131,17 @@ int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off
 void shmipc_mgr_put_msg_nowait(struct shmipc_mgr *mgr, off_t ring_idx,
                                struct shmipc_msg *msg);
 
+void shmipc_mgr_put_msg_server_nowait(struct shmipc_mgr *mgr, off_t ring_idx,
+                               struct shmipc_msg *msg);
+
 // Called after put_msg_nowait with the same idx returned by that function,
 // to check if the server has finished responding and the message is ready
 // for the client to read. On success, it returns 0 0 and stores the result
 // in msg. If the msg cannot be read yet, -1 is returned.
 int shmipc_mgr_poll_msg(struct shmipc_mgr *mgr, off_t idx,
+                        struct shmipc_msg *msg);
+
+int shmipc_mgr_poll_notify_msg(struct shmipc_mgr *mgr, off_t idx,
                         struct shmipc_msg *msg);
 
 // Similar to poll but waits until the msg is ready.

@@ -51,10 +51,11 @@
 #define FS_REQ_ERROR_UNKNOWN_TYPE_FOR_WORKER (-101)
 
 
+///
 #define FS_PENDING_STATUS (0)
 #define FS_SPECULATIVE_STATUS (1)
 #define FS_COMPLETED_STATUS (2)
-
+///
 
 // NOTE: Do not place any more constants below these two. Among all the FS_REQ_*
 // constants, the last ones must be FS_REQ_ERROR_INODE_IN_TRANSFER followed by
@@ -149,6 +150,7 @@ struct rwOpCommon {
   // FsLib, it is okay
   off_t realOffset;
   size_t realCount;
+  uint64_t requestId;
 };
 
 static_assert(

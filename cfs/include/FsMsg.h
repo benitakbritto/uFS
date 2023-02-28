@@ -18,6 +18,7 @@ struct rwOpCommonPacked {
   // with lease, the FD's offset in server does not make sense
   off_t realOffset;
   ssize_t ret;
+  uint64_t requestId;
 };
 
 #pragma pack(1)
@@ -47,7 +48,6 @@ struct writeOpPacked {
 struct pwriteOpPacked {
   struct rwOpCommonPacked rwOp;
   off_t offset;
-  uint64_t requestId;
 };
 
 #pragma pack(1)
@@ -87,6 +87,7 @@ static inline void pack_rwOpCommon(struct rwOpCommon *op,
   dst->flag = op->flag;
   dst->realOffset = op->realOffset;
   dst->realCount = op->realCount;
+  dst->requestId = op->requestId;
 }
 
 static inline void unpack_rwOpCommon(struct rwOpCommonPacked *op,
@@ -97,6 +98,7 @@ static inline void unpack_rwOpCommon(struct rwOpCommonPacked *op,
   dst->flag = op->flag;
   dst->realOffset = op->realOffset;
   dst->realCount = op->realCount;
+  dst->requestId = op->requestId;
 }
 
 static inline void pack_allocatedOpCommon(struct allocatedOpCommon *op,

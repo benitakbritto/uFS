@@ -104,6 +104,8 @@ void printHelp() {
                           " <src_wid> <dst_wid>\n");
   printf(ANSI_COLOR_GREEN "view_pending_ops" ANSI_COLOR_RESET
                           "\n");
+  printf(ANSI_COLOR_GREEN "poll_notification" ANSI_COLOR_RESET
+                          "\n");
 }
 
 void printReturnValue(std::string const &cmd, ssize_t v) {
@@ -625,7 +627,16 @@ void process(std::string const &line) {
         printReturnValue(tokens[0], ret);
         #endif
       }
-    }
+    } else if (tokens[0] == "poll_notification") {
+      if (tokens.size() != 1) {
+        printHelp();
+      } else {
+        #ifndef TEST_VFS_INSTEAD
+        int ret = fs_poll_notification();
+        printReturnValue(tokens[0], ret);
+        #endif
+      }
+    } 
     else {
       printHelp();
     }

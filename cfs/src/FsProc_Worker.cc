@@ -849,6 +849,9 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         cop->op.pwrite.rwOp.ret = getReturnValueForFailedReq(fsReq);
         SPDLOG_DEBUG("pwrite-err set return value to:{}",
                      cop->op.pwrite.rwOp.ret);
+      } else {
+        flushPendingDataOpMap[app->getPid()].push_back(
+          fsReq->getClientOp()->op.pwrite.rwOp.requestId);
       }
 
       cop->opStatus = OP_DONE;
@@ -966,7 +969,6 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         // fileManager->addFdMappingOnOpen(fsReq->getPid(), fobj);
         fsReq->getApp()->AccessIno(fsReq->getTid(), fsReq->getFileInum());
         // fill the return
-        // TODO [BENITA] change here?
         // cop->op.open.ret = fobj->readOnlyFd;
         cop->op.open.ret = fsReq->fileIno;
         EMBEDED_INO_FILED_OP_OPEN(&(cop->op.open)) =
@@ -975,6 +977,10 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
                      cop->op.open.path, fsReq->getTargetInode()->i_no);
         // if create, we add it here
         do_check_inode_migration = true;
+
+        if (curType == FsReqType::CREATE) {
+          flushPendingMetadataOpMap[app->getPid()].push_back(cop->op.open.requestId);
+        }
       }
       cop->opStatus = OP_DONE;
       copy_msg(open);
@@ -2607,6 +2613,45 @@ void FsProcWorker::opStatsAccountSingleOpDone(FsReqType reqType, size_t bytes) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
+// TODO: Use a different shmipc_msg
+void FsProcWorker::notifyWriteOps() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  for (auto &[appPid, reqIdList]: flushPendingDataOpMap) {
+      for (auto reqId: reqIdList) {
+        // put msg in ring buff
+        struct shmipc_msg msg;
+        off_t ring_idx;
+        memset(&msg, 0, sizeof(msg));
+        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr); // Is this correct?
+        std::cout << "[BENITA] ring_idx = " << ring_idx << std::endl;
+        msg.retval = reqId;
+        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
+      }
+
+      flushPendingDataOpMap.erase(appPid);
+  } 
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+}
+
+void FsProcWorker::notifyMetadataOps() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  for (auto &[appPid, reqIdList]: flushPendingMetadataOpMap) {
+      for (auto reqId: reqIdList) {
+        // put msg in ring buff
+        struct shmipc_msg msg;
+        off_t ring_idx;
+        memset(&msg, 0, sizeof(msg));
+        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr); // Is this correct?
+        msg.retval = reqId;
+        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
+      }
+
+      flushPendingMetadataOpMap.erase(appPid);
+  } 
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+}
+
+
 FsProcWorkerMaster::FsProcWorkerMaster(int w, CurBlkDev *d, int shmBaseOffset,
                                        std::atomic_bool *workerRunning,
                                        PerWorkerLoadStatsSR *stats)
@@ -4003,6 +4048,10 @@ void FsProcWorker::blockingFlushBufferOnExit() {
 #else
   fileManager->flushMetadataOnExit();
 #endif
+
+  // notify
+  notifyMetadataOps();
+  notifyWriteOps();
 
   // SPDLOG_INFO("wid:{} All buffers successfully flushed to disk ~~~", getWid());
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;

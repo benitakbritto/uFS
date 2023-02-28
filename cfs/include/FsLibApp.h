@@ -106,6 +106,10 @@ class FsService {
     return inodeOffsetMap.count(inode) == 0 ? 0 : inodeOffsetMap[inode];
   }
 
+  void notificationListenerLoop();
+
+  void cleanupNotificationListener();
+
  private:
   std::list<int> unusedRingSlots;
   std::atomic_flag unusedSlotsLock;
@@ -113,6 +117,7 @@ class FsService {
   int wid;
   CommuChannelAppSide *channelPtr;
   std::unordered_map<ino_t, off_t> inodeOffsetMap;
+  std::thread *notificationListener_;
 };
 
 struct FsLibServiceMng {

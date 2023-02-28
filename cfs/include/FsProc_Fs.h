@@ -435,6 +435,10 @@ struct FsWorkerOpStats {
 //
 class FsProcWorker {
  public:
+  // Notify
+  void notifyWriteOps();
+  void notifyMetadataOps();
+
   // Interval for reporting CPU usage (in us).
   static constexpr int64_t kCpuReportInterval = 1e6;  // set to 1s
   // The default workerId, which handles all the metadata operation
@@ -765,6 +769,11 @@ class FsProcWorker {
   uint64_t loopCountBeforeCheckExit;
   std::thread *acceptHandler;
   int pinnedCPUCore{-1};
+
+  // client state of pending ops
+  std::unordered_map<pid_t, std::vector<uint64_t>> flushPendingDataOpMap;
+  std::unordered_map<pid_t, std::vector<uint64_t>> flushPendingMetadataOpMap;
+
 
   // fileManger will execute FS functionality (~= VFS layer)
   FileMng *fileManager;

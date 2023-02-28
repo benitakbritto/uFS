@@ -294,6 +294,16 @@ void shmipc_mgr_put_msg_nowait(struct shmipc_mgr *mgr, off_t ring_idx,
   SHMIPC_SET_MSG_STATUS(rmsg, shmipc_STATUS_READY_FOR_SERVER);
 }
 
+void shmipc_mgr_put_msg_server_nowait(struct shmipc_mgr *mgr, off_t ring_idx,
+                               struct shmipc_msg *msg) {
+  struct shmipc_msg *rmsg;
+
+  rmsg = IDX_TO_MSG(mgr, ring_idx);
+  memcpy((char *)rmsg + 9, (char *)msg + 9, 55);
+  SHMIPC_SET_MSG_STATUS(rmsg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
+}
+
+
 int shmipc_mgr_poll_msg(struct shmipc_mgr *mgr, off_t idx,
                         struct shmipc_msg *msg) {
   struct shmipc_msg *rmsg;
@@ -304,6 +314,18 @@ int shmipc_mgr_poll_msg(struct shmipc_mgr *mgr, off_t idx,
   // server finished operation, copy into rmsg.
   memcpy(msg, rmsg, 64);
   return 0;
+}
+
+int shmipc_mgr_poll_notify_msg(struct shmipc_mgr *mgr, off_t idx,
+                        struct shmipc_msg *msg) {
+  struct shmipc_msg *rmsg;
+
+  rmsg = IDX_TO_MSG(mgr, idx);
+  if (rmsg->status != shmipc_STATUS_NOTIFY_FOR_CLIENT) return -1;
+
+  printf("[BENITA] got notify message\n");
+  memcpy(msg, rmsg, 64);
+  return 0;          
 }
 
 void shmipc_mgr_wait_msg(struct shmipc_mgr *mgr, off_t idx,

@@ -127,7 +127,8 @@ inline bool FsProcMsgRing::put_message(FsProcMessage &fsp_msg) {
   void **ptr = (void **)(msg.inline_data);
   *ptr = (void *)fsp_msg.ctx;
   off_t ring_idx = shmipc_mgr_alloc_slot(producer);
-  shmipc_mgr_put_msg_nowait(producer, ring_idx, &msg);
+  shmipc_mgr_put_msg_nowait(producer, ring_idx, &msg, 
+    shmipc_STATUS_READY_FOR_SERVER);
   return true;
 }
 

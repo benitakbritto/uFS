@@ -110,7 +110,7 @@ class FsService {
 
   void cleanupNotificationListener();
 
-  void handleServerNotification(int64_t requestId, uint8_t type);
+  void handleServerNotification(int64_t requestId);
  private:
   std::list<int> unusedRingSlots;
   std::atomic_flag unusedSlotsLock;
@@ -121,10 +121,37 @@ class FsService {
   std::thread *notificationListener_;
 };
 
+class PendingQueueMgr {
+ public:
+  PendingQueueMgr(key_t shmKey);
+  ~PendingQueueMgr();
+
+  void init(key_t shmKey);
+  off_t enqueuePendingMsg(struct shmipc_msg* msgSrc);
+  template <typename T>   
+  void enqueuePendingXreq(T *opSrc, off_t idx);
+  void enqueuePendingData(void *dataStr, off_t idx, 
+    int size);
+  void dequePendingMsg(uint64_t requestId);
+  // void getPendingMsg();
+  template <typename T>
+  T* getPendingXreq(off_t idx);
+  void* getPendingData(off_t idx);
+  uint8_t getMessageStatus(uint64_t requestId);
+  uint8_t getMessageType(off_t idx);
+
+  struct shmipc_mgr *getShmManager();
+
+ private:
+  struct shmipc_mgr *queue_shmipc_mgr = NULL;
+};
+
 struct FsLibServiceMng {
   std::unordered_map<int, FsService *> multiFsServMap;
   std::atomic_int multiFsServNum{0};
   FsService *primaryServ{nullptr};
+  std::unordered_map<uint64_t, std::vector<off_t>> reqRingMap; 
+  PendingQueueMgr *queueMgr{nullptr};
 };
 
 // NOTE: enable this flag will record the entry and exit timestamp

@@ -46,68 +46,18 @@
 // #define _CFS_LIB_PRINT_REQ_
 #define LDB_PRINT_CALL
 
+/* #region requestId */
 // TODO: Lock over gRequestId
 uint64_t gRequestId = 0;
-
-/// Pending ops state 
-typedef struct RequestDetailsStruct {
-  uint8_t type; 
-  const char *path;
-  int flags;
-  mode_t mode;
-  int fd;
-  size_t count; 
-  off_t offset;
-  uint8_t status;
-} RequestDetails;
-
-std::unordered_map<uint64_t, RequestDetails*> gPendingRequestMap;
-
-void inline addCreateToPendingRequestMap(uint64_t id, const char *path, int flags, mode_t mode) {
-  // TODO: Lock
-  RequestDetails* details = (RequestDetails*) malloc(sizeof(RequestDetails));
-  details->type = CFS_OP_OPEN;
-  details->path = path;
-  details->flags = flags;
-  details->mode = mode;
-  details->fd = -1;
-  details->count = 0;
-  details->offset = 0;
-  details->status = FS_PENDING_STATUS;
-  gPendingRequestMap[id] = details;
-}
-
-void inline addPwriteToPendingRequestMap(uint64_t id, int fd, size_t count,
-  off_t offset) {
-  RequestDetails* details = (RequestDetails*) malloc(sizeof(RequestDetails));
-  details->type = CFS_OP_PWRITE;
-  details->path = nullptr;
-  details->flags = 0;
-  details->mode = 0;
-  details->fd = fd;
-  details->count = count;
-  details->offset = offset;
-  details->status = FS_PENDING_STATUS;
-  gPendingRequestMap[id] = details;
-}
-
-void inline updatePendingRequestMapStatus(uint64_t id, uint8_t status) {
-  // TODO: Lock
-  gPendingRequestMap[id]->status = status; 
-}
-
-void inline clearPendingRequestFromMap(uint64_t id) {
-  // TODO: Lock
-  free(gPendingRequestMap[id]);
-  gPendingRequestMap.erase(id);
-}
 
 // TODO: Lock
 uint64_t inline getNewRequestId() {
   return gRequestId++;
 }
-///////
 
+/* #endregion requestId end */
+
+/* #region print api */
 void print_server_unavailable(const char *func_name) {
   fprintf(stderr, "[WARN] Server is unavailable for function %s. \
           Retry operation later.\n", func_name);
@@ -140,13 +90,14 @@ void print_read(int fd, void *buf, size_t count, bool ldb = false) {
           buf, count, threadFsTid);
 }
 
-void print_write(int fd, const void *buf, size_t count, bool ldb = false) {
-  fprintf(stderr, "-- write%s(%d, %s, %lu) from tid %d --\n", ldb ? "_ldb" : "", fd,
+void print_write(int fd, const void *buf, size_t count, uint64_t requestId = 0, 
+  bool ldb = false) {
+  fprintf(stderr, "-- Req #%ld: write%s(%d, %s, %lu) from tid %d --\n", requestId, ldb ? "_ldb" : "", fd,
           (char *) buf, count, threadFsTid);
 }
 
-void print_pwrite(int fd, const void *buf, size_t count, off_t offset) {
-  fprintf(stderr, "-- pwrite(%d, %s, %lu, %ld)\n --",
+void print_pwrite(int fd, const void *buf, size_t count, off_t offset, uint64_t requestId = 0) {
+  fprintf(stderr, "-- Req #%ld: pwrite(%d, %s, %lu, %ld)\n --", requestId,
           fd, (char *)buf, count, offset);
 }
 
@@ -175,6 +126,52 @@ void print_stat(const char *path) {
 void print_fstat(int fd) {
   fprintf(stderr, "-- fstat(%d) --\n", fd);
 }
+
+/* #endregion print api end */
+
+/* #region FS global variables */
+// Global variables
+// The master's workerID
+static int gPrimaryServWid = APP_CFS_COMMON_KNOWLEDGE_MASTER_WID;
+FsLibSharedContext *gLibSharedContext = nullptr;
+
+#ifdef UFS_SOCK_LISTEN
+static key_t g_registered_shm_key_base = 0;
+static int g_registered_max_num_worker = -1;
+static int g_registered_shmkey_distance = -1;
+std::once_flag g_register_flag;
+#endif
+
+// Used for multiple Fs processes
+static FsLibServiceMng *gServMngPtr = nullptr;
+std::atomic_bool gCleanedUpDone;
+std::atomic_flag gMultiFsServLock = ATOMIC_FLAG_INIT;
+
+// Thread local variables
+// if threadFsTid is 0, it means fsLib has not setup its FsLibMemMng
+thread_local int threadFsTid = 0;
+
+#ifdef CFS_LIB_SAVE_API_TS
+thread_local FsApiTs *tFsApiTs;
+#endif
+
+#ifdef FS_LIB_SPPG
+constexpr uint32_t kLocalPinnedMemSize = ((uint32_t)1024) * 1024 * 16;  // 16M
+
+struct SpdkEnvWrapper {
+  struct spdk_env_opts opts;
+};
+
+std::shared_ptr<SpdkEnvWrapper> gSpdkEnvPtr;
+std::once_flag gSpdkEnvFlag;
+
+struct FsLibPinnedMemMng {
+  void *memPtr{nullptr};
+};
+thread_local std::unique_ptr<FsLibPinnedMemMng> tlPinnedMemPtr;
+#endif
+
+/* #endregion */
 
 //
 // helper functions to dump rbtree to stdout
@@ -225,20 +222,7 @@ static void dumpAllocatedOpCommon(allocatedOpCommonPacked *alOp) {
           alOp->shmid, alOp->dataPtrId, alOp->perAppSeqNo);
 }
 
-FsService::FsService(int wid, key_t key)
-    : unusedSlotsLock(ATOMIC_FLAG_INIT),
-      shmKey(key),
-      wid(wid),
-      channelPtr(nullptr) {
-  for (auto i = 0; i < RING_SIZE; i++) {
-    unusedRingSlots.push_back(i);
-  }
-  initService();
-
-  notificationListener_ = new std::thread(&FsService::notificationListenerLoop, this);
-}
-
-// TODO: Not sure if the same ring should be used
+/* #region Notification handling start */
 void FsService::notificationListenerLoop() {
   while(true) {
     uint8_t count = 0;
@@ -250,7 +234,7 @@ void FsService::notificationListenerLoop() {
       memset(&msg, 0, sizeof(struct shmipc_msg));
       auto ret = shmipc_mgr_poll_notify_msg(shmipc_mgr, ringIdx, &msg);
       if (ret != -1) {                        
-        handleServerNotification(msg.retval, msg.type);
+        handleServerNotification(msg.retval);
         shmipc_mgr_dealloc_slot(shmipc_mgr, ringIdx);        
       }
       ringIdx++;
@@ -260,12 +244,27 @@ void FsService::notificationListenerLoop() {
  };
 }
 
-void FsService::handleServerNotification(int64_t requestId, uint8_t type) {
-  updatePendingRequestMapStatus(requestId, type);
+void FsService::handleServerNotification(int64_t requestId) {
+  gServMngPtr->queueMgr->dequePendingMsg(requestId);
+  gServMngPtr->reqRingMap.erase(requestId);
 }
 
 void FsService::cleanupNotificationListener() {
   notificationListener_->join();
+}
+
+/* #endregion Notification handling start */
+
+/* #region FS Service */
+FsService::FsService(int wid, key_t key)
+    : unusedSlotsLock(ATOMIC_FLAG_INIT),
+      shmKey(key),
+      wid(wid),
+      channelPtr(nullptr) {
+  for (auto i = 0; i < RING_SIZE; i++) {
+    unusedRingSlots.push_back(i);
+  }
+  initService();
 }
 
 // Assume 0 means no shmKey available
@@ -292,8 +291,10 @@ void FsService::initService() {
     throw std::runtime_error("initservice failed to initialize shared memory");
   }
 
-  std::cout << "INFO initService connected to contrl shm at " << shmfile
+    std::cout << "INFO initService connected to contrl shm at " << shmfile
             << std::endl;
+
+    notificationListener_ = new std::thread(&FsService::notificationListenerLoop, this);
 }
 
 int FsService::allocRingSlot() {
@@ -348,7 +349,121 @@ int FsService::submitReq(int slotId) {
   }
   return ret;
 }
+/* #endregion */
 
+/* #region PendingQueueMgr start */
+PendingQueueMgr::PendingQueueMgr(key_t shmKey) {
+  init(shmKey);
+}
+
+PendingQueueMgr::~PendingQueueMgr() {
+  shmipc_mgr_destroy(queue_shmipc_mgr);
+}
+
+void PendingQueueMgr::init(key_t shmKey) {
+  // TODO: if shmkey is known, init memory. Otherwise, init with FsProc
+  if (shmKey == 0) {
+    std::cerr << "ERROR initService (shmKey==0) does not supported yet"
+              << std::endl;
+    exit(1);
+  }
+
+  char shmfile[128];
+  snprintf(shmfile, 128, "/shmipc_mgr_%03d", (int)shmKey);
+
+  // We create the memory on server side, so for client this is 0
+  queue_shmipc_mgr = shmipc_mgr_init(shmfile, RING_SIZE, 1);
+  if (queue_shmipc_mgr == NULL) {
+    std::cerr << "ERROR PendingQueueMgr::init failed to initialize shared memory."
+              << " errno : " << strerror(errno) << std::endl;
+    throw std::runtime_error("PendingQueueMgr::init failed to initialize shared memory");
+  }
+
+    std::cout << "INFO PendingQueueMgr connected to contrl shm at " << shmfile
+            << std::endl;
+}
+
+struct shmipc_mgr *PendingQueueMgr::getShmManager() {
+  return this->queue_shmipc_mgr;
+}
+
+off_t PendingQueueMgr::enqueuePendingMsg(struct shmipc_msg* msgSrc) {
+  auto shmMgr = gServMngPtr->queueMgr->getShmManager();
+  assert(shmMgr != nullptr);
+
+  struct shmipc_msg queueMsg;
+  memcpy(&queueMsg, msgSrc, sizeof(msgSrc));
+
+  off_t ringIdx = shmipc_mgr_alloc_slot_dbg(shmMgr);
+  
+  shmipc_mgr_put_msg_nowait(shmMgr, ringIdx, &queueMsg, FS_PENDING_STATUS);
+
+  return ringIdx;
+}
+
+template <typename T>   
+void PendingQueueMgr::enqueuePendingXreq(T *opSrc, off_t idx) {
+  auto shmMgr = gServMngPtr->queueMgr->getShmManager();
+  assert(shmMgr != nullptr);
+  
+  T *opDest = (T *)IDX_TO_XREQ(shmMgr, idx);
+  memcpy(opDest, opSrc, sizeof(opSrc));
+}
+
+void PendingQueueMgr::enqueuePendingData(void *dataStr, off_t idx, 
+  int size) {
+  auto shmMgr = gServMngPtr->queueMgr->getShmManager();
+  assert(shmMgr != nullptr);
+
+  void *dataDest = (void *)IDX_TO_DATA(shmMgr, idx);
+  memcpy(dataDest, (char *)dataStr, size);
+}
+
+void PendingQueueMgr::dequePendingMsg(uint64_t requestId) {
+  auto shmMgr = gServMngPtr->queueMgr->getShmManager();
+  assert(shmMgr != nullptr);
+  
+  for (auto ringIdx: gServMngPtr->reqRingMap[requestId]) {
+    shmipc_mgr_dealloc_slot(shmMgr, ringIdx);
+  }
+}
+
+template <typename T>
+T* PendingQueueMgr::getPendingXreq(off_t idx) {
+  auto shmMgr = gServMngPtr->queueMgr->getShmManager();
+  assert(shmMgr != nullptr);
+  return (T *)IDX_TO_XREQ(shmMgr, idx);
+}
+
+void* PendingQueueMgr::getPendingData(off_t idx) {
+  auto shmMgr = gServMngPtr->queueMgr->getShmManager();
+  assert(shmMgr != nullptr);
+  return IDX_TO_DATA(shmMgr, idx);
+}
+
+uint8_t PendingQueueMgr::getMessageStatus(uint64_t requestId) {
+  auto shmMgr = gServMngPtr->queueMgr->getShmManager();
+  assert(shmMgr != nullptr);
+
+  if (gServMngPtr->reqRingMap.count(requestId) == 0 || 
+   gServMngPtr->reqRingMap[requestId].size() == 0) {
+    throw std::runtime_error("Invalid request id");
+  }
+
+  off_t ringIdx = gServMngPtr->reqRingMap[requestId][0];
+
+  return (IDX_TO_MSG(shmMgr, ringIdx))->status;
+}
+
+uint8_t PendingQueueMgr::getMessageType(off_t idx) {
+  auto shmMgr = gServMngPtr->queueMgr->getShmManager();
+  assert(shmMgr != nullptr);
+
+  return (IDX_TO_MSG(shmMgr, idx))->type;
+}
+/* #endregion PendingQueueMgr start */
+
+/* #region CommuChannelAppSide start */
 CommuChannelAppSide::CommuChannelAppSide(pid_t id, key_t shmKey)
     : CommuChannel(id, shmKey) {
   int rt = this->initChannelMemLayout();
@@ -382,7 +497,9 @@ int CommuChannelAppSide::submitSlot(int sid) {
   int ret = ringBufferPtr->enqueue(sid);
   return ret;
 }
+/* #endregion CommuChannelAppSide end */
 
+/* #region fs helper functions */
 static inline void adjustPath(const char *path, char *opPath) {
   std::string s(path);
   strncpy(opPath, s.c_str(), MULTI_DIRSIZE);
@@ -785,10 +902,10 @@ static inline bool fs_check_req_io_size(size_t count, const char *func_name) {
   return true;
 }
 
-// ping Op
 static inline void prepare_pingOp(struct shmipc_msg *msg, struct pingOp *op) {
   msg->type = CFS_OP_PING;
 }
+/* #endregion */
 
 // send an op without argument to given FsService
 template <typename NoArgOp>
@@ -819,49 +936,6 @@ static int send_noargop(FsService *fsServ, CfsOpCode opcode) {
   return ret;
 }
 
-/*----------------------------------------------------------------------------*/
-
-// Global variables
-// The master's workerID
-static int gPrimaryServWid = APP_CFS_COMMON_KNOWLEDGE_MASTER_WID;
-FsLibSharedContext *gLibSharedContext = nullptr;
-
-#ifdef UFS_SOCK_LISTEN
-static key_t g_registered_shm_key_base = 0;
-static int g_registered_max_num_worker = -1;
-static int g_registered_shmkey_distance = -1;
-std::once_flag g_register_flag;
-#endif
-
-// Used for multiple Fs processes
-static FsLibServiceMng *gServMngPtr = nullptr;
-std::atomic_bool gCleanedUpDone;
-std::atomic_flag gMultiFsServLock = ATOMIC_FLAG_INIT;
-
-// Thread local variables
-// if threadFsTid is 0, it means fsLib has not setup its FsLibMemMng
-thread_local int threadFsTid = 0;
-
-#ifdef CFS_LIB_SAVE_API_TS
-thread_local FsApiTs *tFsApiTs;
-#endif
-
-#ifdef FS_LIB_SPPG
-constexpr uint32_t kLocalPinnedMemSize = ((uint32_t)1024) * 1024 * 16;  // 16M
-
-struct SpdkEnvWrapper {
-  struct spdk_env_opts opts;
-};
-
-std::shared_ptr<SpdkEnvWrapper> gSpdkEnvPtr;
-std::once_flag gSpdkEnvFlag;
-
-struct FsLibPinnedMemMng {
-  void *memPtr{nullptr};
-};
-thread_local std::unique_ptr<FsLibPinnedMemMng> tlPinnedMemPtr;
-#endif
-
 static inline off_t shmipc_mgr_alloc_slot_dbg(struct shmipc_mgr *mgr) {
 #ifdef _SHMIPC_DBG_
   off_t ring_idx = shmipc_mgr_alloc_slot(mgr);
@@ -872,8 +946,7 @@ static inline off_t shmipc_mgr_alloc_slot_dbg(struct shmipc_mgr *mgr) {
 #endif
 }
 
-/*----------------------------------------------------------------------------*/
-
+/* #region global util functions */
 // Global utility function for resolivng FsService given a file descriptor
 inline FsService *getFsServiceForFD(int fd, int &wid) {
   auto &fdMap = gLibSharedContext->fdWidMap;
@@ -976,6 +1049,8 @@ inline bool handle_inode_in_transfer(int rc) {
   }
   return false;
 }
+
+/* #endregion */
 
 uint8_t fs_notify_server_new_shm(const char *shmFname,
                                  fslib_malloc_block_sz_t block_sz,
@@ -1135,142 +1210,7 @@ static void print_app_zc_mimic() {
 #endif
 }
 
-// If app know's its key, allow init with the key
-int fs_init(key_t key) {
-  print_app_zc_mimic();
-  if (gServMngPtr != nullptr) {
-    fprintf(stderr, "ERROR fs has initialized\n");
-    return -1;
-  }
-
-  while (gServMngPtr == nullptr) {
-    if (gMultiFsServLock.test_and_set(std::memory_order_acquire)) {
-      try {
-        gServMngPtr = new FsLibServiceMng();
-        gServMngPtr->primaryServ = new FsService(gPrimaryServWid, key);
-        gServMngPtr->primaryServ->inUse = true;
-        // gPrimaryServ = new FsService(gPrimaryServWid, key);
-      } catch (const char *msg) {
-        fprintf(stderr, "Cannot init FsService:%s\n", msg);
-        return -1;
-      }
-
-      gServMngPtr->multiFsServMap.insert(
-          std::make_pair(gPrimaryServWid, gServMngPtr->primaryServ));
-      gServMngPtr->multiFsServNum = 1;
-
-      if (gLibSharedContext == nullptr) {
-        gLibSharedContext = new FsLibSharedContext();
-        gLibSharedContext->tidIncr = 1;
-        gLibSharedContext->key = key;
-      }
-
-      gMultiFsServLock.clear(std::memory_order_release);
-    }
-  }
-  return 0;
-}
-
-// NOTE: guarded by gMultiFsServLock
-int fs_init_after_registration() {
-#ifdef UFS_SOCK_LISTEN
-  if (g_registered_max_num_worker <= 0) return -1;
-  while (gServMngPtr == nullptr) {
-    if (gMultiFsServLock.test_and_set(std::memory_order_acquire)) {
-      if (g_registered_max_num_worker > 0) {
-        gServMngPtr = new FsLibServiceMng();
-        int curWid;
-        for (int i = 0; i < g_registered_max_num_worker; i++) {
-          auto key =
-              g_registered_shm_key_base + i * g_registered_shmkey_distance;
-          fprintf(stdout,
-                  "fs_init_after_registration-> init for key:%d map key is: %d "
-                  "dist:%d\n",
-                  key, (i + gPrimaryServWid), g_registered_shmkey_distance);
-          curWid = i + gPrimaryServWid;
-          gServMngPtr->multiFsServMap.insert(
-              std::make_pair(curWid, new FsService(curWid, key)));
-        }
-        gServMngPtr->primaryServ = gServMngPtr->multiFsServMap[gPrimaryServWid];
-        gServMngPtr->primaryServ->inUse = true;
-        gServMngPtr->multiFsServNum = g_registered_max_num_worker;
-
-        if (gLibSharedContext == nullptr) {
-          gLibSharedContext = new FsLibSharedContext();
-          gLibSharedContext->tidIncr = 1;
-          gLibSharedContext->key = g_registered_shm_key_base;
-        }
-
-        gCleanedUpDone = false;
-      }
-      gMultiFsServLock.clear(std::memory_order_release);
-    }
-  }
-#endif
-  return 0;
-}
-
-// Use for app do not know its' key. which is for real application
-int fs_register(void) {
-#ifdef UFS_SOCK_LISTEN
-  std::call_once(g_register_flag, fs_register_via_socket);
-  // fprintf(stdout, "g_register_shm_key_base:%d max_nw:%d\n",
-  //        g_registered_shm_key_base, g_registered_max_num_worker);
-  int rt = fs_init_after_registration();
-  return rt;
-#endif
-  return -1;
-}
-
-// each key will represent one FSP thread (instance/worker)
-int fs_init_multi(int num_key, const key_t *keys) {
-  print_app_zc_mimic();
-  while (gServMngPtr == nullptr) {
-    if (gMultiFsServLock.test_and_set(std::memory_order_acquire)) {
-      gServMngPtr = new FsLibServiceMng();
-      int curWid;
-      for (int i = 0; i < num_key; i++) {
-        auto key = keys[i];
-        fprintf(stdout, "fs_init_multi-> init for key:%d map key is: %d\n", key,
-                (i + gPrimaryServWid));
-        curWid = i + gPrimaryServWid;
-        gServMngPtr->multiFsServMap.insert(
-            std::make_pair(curWid, new FsService(curWid, key)));
-      }
-      gServMngPtr->primaryServ = gServMngPtr->multiFsServMap[gPrimaryServWid];
-      gServMngPtr->primaryServ->inUse = true;
-      gServMngPtr->multiFsServNum = num_key;
-
-      if (gLibSharedContext == nullptr) {
-        gLibSharedContext = new FsLibSharedContext();
-        gLibSharedContext->tidIncr = 1;
-        gLibSharedContext->key = keys[0];
-      }
-
-      gCleanedUpDone = false;
-      gMultiFsServLock.clear(std::memory_order_release);
-    }
-  }
-
-  return 0;
-}
-
-// Now, it will busy wait the result by checking the op's status variable
-void spinWaitOpDone(struct clientOp *copPtr) {
-  // std::cout << "spinwaitdone init:" << (int) copPtr->opStatus << std::endl;
-  while (copPtr->opStatus != OP_DONE) {
-    // spin wait
-  }
-  // assert(copPtr->opStatus == OP_DONE);
-}
-
-//// Check if the access of fs has be initialized for calling process.
-//// Return true when access is OK
-static inline bool check_fs_access_ok() {
-  // return !(gFsServ == nullptr && gMultiFsServNum == 0);
-  return gServMngPtr->multiFsServNum != 0;
-}
-
+/* #region fs util */
 int fs_exit() {
   int ret = 0;
 
@@ -1364,14 +1304,6 @@ int fs_cleanup() {
       gMultiFsServLock.clear(std::memory_order_release);
     }
 
-    // TODO: Locks
-    // Pending requests
-    for (auto ele: gPendingRequestMap) {
-      free(ele.second);
-      ele.second = nullptr;
-    }
-    
-    gPendingRequestMap.clear();
     gCleanedUpDone = true;
   }
   return 0;
@@ -1557,27 +1489,38 @@ int fs_dumpinodes_internal(FsService *fsServ) {
   return ret;
 }
 
+// TODO: Change this
 // TODO: Lock
 // NOTE: For testing purposes only
 int fs_dump_pendingops() {
-  for (auto &[key, val]: gPendingRequestMap) {
-    if (val->status == FS_PENDING_STATUS) {
-      std::cout << "req #" << key << " " << "pending" << std::endl;
-    } else if (val->status == FS_SPECULATIVE_STATUS) {
-      std::cout << "req #" << key << " " << "speculative" << std::endl;
-    } else if (val->status == FS_COMPLETED_STATUS) {
-      std::cout << "req #" << key << " " << "completed" << std::endl;
+  // for (auto &[key, val]: gPendingRequestMap) {
+  //   if (val->status == FS_PENDING_STATUS) {
+  //     std::cout << "req #" << key << " " << "pending" << std::endl;
+  //   } else if (val->status == FS_SPECULATIVE_STATUS) {
+  //     std::cout << "req #" << key << " " << "speculative" << std::endl;
+  //   } else if (val->status == FS_COMPLETED_STATUS) {
+  //     std::cout << "req #" << key << " " << "completed" << std::endl;
+  //   }
+  // }
+
+  for (auto &[key, ringList]: gServMngPtr->reqRingMap) {
+    for (auto ringIdx: ringList) {
+      std::cout << "Req: " << key << "\t"
+      << "ringIdx: " << ringIdx << "\t"
+      << "request type: " << gServMngPtr->queueMgr->getMessageType(ringIdx)
+      << std::endl;
     }
   }
 
   return 0;
 }
 
+// TODO: Change this
 // Test function
 int fs_poll_notification() {
-  for (auto &[wid, service]: gServMngPtr->multiFsServMap) {
-    service->notificationListenerLoop();
-  }
+  // for (auto &[wid, service]: gServMngPtr->multiFsServMap) {
+  //   service->notificationListenerLoop();
+  // }
 
   return 0;
 }
@@ -1589,6 +1532,150 @@ int fs_dumpinodes(int wid) {
   } else {
     return -1;
   }
+}
+
+/* #endregion */
+
+/* #region fs functions */
+// TODO: Deprecate this, as we need atleast 2 keys to work
+// with client retries (1 for server and 1 for private pending ops tracking)
+// If app know's its key, allow init with the key
+int fs_init(key_t key) {
+  print_app_zc_mimic();
+  if (gServMngPtr != nullptr) {
+    fprintf(stderr, "ERROR fs has initialized\n");
+    return -1;
+  }
+
+  while (gServMngPtr == nullptr) {
+    if (gMultiFsServLock.test_and_set(std::memory_order_acquire)) {
+      try {
+        gServMngPtr = new FsLibServiceMng();
+        gServMngPtr->primaryServ = new FsService(gPrimaryServWid, key);
+        gServMngPtr->primaryServ->inUse = true;
+        // gPrimaryServ = new FsService(gPrimaryServWid, key);
+      } catch (const char *msg) {
+        fprintf(stderr, "Cannot init FsService:%s\n", msg);
+        return -1;
+      }
+
+      gServMngPtr->multiFsServMap.insert(
+          std::make_pair(gPrimaryServWid, gServMngPtr->primaryServ));
+      gServMngPtr->multiFsServNum = 1;
+
+      if (gLibSharedContext == nullptr) {
+        gLibSharedContext = new FsLibSharedContext();
+        gLibSharedContext->tidIncr = 1;
+        gLibSharedContext->key = key;
+      }
+
+      gMultiFsServLock.clear(std::memory_order_release);
+    }
+  }
+  return 0;
+}
+
+// NOTE: guarded by gMultiFsServLock
+int fs_init_after_registration() {
+#ifdef UFS_SOCK_LISTEN
+  if (g_registered_max_num_worker <= 0) return -1;
+  while (gServMngPtr == nullptr) {
+    if (gMultiFsServLock.test_and_set(std::memory_order_acquire)) {
+      if (g_registered_max_num_worker > 0) {
+        gServMngPtr = new FsLibServiceMng();
+        int curWid;
+        for (int i = 0; i < g_registered_max_num_worker; i++) {
+          auto key =
+              g_registered_shm_key_base + i * g_registered_shmkey_distance;
+          fprintf(stdout,
+                  "fs_init_after_registration-> init for key:%d map key is: %d "
+                  "dist:%d\n",
+                  key, (i + gPrimaryServWid), g_registered_shmkey_distance);
+          curWid = i + gPrimaryServWid;
+          gServMngPtr->multiFsServMap.insert(
+              std::make_pair(curWid, new FsService(curWid, key)));
+        }
+        gServMngPtr->primaryServ = gServMngPtr->multiFsServMap[gPrimaryServWid];
+        gServMngPtr->primaryServ->inUse = true;
+        gServMngPtr->multiFsServNum = g_registered_max_num_worker;
+
+        if (gLibSharedContext == nullptr) {
+          gLibSharedContext = new FsLibSharedContext();
+          gLibSharedContext->tidIncr = 1;
+          gLibSharedContext->key = g_registered_shm_key_base;
+        }
+
+        gCleanedUpDone = false;
+      }
+      gMultiFsServLock.clear(std::memory_order_release);
+    }
+  }
+#endif
+  return 0;
+}
+
+// Use for app do not know its' key. which is for real application
+int fs_register(void) {
+#ifdef UFS_SOCK_LISTEN
+  std::call_once(g_register_flag, fs_register_via_socket);
+  // fprintf(stdout, "g_register_shm_key_base:%d max_nw:%d\n",
+  //        g_registered_shm_key_base, g_registered_max_num_worker);
+  int rt = fs_init_after_registration();
+  return rt;
+#endif
+  return -1;
+}
+
+// TODO: add pendingqueue
+// each key will represent one FSP thread (instance/worker)
+int fs_init_multi(int num_key, const key_t *keys) {
+  print_app_zc_mimic();
+  while (gServMngPtr == nullptr) {
+    if (gMultiFsServLock.test_and_set(std::memory_order_acquire)) {
+      gServMngPtr = new FsLibServiceMng();
+      int curWid;
+      gServMngPtr->queueMgr = new PendingQueueMgr(keys[num_key - 1]);
+      for (int i = 0; i < num_key - 1; i++) {
+        auto key = keys[i];
+        fprintf(stdout, "fs_init_multi-> init for key:%d map key is: %d\n", key,
+                (i + gPrimaryServWid));
+        curWid = i + gPrimaryServWid;
+        gServMngPtr->multiFsServMap.insert(
+            std::make_pair(curWid, new FsService(curWid, key)));
+      }
+      gServMngPtr->primaryServ = gServMngPtr->multiFsServMap[gPrimaryServWid];
+      gServMngPtr->primaryServ->inUse = true;
+      // NOTE: 1 key is used for private shm (pending ops)
+      gServMngPtr->multiFsServNum = num_key - 1; 
+
+      if (gLibSharedContext == nullptr) {
+        gLibSharedContext = new FsLibSharedContext();
+        gLibSharedContext->tidIncr = 1;
+        gLibSharedContext->key = keys[0];
+      }
+
+      gCleanedUpDone = false;
+      gMultiFsServLock.clear(std::memory_order_release);
+    }
+  }
+
+  return 0;
+}
+
+// Now, it will busy wait the result by checking the op's status variable
+void spinWaitOpDone(struct clientOp *copPtr) {
+  // std::cout << "spinwaitdone init:" << (int) copPtr->opStatus << std::endl;
+  while (copPtr->opStatus != OP_DONE) {
+    // spin wait
+  }
+  // assert(copPtr->opStatus == OP_DONE);
+}
+
+//// Check if the access of fs has be initialized for calling process.
+//// Return true when access is OK
+static inline bool check_fs_access_ok() {
+  // return !(gFsServ == nullptr && gMultiFsServNum == 0);
+  return gServMngPtr->multiFsServNum != 0;
 }
 
 int fs_stat_internal(FsService *fsServ, const char *pathname,
@@ -1781,7 +1868,6 @@ int fs_open(const char *path, int flags, mode_t mode) {
   assert(threadFsTid != 0);
   uint64_t requestId = getNewRequestId();
   // TODO: how to know if new file was created Only for create
-  addCreateToPendingRequestMap(requestId, path, flags, mode);
 retry:
   int wid = -1;
   auto service = getFsServiceForPath(standardPath, wid);
@@ -1881,144 +1967,6 @@ retry:
   tFsApiTs->addApiNormalDone(FsApiType::FS_CLOSE, tsIdx);
 #endif
   return rc;
-}
-
-OpenLeaseMapEntry *LeaseRef(const char *path) {
-  assert(false);
-  return nullptr;
-}
-
-OpenLeaseMapEntry *LeaseRef(int fd) {
-  std::shared_lock<std::shared_mutex> guard(
-      gLibSharedContext->openLeaseMapLock);
-  auto it = gLibSharedContext->fdOpenLeaseMap.find(fd);
-  if (it == gLibSharedContext->fdOpenLeaseMap.end()) {
-    // base fd lease not found, go to server
-    return nullptr;
-  } else {
-    it->second->ref += 1;
-    return it->second;
-  }
-}
-
-void LeaseUnref(OpenLeaseMapEntry *entry, bool del = false) {
-  if (del) {
-    assert(false);
-  } else {
-    std::shared_lock<std::shared_mutex> lock(
-        gLibSharedContext->openLeaseMapLock);
-    int ref = entry->ref.fetch_sub(1);
-    if (ref == 1) entry->cv.notify_all();
-  }
-}
-
-int fs_open_lease(const char *path, int flags, mode_t mode) {
-  int delixArr[32];
-  int dummy;
-  char *standardPath = filepath2TokensStandardized(path, delixArr, dummy);
-
-  // reference step
-  gLibSharedContext->openLeaseMapLock.lock_shared();
-  auto it = gLibSharedContext->pathOpenLeaseMap.find(standardPath);
-  OpenLeaseMapEntry *entry = nullptr;
-  if (it == gLibSharedContext->pathOpenLeaseMap.end()) {
-    // open, install lease, local open
-    gLibSharedContext->openLeaseMapLock.unlock_shared();
-    // do open to the server
-    assert(threadFsTid != 0);
-    uint64_t size;
-  retry:
-    int wid = -1;
-    auto service = getFsServiceForPath(standardPath, wid);
-    int rc = fs_open_internal(service, standardPath, flags, mode, 0 /*requestId*/, &size);
-
-    if (rc > 0) {
-      gLibSharedContext->fdWidMap[rc] = wid;
-      goto open_end;
-    } else if (rc > FS_REQ_ERROR_INODE_IN_TRANSFER) {
-      goto open_end;
-    }
-    // migration related errors
-    if (handle_inode_in_transfer(rc)) goto retry;
-    wid = getWidFromReturnCode(rc);
-    if (wid >= 0) {
-      updatePathWidMap(wid, standardPath);
-      goto retry;
-    }
-
-  open_end:
-    if (rc > 0 && size != 0) {
-      {
-        // install lease & local_open
-        // reference step
-        std::unique_lock<std::shared_mutex> lock(
-            gLibSharedContext->openLeaseMapLock);
-        // TODO: check for concurrent opens
-        OpenLeaseMapEntry *new_entry =
-            new OpenLeaseMapEntry(rc, standardPath, size);
-        auto retval = gLibSharedContext->pathOpenLeaseMap.emplace(standardPath,
-                                                                  new_entry);
-        assert(retval.second);
-        auto retval2 = gLibSharedContext->fdOpenLeaseMap.emplace(rc, new_entry);
-        assert(retval2.second);
-        entry = new_entry;
-        entry->ref++;
-      }
-      {
-        // local_open
-        std::unique_lock<std::shared_mutex> lock(entry->lock);
-        rc = entry->lease->Open(flags, mode);
-      }
-      LeaseUnref(entry);
-    }
-    free(standardPath);
-    return rc;
-  } else {
-    // local open
-    // reference done
-    bool is_create = flags & O_CREAT;
-    if (!is_create) {
-      entry = it->second;
-      entry->ref++;
-    }
-    gLibSharedContext->openLeaseMapLock.unlock_shared();
-    // do local_open
-    if (is_create) {
-      free(standardPath);
-      return -1;
-    }
-    int fd = -1;
-    {
-      // local_open
-      std::unique_lock<std::shared_mutex> lock(entry->lock);
-      fd = entry->lease->Open(flags, mode);
-    }
-    LeaseUnref(entry);
-    free(standardPath);
-    return fd;
-  }
-}
-
-int fs_close_lease(int fd) {
-  if (OpenLease::IsLocalFd(fd)) {
-    int base_fd = OpenLease::FindBaseFd(fd);
-    OpenLeaseMapEntry *entry = LeaseRef(base_fd);
-    if (entry) {
-      {
-        // local close
-        int offset = OpenLease::FindOffset(fd);
-        std::unique_lock<std::shared_mutex> lock(entry->lock);
-        entry->lease->Close(offset);
-      }
-      LeaseUnref(entry);
-      return 0;
-    } else {
-      return fs_close(fd);
-    }
-  } else {
-    // global fd, go to server
-    return fs_close(fd);
-  }
 }
 
 int fs_unlink_internal(FsService *fsServ, const char *pathname) {
@@ -2417,7 +2365,8 @@ void generic_fs_syncall(bool UNLINK_ONLY) {
       prepare_syncallOp(&msg, synop);
     }
 
-    shmipc_mgr_put_msg_nowait(serv->shmipc_mgr, ring_idx, &msg);
+    shmipc_mgr_put_msg_nowait(serv->shmipc_mgr, ring_idx, &msg, 
+     shmipc_STATUS_READY_FOR_SERVER);
     async_ops.emplace_back(serv, ring_idx);
   }
 
@@ -2685,7 +2634,8 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
 }
 
 static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
-                                  size_t count, off_t offset, uint64_t requestId) {
+                                  size_t count, off_t offset, uint64_t requestId,
+                                  bool isOpRetried) {
   ssize_t total_rc = 0;
   size_t bytes = 0;
   size_t toWrite = count;
@@ -2713,6 +2663,13 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     memcpy(curDataPtr, ((char *)buf + bytes), tmpBytes);
 #endif
 
+    if (!isOpRetried) {
+      auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+      gServMngPtr->queueMgr->enqueuePendingXreq<struct pwriteOpPacked>(pwop_p, pendingOpIdx);
+      gServMngPtr->queueMgr->enqueuePendingData(curDataPtr, pendingOpIdx, tmpBytes);
+      gServMngPtr->reqRingMap[requestId].push_back(pendingOpIdx);
+    }
+    
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
     if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
       print_server_unavailable(__func__);
@@ -2721,6 +2678,7 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     ssize_t rc = pwop_p->rwOp.ret;
     if (rc < 0) {
       shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
+      gServMngPtr->queueMgr->dequePendingMsg(requestId);
       return rc;
     } 
 
@@ -2734,25 +2692,31 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
 }
 
 ssize_t fs_write(int fd, const void *buf, size_t count) {
-#ifdef LDB_PRINT_CALL
-  print_write(fd, buf, count);
-#endif
   if (count == 0) return 0;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_WRITE);
 #endif
   auto requestId = getNewRequestId();
+#ifdef LDB_PRINT_CALL
+  print_write(fd, buf, count, requestId);
+#endif
   int wid = -1;
+  bool isOpRetried = false;
 retry:
   auto service = getFsServiceForFD(fd, wid);
   auto prevOffset = service->getOffset(fd);
-  addPwriteToPendingRequestMap(requestId, fd, count, prevOffset);
   
-  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, prevOffset, requestId);
+  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, prevOffset, requestId, isOpRetried);
   if (rc < 0) {
-    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
+    if (handle_inode_in_transfer(static_cast<int>(rc))) {
+      isOpRetried = true;
+      goto retry;
+    }
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
-    if (should_retry) goto retry;
+    if (should_retry) {
+      isOpRetried = true;
+      goto retry;
+    }
   } else {
     service->updateOffset(fd, prevOffset + rc);
   }
@@ -2764,23 +2728,29 @@ retry:
 }
 
 ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset) {
-#ifdef LDB_PRINT_CALL
-  print_pwrite(fd, buf, count, offset);
-#endif
   if (count == 0) return 0;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_PWRITE);
 #endif
   int wid = -1;
   auto requestId = getNewRequestId();
-  addPwriteToPendingRequestMap(requestId, fd, count, offset);
+#ifdef LDB_PRINT_CALL
+  print_pwrite(fd, buf, count, offset, requestId);
+#endif
+  bool isOpRetried = false;
 retry:
   auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, offset, requestId);
+  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, offset, requestId, isOpRetried);
   if (rc < 0) {
-    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
+    if (handle_inode_in_transfer(static_cast<int>(rc))) {
+      isOpRetried = true;
+      goto retry;
+    }
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
-    if (should_retry) goto retry;
+    if (should_retry){
+      isOpRetried = true;
+      goto retry;
+    }
   } 
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_PWRITE, tsIdx);
@@ -2788,9 +2758,149 @@ retry:
   return rc;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// fs_allocated_xxx()
+/* #endregion */
 
+/* #region lease */
+OpenLeaseMapEntry *LeaseRef(const char *path) {
+  assert(false);
+  return nullptr;
+}
+
+OpenLeaseMapEntry *LeaseRef(int fd) {
+  std::shared_lock<std::shared_mutex> guard(
+      gLibSharedContext->openLeaseMapLock);
+  auto it = gLibSharedContext->fdOpenLeaseMap.find(fd);
+  if (it == gLibSharedContext->fdOpenLeaseMap.end()) {
+    // base fd lease not found, go to server
+    return nullptr;
+  } else {
+    it->second->ref += 1;
+    return it->second;
+  }
+}
+
+void LeaseUnref(OpenLeaseMapEntry *entry, bool del = false) {
+  if (del) {
+    assert(false);
+  } else {
+    std::shared_lock<std::shared_mutex> lock(
+        gLibSharedContext->openLeaseMapLock);
+    int ref = entry->ref.fetch_sub(1);
+    if (ref == 1) entry->cv.notify_all();
+  }
+}
+
+int fs_open_lease(const char *path, int flags, mode_t mode) {
+  int delixArr[32];
+  int dummy;
+  char *standardPath = filepath2TokensStandardized(path, delixArr, dummy);
+
+  // reference step
+  gLibSharedContext->openLeaseMapLock.lock_shared();
+  auto it = gLibSharedContext->pathOpenLeaseMap.find(standardPath);
+  OpenLeaseMapEntry *entry = nullptr;
+  if (it == gLibSharedContext->pathOpenLeaseMap.end()) {
+    // open, install lease, local open
+    gLibSharedContext->openLeaseMapLock.unlock_shared();
+    // do open to the server
+    assert(threadFsTid != 0);
+    uint64_t size;
+  retry:
+    int wid = -1;
+    auto service = getFsServiceForPath(standardPath, wid);
+    int rc = fs_open_internal(service, standardPath, flags, mode, 0 /*requestId*/, &size);
+
+    if (rc > 0) {
+      gLibSharedContext->fdWidMap[rc] = wid;
+      goto open_end;
+    } else if (rc > FS_REQ_ERROR_INODE_IN_TRANSFER) {
+      goto open_end;
+    }
+    // migration related errors
+    if (handle_inode_in_transfer(rc)) goto retry;
+    wid = getWidFromReturnCode(rc);
+    if (wid >= 0) {
+      updatePathWidMap(wid, standardPath);
+      goto retry;
+    }
+
+  open_end:
+    if (rc > 0 && size != 0) {
+      {
+        // install lease & local_open
+        // reference step
+        std::unique_lock<std::shared_mutex> lock(
+            gLibSharedContext->openLeaseMapLock);
+        // TODO: check for concurrent opens
+        OpenLeaseMapEntry *new_entry =
+            new OpenLeaseMapEntry(rc, standardPath, size);
+        auto retval = gLibSharedContext->pathOpenLeaseMap.emplace(standardPath,
+                                                                  new_entry);
+        assert(retval.second);
+        auto retval2 = gLibSharedContext->fdOpenLeaseMap.emplace(rc, new_entry);
+        assert(retval2.second);
+        entry = new_entry;
+        entry->ref++;
+      }
+      {
+        // local_open
+        std::unique_lock<std::shared_mutex> lock(entry->lock);
+        rc = entry->lease->Open(flags, mode);
+      }
+      LeaseUnref(entry);
+    }
+    free(standardPath);
+    return rc;
+  } else {
+    // local open
+    // reference done
+    bool is_create = flags & O_CREAT;
+    if (!is_create) {
+      entry = it->second;
+      entry->ref++;
+    }
+    gLibSharedContext->openLeaseMapLock.unlock_shared();
+    // do local_open
+    if (is_create) {
+      free(standardPath);
+      return -1;
+    }
+    int fd = -1;
+    {
+      // local_open
+      std::unique_lock<std::shared_mutex> lock(entry->lock);
+      fd = entry->lease->Open(flags, mode);
+    }
+    LeaseUnref(entry);
+    free(standardPath);
+    return fd;
+  }
+}
+
+int fs_close_lease(int fd) {
+  if (OpenLease::IsLocalFd(fd)) {
+    int base_fd = OpenLease::FindBaseFd(fd);
+    OpenLeaseMapEntry *entry = LeaseRef(base_fd);
+    if (entry) {
+      {
+        // local close
+        int offset = OpenLease::FindOffset(fd);
+        std::unique_lock<std::shared_mutex> lock(entry->lock);
+        entry->lease->Close(offset);
+      }
+      LeaseUnref(entry);
+      return 0;
+    } else {
+      return fs_close(fd);
+    }
+  } else {
+    // global fd, go to server
+    return fs_close(fd);
+  }
+}
+/*#endregion*/
+
+/* #region fs_allocated_xxx */
 static ssize_t fs_allocated_read_internal(FsService *fsServ, int fd, void *buf,
                                           size_t count) {
   struct shmipc_msg msg;
@@ -3128,7 +3238,9 @@ static int compare_file_offset(node n, void *leftp, void *rightp) {
   }
 }
 #endif
+/* #endregion */
 
+/* #region fs cache*/
 constexpr static int gRWLookupLocalErr_FdNotFound = -11;
 constexpr static int gRWLookupLocalErr_NoData = -13;
 constexpr static int gRWLookupLocalSuccess = 0;
@@ -3844,6 +3956,8 @@ ssize_t fs_uc_pread(int fd, void *buf, size_t count, off_t offset) {
   return 0;
 }
 
+/* #endregion */
+
 off_t fs_lseek_internal(FsService *fsServ, int fd, long int offset,
                         int whence, off_t file_offset) {
   struct shmipc_msg msg;
@@ -3924,6 +4038,7 @@ retry:
   return rc;
 }
 
+
 #ifdef FS_LIB_SPPG
 void init_global_spdk_env() {
   gSpdkEnvPtr.reset(new SpdkEnvWrapper());
@@ -3951,8 +4066,6 @@ ssize_t fs_sppg_cpc_pread(int fd, void *buf, size_t count, off_t offset) {
   return 0;
 }
 #endif
-
-////////////////////////////////////////////////////////////////////////////////
 
 void *fs_malloc_pad(size_t size) {
   int err;
@@ -4008,8 +4121,7 @@ void fs_free(void *ptr, int fsTid) {
 
 void fs_free(void *ptr) { fs_free(ptr, threadFsTid); }
 
-/////////// ldb specific /////
-
+/* #region fs ldb specific */
 int fs_open_ldb(const char *path, int flags, mode_t mode) {
   int delixArr[32];
   int dummy;
@@ -4294,3 +4406,4 @@ retry:
 #endif
   return rc;
 }
+/* #endregion fs ldb specific */

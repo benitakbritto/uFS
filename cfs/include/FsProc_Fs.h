@@ -436,10 +436,10 @@ struct FsWorkerOpStats {
 class FsProcWorker {
  public:
   // Notify
-  void notifyAllWriteOps(uint8_t type);
-  void notifyAllMetadataOps(uint8_t type);
-  void notifyFileWriteOps(uint8_t type, cfs_ino_t inodeNum);
-  void notifyFileMetadataOps(uint8_t type, cfs_ino_t inodeNum);
+  void notifyAllWriteOps();
+  void notifyAllMetadataOps();
+  void notifyFileWriteOps(cfs_ino_t inodeNum);
+  void notifyFileMetadataOps(cfs_ino_t inodeNum);
 
   // Interval for reporting CPU usage (in us).
   static constexpr int64_t kCpuReportInterval = 1e6;  // set to 1s

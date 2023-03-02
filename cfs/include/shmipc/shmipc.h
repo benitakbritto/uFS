@@ -129,7 +129,7 @@ int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off
 // NOTE: The nowait here applies to waiting for the server to respond. This
 // function will still block while inserting into the ring if the ring is full.
 void shmipc_mgr_put_msg_nowait(struct shmipc_mgr *mgr, off_t ring_idx,
-                               struct shmipc_msg *msg);
+                               struct shmipc_msg *msg, uint8_t status);
 
 void shmipc_mgr_put_msg_server_nowait(struct shmipc_mgr *mgr, off_t ring_idx,
                                struct shmipc_msg *msg);

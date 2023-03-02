@@ -272,7 +272,7 @@ int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off
   int count = 0;
 
   while (ret == -1 && count < retry_count) {
-    shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg);
+    shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg, shmipc_STATUS_READY_FOR_SERVER);
     
     sleep(sleep_time);
 
@@ -286,12 +286,13 @@ int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off
 }
 
 void shmipc_mgr_put_msg_nowait(struct shmipc_mgr *mgr, off_t ring_idx,
-                               struct shmipc_msg *msg) {
+                               struct shmipc_msg *msg, 
+                               uint8_t status) {
   struct shmipc_msg *rmsg;
 
   rmsg = IDX_TO_MSG(mgr, ring_idx);
   memcpy((char *)rmsg + 9, (char *)msg + 9, 55);
-  SHMIPC_SET_MSG_STATUS(rmsg, shmipc_STATUS_READY_FOR_SERVER);
+  SHMIPC_SET_MSG_STATUS(rmsg, status);
 }
 
 void shmipc_mgr_put_msg_server_nowait(struct shmipc_mgr *mgr, off_t ring_idx,

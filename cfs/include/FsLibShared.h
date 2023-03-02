@@ -53,8 +53,7 @@
 
 ///
 #define FS_PENDING_STATUS (0)
-#define FS_SPECULATIVE_STATUS (1)
-#define FS_COMPLETED_STATUS (2)
+#define FS_COMPLETED_STATUS (1)
 ///
 
 // NOTE: Do not place any more constants below these two. Among all the FS_REQ_*

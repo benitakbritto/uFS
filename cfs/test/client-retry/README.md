@@ -1,20 +1,18 @@
-TODO
-
 # Folder structure
 
-client-retry
-|
-|__sanity
-    |
-    |__no-crash
-        |
-        |__commands
-        |  
-        |__client
-        |  
-        |__server
-    |
-    |__crash TODO
+client-retry  
+|  
+|__ sanity   
+|  
+|______ no-crash    
+|  
+|__________ commands   
+|    
+|__________ client  
+|  
+|__________ server  
+|  
+|________ crash TODO. 
 
 # Enumerate tests
 ## sanity/no-crash

@@ -2692,6 +2692,7 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     if (rc < 0) {
       shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
       gServMngPtr->queueMgr->dequePendingMsg(requestId);
+      gServMngPtr->reqRingMap.erase(requestId);
       return rc;
     } 
 

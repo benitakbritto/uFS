@@ -1783,7 +1783,8 @@ int fs_fstat(int fd, struct stat *statbuf) {
 }
 
 static int fs_open_internal(FsService *fsServ, const char *path, int flags,
-                            mode_t mode, uint64_t requestId, uint64_t *size = nullptr) {
+                            mode_t mode, uint64_t requestId, bool isOpRetried, 
+                            uint64_t *size = nullptr) {
   struct shmipc_msg msg;
   struct openOp *oop;
   off_t ring_idx;
@@ -1798,6 +1799,13 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   oop = (struct openOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_openOp(&msg, oop, path, flags, mode, size, requestId);
+
+  if (!isOpRetried) {
+    auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+    gServMngPtr->queueMgr->enqueuePendingXreq<struct openOp>(oop, pendingOpIdx);
+    gServMngPtr->reqRingMap[requestId].push_back(pendingOpIdx);
+  }
+
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
       print_server_unavailable(__func__);
@@ -1867,11 +1875,12 @@ int fs_open(const char *path, int flags, mode_t mode) {
   //(void) check_app_thread_mem_buf_ready();
   assert(threadFsTid != 0);
   uint64_t requestId = getNewRequestId();
+  bool isOpRetried = false;
   // TODO: how to know if new file was created Only for create
 retry:
   int wid = -1;
   auto service = getFsServiceForPath(standardPath, wid);
-  int rc = fs_open_internal(service, standardPath, flags, mode, requestId);
+  int rc = fs_open_internal(service, standardPath, flags, mode, requestId, isOpRetried);
 
   if (rc > 0) {
     gLibSharedContext->fdWidMap[rc] = wid;
@@ -1881,11 +1890,15 @@ retry:
   }
 
   // migration related errors
-  if (handle_inode_in_transfer(rc)) goto retry;
+  if (handle_inode_in_transfer(rc)) {
+    isOpRetried = true;
+    goto retry;
+  }
 
   wid = getWidFromReturnCode(rc);
   if (wid >= 0) {
     updatePathWidMap(wid, standardPath);
+    isOpRetried = true;
     goto retry;
   }
 
@@ -2805,10 +2818,12 @@ int fs_open_lease(const char *path, int flags, mode_t mode) {
     // do open to the server
     assert(threadFsTid != 0);
     uint64_t size;
+    bool isOpRetried = false;
   retry:
     int wid = -1;
     auto service = getFsServiceForPath(standardPath, wid);
-    int rc = fs_open_internal(service, standardPath, flags, mode, 0 /*requestId*/, &size);
+    int rc = fs_open_internal(service, standardPath, flags, mode, 0 /*requestId*/, 
+      isOpRetried, &size);
 
     if (rc > 0) {
       gLibSharedContext->fdWidMap[rc] = wid;
@@ -2817,10 +2832,14 @@ int fs_open_lease(const char *path, int flags, mode_t mode) {
       goto open_end;
     }
     // migration related errors
-    if (handle_inode_in_transfer(rc)) goto retry;
+    if (handle_inode_in_transfer(rc)) {
+      isOpRetried = true;
+      goto retry;
+    }
     wid = getWidFromReturnCode(rc);
     if (wid >= 0) {
       updatePathWidMap(wid, standardPath);
+      isOpRetried = true;
       goto retry;
     }
 
@@ -4137,12 +4156,14 @@ int fs_open_ldb(const char *path, int flags, mode_t mode) {
   // So, it is important for any user (thread) to invoke this
   //(void) check_app_thread_mem_buf_ready();
   assert(threadFsTid != 0);
+  bool isOpRetried = false;
 
 retry:
   int wid = -1;
   auto service = getFsServiceForPath(standardPath, wid);
   size_t file_size;
-  int rc = fs_open_internal(service, standardPath, flags, mode, 0/*requestId*/, &file_size);
+  int rc = fs_open_internal(service, standardPath, flags, mode, 0/*requestId*/, 
+    isOpRetried, &file_size);
 
   if (rc > 0) {
     gLibSharedContext->fdWidMap[rc] = wid;
@@ -4152,11 +4173,15 @@ retry:
   }
 
   // migration related errors
-  if (handle_inode_in_transfer(rc)) goto retry;
+  if (handle_inode_in_transfer(rc)) {
+    isOpRetried = true;
+    goto retry;
+  }
 
   wid = getWidFromReturnCode(rc);
   if (wid >= 0) {
     updatePathWidMap(wid, standardPath);
+    isOpRetried = true;
     goto retry;
   }
 

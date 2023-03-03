@@ -59,14 +59,15 @@ FileMng::~FileMng() { delete fsImpl_; }
 void FileMng::flushMetadataOnExit() { fsImpl_->flushMetadataOnExit(fsWorker_); }
 
 int64_t FileMng::checkAndFlushBufferDirtyItems() {
+  // Data
   auto ret = fsImpl_->checkAndFlushDirty(fsWorker_);
-  
-  // TODO: Move ti FsProc_Worker
-  // notify clients
   if (ret > 0) {
     fsWorker_->notifyAllWriteOps();
-  }
 
+    // Metadata
+    fsWorker_->blockingFlushBufferInternal();
+    fsWorker_->notifyAllMetadataOps();
+  }
   return ret;
 }
 

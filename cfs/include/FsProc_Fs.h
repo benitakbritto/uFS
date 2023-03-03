@@ -762,6 +762,7 @@ class FsProcWorker {
   virtual AppProc *testOnlyGetAppProc(pid_t pid);
 
   virtual void blockingFlushBufferOnExit() final;
+  void blockingFlushBufferInternal();
   // =======
 
  protected:

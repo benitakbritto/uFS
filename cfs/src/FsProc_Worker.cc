@@ -4066,14 +4066,7 @@ void FsProcWorkerServant::ProcessLmRedirectOneTau(LmMsgRedirectOneTauCtx *ctx) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
-void FsProcWorker::blockingFlushBufferOnExit() {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
-  auto bypass_shutdown_sync = std::getenv("FSP_BYPASS_SHUTDOWN_NOSYNC");
-  if (bypass_shutdown_sync != nullptr &&
-      std::string(bypass_shutdown_sync) == "YES") {
-    SPDLOG_INFO("FSP_BYPASS_SHUTDOWN_NOSYNC set to {}", bypass_shutdown_sync);
-    return;
-  }
+void FsProcWorker::blockingFlushBufferInternal() {
   auto req = new FsReq(wid);
   req->setType(FsReqType::SYNCALL);
   req->reqState = FsReqState::SYNCALL_GUARD;
@@ -4112,6 +4105,19 @@ void FsProcWorker::blockingFlushBufferOnExit() {
 #else
   fileManager->flushMetadataOnExit();
 #endif
+
+}
+
+void FsProcWorker::blockingFlushBufferOnExit() {
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  auto bypass_shutdown_sync = std::getenv("FSP_BYPASS_SHUTDOWN_NOSYNC");
+  if (bypass_shutdown_sync != nullptr &&
+      std::string(bypass_shutdown_sync) == "YES") {
+    SPDLOG_INFO("FSP_BYPASS_SHUTDOWN_NOSYNC set to {}", bypass_shutdown_sync);
+    return;
+  }
+  
+  blockingFlushBufferInternal();
 
   // notify
   notifyAllMetadataOps();

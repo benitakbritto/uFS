@@ -1010,13 +1010,16 @@ std::string FsReq::getOutputStr() {
   return ss.str();
 }
 
-void FsReq::markComplete() {
+void FsReq::markComplete(bool isCreate = false) {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // TODO change the member variable type
   off_t ring_idx = (off_t)appRingSlotId;
   struct shmipc_msg *msg = NULL;
   msg = IDX_TO_MSG(app->shmipc_mgr, ring_idx);
   SHMIPC_SET_MSG_STATUS(msg, shmipc_STATUS_READY_FOR_CLIENT);
+  if (isCreate) {
+    SHMIPC_SET_MSG_TYPE(msg, CFS_OP_CREATE);
+  }
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 

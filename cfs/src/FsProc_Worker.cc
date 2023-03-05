@@ -754,6 +754,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
   auto app = fsReq->getApp();
   assert(app != nullptr);
   clientOp *cop = nullptr;
+  bool isCreate = false;
 
   // TODO measure using closure vs argument for this lambda?
   auto getReturnValueForFailedReq = [](FsReq *fsReq) {
@@ -979,12 +980,12 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         do_check_inode_migration = true;
 
         if (curType == FsReqType::CREATE) {
+          isCreate = true;
           flushPendingMetadataOpMap[app->getPid()][fsReq->getTargetInode()->i_no].push_back(cop->op.open.requestId);
         }
       }
       cop->opStatus = OP_DONE;
       copy_msg(open);
-
     }  // it != appMap.end()
   } else if (curType == FsReqType::CLOSE) {
     auto it = appMap.find(fsReq->getPid());
@@ -1256,7 +1257,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
 #undef pack_msg
 
   // make the STATUS "DONE" visible to clients
-  fsReq->markComplete();
+  fsReq->markComplete(isCreate);
 
   if (fsReq->getState() != FsReqState::OP_OWNERSHIP_UNKNOWN &&
       fsReq->getState() != FsReqState::OP_OWNERSHIP_REDIRECT) {

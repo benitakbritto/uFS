@@ -80,6 +80,7 @@ enum CfsOpCode {
   CFS_OP_ALLOCED_WRITE = 8,
   CFS_OP_LSEEK = 9,
   // control plane ops
+  CFS_OP_CREATE = 10,
   CFS_OP_OPEN = 11,
   CFS_OP_CLOSE = 12,
   CFS_OP_UNLINK = 13,

@@ -73,6 +73,12 @@ struct shmipc_msg {
     (msg)->status = flag;                \
   } while (0);
 
+#define SHMIPC_SET_MSG_TYPE(msg, type_) \
+  do {                                   \
+    __sync_synchronize();                \
+    (msg)->type = type_;                \
+  } while (0);
+
 #define IDX_TO_XREQ(mgr, idx) (&(mgr->xreq[(idx)*shmipc_XREQ_MAX_ELEM_SIZE]))
 #define IDX_TO_MSG(mgr, idx) (&(mgr->ring[(idx)]))
 #define IDX_TO_DATA(mgr, idx) (&(mgr->data[(idx)*shmipc_DATA_MAX_ELEM_SIZE]))

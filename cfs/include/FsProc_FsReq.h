@@ -614,7 +614,7 @@ class FsReq {
   //
   // mark request as completed so client can read response
   //
-  void markComplete();
+  void markComplete(bool isCreate);
 
   //
   // read BIO

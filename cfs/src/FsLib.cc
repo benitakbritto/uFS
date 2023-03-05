@@ -1800,17 +1800,17 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
   oop = (struct openOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_openOp(&msg, oop, path, flags, mode, size, requestId);
 
-  if (!isOpRetried) {
-    auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
-    gServMngPtr->queueMgr->enqueuePendingXreq<struct openOp>(oop, pendingOpIdx);
-    gServMngPtr->reqRingMap[requestId].push_back(pendingOpIdx);
-  }
-
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
       print_server_unavailable(__func__);
       return -1;
     }
+
+  if (!isOpRetried && msg.type == CFS_OP_CREATE) {
+    auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+    gServMngPtr->queueMgr->enqueuePendingXreq<struct openOp>(oop, pendingOpIdx);
+    gServMngPtr->reqRingMap[requestId].push_back(pendingOpIdx);
+  }
 
   // TODO make sure this doesn't get optimized out?
   ret = oop->ret;

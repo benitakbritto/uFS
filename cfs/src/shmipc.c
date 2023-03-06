@@ -272,16 +272,21 @@ int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off
   int count = 0;
 
   while (ret == -1 && count < retry_count) {
-    shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg, shmipc_STATUS_READY_FOR_SERVER);
-    
+    printf("Attempt at req: %d \n", count + 1);
+
+    sleep_time = sleep_time * (count);
     sleep(sleep_time);
 
+    if (count == 0) {
+      shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg, shmipc_STATUS_READY_FOR_SERVER);
+    }
+    
     ret = shmipc_mgr_poll_msg(mgr, ring_idx, msg);
 
     count++;
-    sleep_time = sleep_time * (count + 1);
   }
 
+  printf("Exiting retry loop | ret: %d \n", ret);
   return ret;
 }
 

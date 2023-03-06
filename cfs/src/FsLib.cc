@@ -58,6 +58,8 @@ uint64_t inline getNewRequestId() {
 /* #endregion requestId end */
 
 /* #region print api */
+
+// TODO: Add retry module here
 void print_server_unavailable(const char *func_name) {
   fprintf(stderr, "[WARN] Server is unavailable for function %s. \
           Retry operation later.\n", func_name);

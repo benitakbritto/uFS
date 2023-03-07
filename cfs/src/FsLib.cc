@@ -1612,7 +1612,7 @@ void handle_create_retry(uint64_t reqId) {
   fs_open(op->path, op->flags, op->mode);
 }
 
-void handle_pread_retry(uint64_t reqId) {
+bool handle_pread_retry(uint64_t reqId) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct preadOpPacked>(gServMngPtr->reqRingMap[reqId][0]);
   void *buf = calloc(op->rwOp.count, sizeof(char));
   if (fs_pread(op->rwOp.fd, buf, op->rwOp.count, op->offset, true, reqId) > 0) {
@@ -1621,9 +1621,11 @@ void handle_pread_retry(uint64_t reqId) {
 
     // clean up
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
-    gServMngPtr->reqRingMap.erase(reqId); // TODO: Fix, causing seg fault. Need to erase separately
     free(buf);
+    return true;
   }
+
+  return false;
 }
 
 void handle_unlink_retry(uint64_t reqId) {
@@ -1645,25 +1647,34 @@ void fs_retry_pending_ops() {
     return;
   } else {
     std::cout << "[INFO] Connection to server successful" << std::endl;
-    for (auto &req: gServMngPtr->reqRingMap) {
-      std::cout << "Retrying request #" << req.first << std::endl;
-      auto type = gServMngPtr->queueMgr->getMessageType(gServMngPtr->reqRingMap[req.first][0]);
+    for (auto itr = gServMngPtr->reqRingMap.begin(); itr != gServMngPtr->reqRingMap.end(); ) {
+      std::cout << "[INFO] Retrying request #" << itr->first << std::endl;
+      auto reqId = itr->first;
+      auto type = gServMngPtr->queueMgr->getMessageType(gServMngPtr->reqRingMap[reqId][0]);
       switch(type) {
-      case CFS_OP_PWRITE:
-        handle_pwrite_retry(req.first);
-        break;
-      case CFS_OP_CREATE:
-        handle_create_retry(req.first);
-        break;
-      case CFS_OP_PREAD:
-        handle_pread_retry(req.first);
-        break;
-      case CFS_OP_UNLINK:
-        handle_unlink_retry(req.first);
-        break;
-      default:
-        std::cout << "[ERR] Not supported" << std::endl;
-        break;
+        case CFS_OP_PWRITE:
+          handle_pwrite_retry(reqId);
+          itr++;
+          break;
+        case CFS_OP_CREATE:
+          handle_create_retry(reqId);
+          itr++;
+          break;
+        case CFS_OP_PREAD:
+          if (handle_pread_retry(reqId)) {
+            gServMngPtr->reqRingMap.erase(itr++);
+          } else {
+            itr++;
+          }
+          break;
+        case CFS_OP_UNLINK:
+          handle_unlink_retry(reqId);
+          itr++;
+          break;
+        default:
+          std::cout << "[ERR] Not supported" << std::endl;
+          itr++;
+          break;
       }
     }
   }
@@ -2130,20 +2141,26 @@ int fs_unlink_internal(FsService *fsServ, const char *pathname, bool isRetry = f
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   unlkop = (struct unlinkOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_unlinkOp(&msg, unlkop, pathname, isRetry, reqId);
+
+  if (gServMngPtr->reqRingMap.count(reqId) == 0) {
+    auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+    gServMngPtr->queueMgr->enqueuePendingXreq<struct unlinkOp>(unlkop, off);
+    gServMngPtr->reqRingMap[reqId].push_back(off);
+  }
+
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-
-      if (gServMngPtr->reqRingMap.count(reqId) == 0) {
-        auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
-        gServMngPtr->queueMgr->enqueuePendingXreq<struct unlinkOp>(unlkop, off);
-        gServMngPtr->reqRingMap[reqId].push_back(off);
-      }
-
-      return -1;
-    }
+    print_server_unavailable(__func__);
+    return -1;
+  }
 
   ret = unlkop->ret;
+
+  // cleanup
+  if (ret != 0) {
+    gServMngPtr->queueMgr->dequePendingMsg(reqId);
+    gServMngPtr->reqRingMap.erase(reqId);
+  }
 #ifdef _CFS_LIB_PRINT_REQ_
   fprintf(stdout, "fs_unlink(pathname:%s) return:%d\n", pathname, ret);
 #endif
@@ -2151,7 +2168,6 @@ int fs_unlink_internal(FsService *fsServ, const char *pathname, bool isRetry = f
   return ret;
 }
 
-// TODO: Add unlink to metadata ops & pending until notify clears it
 // Man page of unlink:
 // unlink() deletes a name from the filesystem.  If that name was the last link
 // to a file and no processes have the file open, the file is deleted and the
@@ -2176,7 +2192,7 @@ int fs_unlink(const char *pathname, bool isRetry, uint64_t retryRequestId) {
       delete it->second;
       gLibSharedContext->pathLDBLeaseMap.unsafe_erase(it);
     }
-  } 
+  }
 
   if (rt < 0 && rt >= FS_REQ_ERROR_INODE_IN_TRANSFER) rt = -1;
   free(standardPath);
@@ -2633,7 +2649,6 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
     if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
       print_server_unavailable(__func__);
-      std::cout << "requestId = " << requestId << std::endl;
       if (gServMngPtr->reqRingMap.count(requestId) == 0) {
         auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
         gServMngPtr->queueMgr->enqueuePendingXreq<struct preadOpPacked>(prop_p, off);

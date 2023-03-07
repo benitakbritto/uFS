@@ -1057,6 +1057,13 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         std::cout << "unlink error" << std::endl;
         cop->op.unlink.ret = getReturnValueForFailedReq(fsReq);
         SPDLOG_DEBUG("unlink-err set return value to:{}", cop->op.unlink.ret);
+      } else {
+        if (fsReq->getTargetInode()) {
+          flushPendingMetadataOpMap[app->getPid()][fsReq->getTargetInode()->i_no].push_back(cop->op.unlink.requestId);
+        } else {
+          flushPendingMetadataOpMap[app->getPid()][0].push_back(cop->op.unlink.requestId);
+        }
+        
       }
       cop->opStatus = OP_DONE;
       copy_msg(unlink);

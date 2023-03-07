@@ -88,7 +88,7 @@ int fs_open_lease(const char *path, int flags, mode_t mode);
 int fs_close_lease(int fd);
 
 // ~= unlink()
-int fs_unlink(const char *pathname);
+int fs_unlink(const char *pathname, bool isRetry = false, uint64_t retryRequestId = 0);
 // ~= mkdir()
 int fs_mkdir(const char *pathname, mode_t mode);
 // ~= opendir()

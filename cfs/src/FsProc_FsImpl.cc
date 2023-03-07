@@ -28,7 +28,7 @@ FsImpl::FsImpl(const FsProcWorker *worker, const char *memPtr,
       bmapLock(ATOMIC_FLAG_INIT),
 #endif
       memPtr_(memPtr) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   static_assert(sizeof(cfs_mem_block_t) == BSIZE, "");
   //// static_assert(sizeof(cfs_dinode) == 256, "");
   // Make sure one ITable block (512B) only contains 1 inode
@@ -44,7 +44,7 @@ FsImpl::FsImpl(const FsProcWorker *worker, const char *memPtr,
   initMemAddrDataBlockBuf();
   printSuperBlock();
   permission = FsPermission::getInstance();
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsImpl::FsImpl(const FsProcWorker *worker, const char *bmapMemPtr,
@@ -62,7 +62,7 @@ FsImpl::FsImpl(const FsProcWorker *worker, const char *bmapMemPtr,
       bmapMemPtr_(bmapMemPtr),
       inodeSectorMemPtr_(nullptr),
       dataBlockMemPtr_(dataBlockMemPtr) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(worker != nullptr);
   fsWorker_ = worker;
   idx_ = fsWorker_->getWorkerIdx();
@@ -70,7 +70,7 @@ FsImpl::FsImpl(const FsProcWorker *worker, const char *bmapMemPtr,
   initMemAddrBmapBlockBuf();
   initMemAddrDataBlockBuf();
   permission = FsPermission::getInstance();
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsImpl::FsImpl(const FsProcWorker *worker, const char *bmapMemPtr,
@@ -89,7 +89,7 @@ FsImpl::FsImpl(const FsProcWorker *worker, const char *bmapMemPtr,
       bmapMemPtr_(bmapMemPtr),
       inodeSectorMemPtr_(inodeSectorMemPtr),
       dataBlockMemPtr_(dataBlockMemPtr) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(worker != nullptr);
   fsWorker_ = worker;
   idx_ = fsWorker_->getWorkerIdx();
@@ -97,7 +97,7 @@ FsImpl::FsImpl(const FsProcWorker *worker, const char *bmapMemPtr,
   initMemAddrInodeSectorBuf();
   initMemAddrDataBlockBuf();
   permission = FsPermission::getInstance();
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsImpl::~FsImpl() {
@@ -110,9 +110,9 @@ FsImpl::~FsImpl() {
 }
 
 InMemInode *FsImpl::rootDirInode(FsReq *fsReq) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   InMemInode *rootInodePtr = getInode(ROOTINO, fsReq);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return rootInodePtr;
 }
 
@@ -125,18 +125,18 @@ InMemInode *FsImpl::rootDirInode(FsReq *fsReq) {
 // @return inode number if found, 0 if not found
 uint32_t FsImpl::lookupDir(FsReq *fsReq, InMemInode *dirInode,
                            const std::string &fileName, bool &error) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto dentryPtr = lookupDirDentry(fsReq, dirInode, fileName, error);
   if (dentryPtr != nullptr) {
     return dentryPtr->inum;
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 cfs_dirent *FsImpl::lookupDirDentry(FsReq *fsReq, InMemInode *dirInode,
                                     const std::string &fileName, bool &error) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   cfs_dinode *dinodePtr = dirInode->inodeData;
   // uint32_t fileIno = 0;
   BlockBufferItem *itemPtr = nullptr;
@@ -198,14 +198,14 @@ cfs_dirent *FsImpl::lookupDirDentry(FsReq *fsReq, InMemInode *dirInode,
   retDirent = nullptr;
   fsReq->setError(FS_REQ_ERROR_FILE_NOT_FOUND);
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return retDirent;
 }
 
 int FsImpl::checkInodeDentryInMem(FsReq *fsReq, InMemInode *dirInode,
                                   InMemInode *targetInode,
                                   const std::string &fileName) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int rt = 0;
   auto posPair = targetInode->getDentryDataBlockPosition(dirInode, fileName);
   block_no_t dentryBlockNo = -1;
@@ -226,14 +226,14 @@ int FsImpl::checkInodeDentryInMem(FsReq *fsReq, InMemInode *dirInode,
     }
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return rt;
 }
 
 int FsImpl::dentryPointToNewInode(FsReq *fsReq, InMemInode *oldInode,
                                   InMemInode *newInode, InMemInode *dirInode,
                                   const std::string &fileName) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int inoBlockDentryIdx = -1;
   block_no_t dentryBlockNo = -1;
   auto pairPtr = oldInode->getDentryDataBlockPosition(dirInode, fileName);
@@ -273,14 +273,14 @@ int FsImpl::dentryPointToNewInode(FsReq *fsReq, InMemInode *oldInode,
     return -1;
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 // NOTE: This function only modify data blocks of the inode.
 int FsImpl::removeFromDir(FsReq *fsReq, InMemInode *dirInode,
                           const std::string &fileName) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(fsReq->getLeafName() == fileName);
   auto inodePtr = fsReq->getTargetInode();
   assert(inodePtr != nullptr);
@@ -296,14 +296,14 @@ int FsImpl::removeFromDir(FsReq *fsReq, InMemInode *dirInode,
     inodePtr->delDentryDataBlockPosition(dirInode, fileName);
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return ret;
 }
 
 int FsImpl::removeFromDir(FsReq *fsReq, InMemInode *dirInode,
                           int inoBlockDentryIdx, block_no_t dentryBlockNo,
                           const std::string &fileName) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG(
       "removeFromDir fileName:{} dentryBlockNo:{} inoBlockDentryIdx:{}",
       fileName, dentryBlockNo, inoBlockDentryIdx);
@@ -345,14 +345,14 @@ int FsImpl::removeFromDir(FsReq *fsReq, InMemInode *dirInode,
     return -1;
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 InMemInode *FsImpl::getParDirInode(FsReq *fsReq, bool &is_err) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto tokens = fsReq->getPathTokens();
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return getParDirInode(fsReq, tokens, is_err);
 }
 
@@ -360,7 +360,7 @@ InMemInode *FsImpl::getParDirInode(FsReq *fsReq, bool &is_err) {
 InMemInode *FsImpl::getParDirInode(FsReq *fsReq,
                                    const std::vector<std::string> &pathTokens,
                                    bool &is_err) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   InMemInode *dirInode = rootDirInode(fsReq);
   is_err = false;
   auto parInode = dirInode;
@@ -419,12 +419,12 @@ InMemInode *FsImpl::getParDirInode(FsReq *fsReq,
     fsReq->setDirMap(levelMap);
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return dirInode;
 }
 
 cfs_ino_t FsImpl::GetFreeInum(FsReq *fsReq) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #ifndef NONE_MT_LOCK
   while (iMapBlockLock.test_and_set(std::memory_order_acquire)) {
     // spin
@@ -458,16 +458,15 @@ cfs_ino_t FsImpl::GetFreeInum(FsReq *fsReq) {
 #ifndef NONE_MT_LOCK
   iMapBlockLock.clear(std::memory_order_release);
 #endif
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return ino;
 }
 
 InMemInode *FsImpl::AllocateInode(FsReq *fsReq) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   cfs_ino_t ino = fsReq->getFileInum();
   if (ino == 0) {
     ino = GetFreeInum(fsReq);
-    std::cout << "[BENITA] ino = " << ino << std::endl;
     if (ino == 0) {
       // no free inodes
       return nullptr;
@@ -493,12 +492,12 @@ InMemInode *FsImpl::AllocateInode(FsReq *fsReq) {
     fileInode->logEntry->set_bitmap_op(1);
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return fileInode;
 }
 
 int FsImpl::returnInode(FsReq *req, InMemInode *inode) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("FsImplReturnInode");
 #ifndef NONE_MT_LOCK
   while (iMapBlockLock.test_and_set(std::memory_order_acquire)) {
@@ -521,21 +520,21 @@ int FsImpl::returnInode(FsReq *req, InMemInode *inode) {
   inodeMap_.erase(inode->i_no);
   // dataBlockBuf_->releaseUnlinkedInodeDirtyBlocks(inode->i_no);
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 InMemInode *FsImpl::getFileInode(FsReq *req, uint32_t inodeNo) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   InMemInode *inodePtr = getInode(inodeNo, req);
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return inodePtr;
 }
 
 int FsImpl::writeFileInode(FsReq *req, uint32_t inodeNo,
                            InMemInode *inode_ptr) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (inode_ptr != nullptr) {
     inode_ptr->setDirty(true);
     dirtyInodeSet_.emplace(inodeNo);
@@ -568,7 +567,7 @@ int FsImpl::writeFileInode(FsReq *req, uint32_t inodeNo,
     return 1;
   }
   // NOTE, should never reach here...
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
@@ -576,7 +575,7 @@ int64_t FsImpl::readInodeToUCache(
     FsReq *req, InMemInode *inode,
     std::vector<std::pair<cfs_bno_t, size_t>> &pagesToRead,
     std::vector<std::pair<PageDescriptor *, void *>> &dstVec) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(pagesToRead.size() == dstVec.size());
   cfs_dinode *dinodePtr = inode->inodeData;
   BlockBufferItem *itemPtr = nullptr;
@@ -608,7 +607,7 @@ int64_t FsImpl::readInodeToUCache(
     }
   }
   if (rioNum > 0) return 0;
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return realBytes;
 }
 
@@ -624,7 +623,7 @@ int64_t FsImpl::readInodeToUCache(
 // if remove *memcpy*, then, 4K read, readInode() takes ~=0.29us
 int64_t FsImpl::readInode(FsReq *req, InMemInode *inode, char *dst,
                           uint64_t offStart, uint64_t nBytes, bool nocpy) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   cfs_dinode *dinodePtr = inode->inodeData;
   uint64_t off = offStart, tot;
   uint32_t m;
@@ -690,13 +689,13 @@ int64_t FsImpl::readInode(FsReq *req, InMemInode *inode, char *dst,
   }
   if (rioNum > 0) return 0;
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return realBytes;
 }
 
 int64_t FsImpl::writeEntireInode(FsReq *req, InMemInode *inode,
                                  struct wsyncOp *wsync_op_ptr) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   cfs_dinode *dinodePtr = inode->inodeData;
   uint64_t off = 0;
   uint32_t tot, m;
@@ -792,13 +791,13 @@ int64_t FsImpl::writeEntireInode(FsReq *req, InMemInode *inode,
     }
   }
 
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return realBytes;
 }
 
 uint64_t FsImpl::writeInodeAllocDataBlock(FsReq *req, InMemInode *inode,
                                           uint64_t offStart, uint64_t nBytes) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   cfs_dinode *dinodePtr = inode->inodeData;
   uint64_t off = offStart;
 
@@ -830,7 +829,7 @@ uint64_t FsImpl::writeInodeAllocDataBlock(FsReq *req, InMemInode *inode,
     }
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return toAllocateBlockNum;
 }
 
@@ -842,11 +841,11 @@ uint64_t FsImpl::writeInodeAllocDataBlock(FsReq *req, InMemInode *inode,
 //
 int64_t FsImpl::writeInode(FsReq *req, InMemInode *inode, char *src,
                            uint64_t offStart, uint64_t nBytes) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   cfs_bno_t first_byte_blkno;
   int first_byte_inblkoff;
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return writeInodeAndSaveDataBlockInfo(req, inode, src, offStart, nBytes,
                                         first_byte_blkno, first_byte_inblkoff);
 }
@@ -857,7 +856,7 @@ int64_t FsImpl::writeInodeAndSaveDataBlockInfo(FsReq *req, InMemInode *inode,
                                                cfs_bno_t &first_byte_blkno,
                                                int &first_byte_inblkoff) {
   // see if we need to allocate data blocks first
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int rc = writeInodeAllocDataBlock(req, inode, offStart, nBytes);
   if (rc < 0 || req->numTotalPendingIoReq() > 0) {
     SPDLOG_DEBUG(
@@ -883,7 +882,7 @@ int64_t FsImpl::writeInodeAndSaveDataBlockInfo(FsReq *req, InMemInode *inode,
     uint32_t curBlockIdx = off / BSIZE;
     m = std::min(realBytes - tot, BSIZE - off % BSIZE);
     if (req->getBlockIoDone(srcPtr)) {
-      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+      // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       continue;
     }
     int curExtentArrIdx = getCurrentExtentArrIdx(
@@ -933,7 +932,7 @@ int64_t FsImpl::writeInodeAndSaveDataBlockInfo(FsReq *req, InMemInode *inode,
     }
 
     if (doWrite) {
-      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+      // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       if (first_byte_blkno == 0) {
         first_byte_blkno = dataBlockNo;
         first_byte_inblkoff = (off % BSIZE);
@@ -947,7 +946,7 @@ int64_t FsImpl::writeInodeAndSaveDataBlockInfo(FsReq *req, InMemInode *inode,
       dinodePtr->size = std::max(dinodePtr->size, off + m);
       inode->logEntry->set_size(dinodePtr->size);
       if (!itemPtr->isInMem()) {
-        std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+        // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
         SPDLOG_DEBUG("This write does not do RIO, but set it to inMem anyway");
         // If the writing does not require fetch block data in memory, set its
         // in memory here blockFetchedCallback() will releaseBlock
@@ -963,13 +962,13 @@ int64_t FsImpl::writeInodeAndSaveDataBlockInfo(FsReq *req, InMemInode *inode,
     }
   }
 
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return realBytes;
 }
 
 // REQUIRED: inode lock is held
 int64_t FsImpl::releaseInodeDataBlocks(FsReq *req, InMemInode *inode) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("releaseInodeDataBlocks ino:{}", inode->i_no);
 #ifdef TEST_BLOCK_ALLOC_FREE
   fprintf(stdout, "releaseInodeDataBlocks: %u\n", inode->i_no);
@@ -1007,7 +1006,7 @@ int64_t FsImpl::releaseInodeDataBlocks(FsReq *req, InMemInode *inode) {
     }
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
@@ -1019,7 +1018,7 @@ int64_t FsImpl::releaseInodeDataBlocks(FsReq *req, InMemInode *inode) {
 //          -1 if error happens, 0 if need RIO
 int64_t FsImpl::allocateDataBlocks(FsReq *fsReq, InMemInode *inode,
                                    uint32_t numBlocks) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   struct cfs_dinode *dinodePtr = inode->inodeData;
   struct cfs_extent *extentPtr;
 
@@ -1227,22 +1226,22 @@ int64_t FsImpl::allocateDataBlocks(FsReq *fsReq, InMemInode *inode,
   dinodePtr->i_block_count = curIblockCount;
   inode->logEntry->set_block_count(dinodePtr->i_block_count);
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return allocated;
 }
 
 int64_t FsImpl::checkAndFlushDirty(FsProcWorker *worker) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int64_t numFlushed = 0;
   // flush DataBuffer
   if (dataBlockBuf_->checkIfNeedBgFlush()) {
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #if defined(_EXTENT_FOR_LDB_) || defined(_EXTENT_FOR_FILEBENCH_)
     throw std::runtime_error("Error, we don't want bg flush at all!");
 #endif
     // SPDLOG_INFO("[BG_FLUSH] flush dirty buffer (BG)");
     if (isDebug) {
-      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+      // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       // worker->writeToWorkerLog("will do flushToDisk");
       SPDLOG_DEBUG("checkAndFlushDirty, will do flush");
     }
@@ -1267,17 +1266,17 @@ int64_t FsImpl::checkAndFlushDirty(FsProcWorker *worker) {
       dataBlockBuf_->doFlushDone(emptyVec);
     }
   } else {
-    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     numFlushed = -1;
   }
   
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return numFlushed;
 }
 
 int64_t FsImpl::flushInodeData(FsProcWorker *worker, FsReq *req,
                                bool &needFlush) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   needFlush = true;
   int64_t numFlushed = 0;
   if (!dataBlockBuf_->checkIfFgFlushInflightReachLimit()) {
@@ -1311,21 +1310,21 @@ int64_t FsImpl::flushInodeData(FsProcWorker *worker, FsReq *req,
     numFlushed = -1;
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return numFlushed;
 }
 
 void FsImpl::appendToDir(FsReq *fsReq, InMemInode *dirInode,
                          InMemInode *fileInode) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   appendToDir(fsReq, dirInode, fileInode, fsReq->getLeafName());
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::appendToDir(FsReq *fsReq, InMemInode *dirInode,
                          InMemInode *fileInode,
                          const std::string &entryFileName) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   struct cfs_dirent cur_dirent;
   cur_dirent.inum = fileInode->i_no;
   SPDLOG_DEBUG("appendToDir fileName:{} DirinodeSize:{}", entryFileName.c_str(),
@@ -1346,18 +1345,18 @@ void FsImpl::appendToDir(FsReq *fsReq, InMemInode *dirInode,
       dirInode, entryFileName, first_byte_blkno,
       first_byte_inblkoff / (sizeof(struct cfs_dirent)));
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 int FsImpl::BlockingInitRootInode(FsProcWorker *worker_handler) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   bool io_done = false;
   root_inode_ = BlockingGetInode(ROOTINO, io_done, worker_handler);
   if (root_inode_ == nullptr) {
     throw std::runtime_error("cannot fetch root inode");
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
@@ -1381,7 +1380,7 @@ InMemInode *FsImpl::BlockingGetInodeHelper(cfs_ino_t ino, bool &io_done, FsProcW
 
 InMemInode *FsImpl::BlockingGetInode(cfs_ino_t ino, bool &io_done,
                                      FsProcWorker *worker_handler) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto it = inodeMap_.find(ino);
   assert(it == inodeMap_.end());
   if (idx_ != 0 || worker_handler->getWid() != FsProcWorker::kMasterWidConst) {
@@ -1415,7 +1414,7 @@ InMemInode *FsImpl::BlockingGetInode(cfs_ino_t ino, bool &io_done,
   inode->logEntry = new InodeLogEntry(ino, dinode_data->syncID + 1, inode);
 #endif
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return inode;
 }
 
@@ -1426,7 +1425,7 @@ InMemInode *FsImpl::BlockingGetInode(cfs_ino_t ino, bool &io_done,
 // @return
 //
 InMemInode *FsImpl::getInode(uint32_t ino, FsReq *fsReq, bool doSubmit) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   InMemInode *inodePtr = nullptr;
   BlockBufferItem *bufferItemPtr = nullptr;
 #ifndef NONE_MT_LOCK
@@ -1514,17 +1513,17 @@ InMemInode *FsImpl::getInode(uint32_t ino, FsReq *fsReq, bool doSubmit) {
 #ifndef NONE_MT_LOCK
   inodeMapLock.clear(std::memory_order_release);
 #endif
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return inodePtr;
 }
 
 BlockBufferItem *FsImpl::getBlockForIndex(BlockBuffer *blockbuf,
                                           uint32_t blockNo, FsReq *fsReq,
                                           uint32_t index) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   bool needSubmit = false;
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return getBlockForIndex(blockbuf, blockNo, fsReq, /*doSubmit*/ true,
                           /*doBlockSubmit*/ false, needSubmit, index);
 }
@@ -1534,14 +1533,14 @@ BlockBufferItem *FsImpl::getBlockForIndex(BlockBuffer *blockBuf,
                                           bool doSubmit, bool doBlockSubmit,
                                           bool &canOverwritten,
                                           uint32_t index) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return getBlock(blockBuf, blockNo, fsReq, doSubmit, doBlockSubmit,
                   canOverwritten, index);
 }
 
 BlockBufferItem *FsImpl::getBlock(BlockBuffer *blockBuf, uint32_t blockNo,
                                   FsReq *fsReq) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   bool needSubmit = false;
   return getBlock(blockBuf, blockNo, fsReq, /*doSubmit*/ true,
                   /*doBlockSubmit*/ false, needSubmit);
@@ -1577,7 +1576,7 @@ BlockBufferItem *FsImpl::getBlock(BlockBuffer *blockBuf, uint32_t blockNo,
                                   FsReq *fsReq, bool doSubmit,
                                   bool doBlockSubmit, bool &canOverwritten,
                                   uint32_t new_index) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("FsImpl::getBlock() blockSize:{} blockNo:{}",
                blockBuf->getBlockSize(), blockNo);
 
@@ -1641,7 +1640,7 @@ BlockBufferItem *FsImpl::getBlock(BlockBuffer *blockBuf, uint32_t blockNo,
     }
   }
   assert(item->getBlockNo() == blockNo);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return item;
 }
 
@@ -1652,7 +1651,7 @@ BlockBufferItem *FsImpl::getBlock(BlockBuffer *blockBuf, uint32_t blockNo,
 // hit ratio does not make su much sense. NOTE!!!: All the blockbuffer will use
 // the real on-disk block number is the key for block access.
 void FsImpl::initMemAddrs() {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // superblock
   sbBlockPtr_ = ((cfs_mem_block_t *)memPtr_) + SB_BLOCK_NO;
   memSb_ = (struct cfs_superblock *)sbBlockPtr_;
@@ -1683,11 +1682,11 @@ void FsImpl::initMemAddrs() {
   // data blocks
   blockPtr += (totalInodeBufferMemByte() / (BSIZE));
   dataBlockMemPtr_ = blockPtr->blk;
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::initMemAddrBmapBlockBuf() {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   fprintf(stderr, "initMemAddrBmapBlockBuf called for idx:%d bmapPtr:%p\n",
           idx_, bmapBlockBuf_);
   assert(bmapBlockBuf_ == nullptr);
@@ -1702,11 +1701,11 @@ void FsImpl::initMemAddrBmapBlockBuf() {
           numPartitions_, idx_, pttBmapNumBlocks);
   bmapBlockBuf_ = new BlockBuffer(pttBmapNumBlocks, BSIZE, bmapBlkMemPtr);
   bmapBlockBuf_->setBufferName(std::string("Bmap-") + std::to_string(idx_));
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::initMemAddrInodeSectorBuf() {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(inodeSectorBuf_ == nullptr);
   if (idx_ == 0) {
     block_no_t pttInodeNumSectors = 0;
@@ -1722,11 +1721,11 @@ void FsImpl::initMemAddrInodeSectorBuf() {
     assert(inodeSectorMemPtr_ != nullptr);
     throw std::runtime_error("inodeSectorMemPtr is null");
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::initMemAddrDataBlockBuf() {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(dataBlockBuf_ == nullptr);
   block_no_t pttDataNumBlocks = 0;
   char *dataBlkMemPtr = getDataBlockMemPtrPartition(
@@ -1752,11 +1751,11 @@ void FsImpl::initMemAddrDataBlockBuf() {
           dataBlockBuf_->getDirtyFlushOneTimeSubmitNum(),
           dataBlockBuf_->getDirtyItemNum());
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::initDataBlockAllocNextFreeBlockIdx() {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   uint32_t curAllocUnit;
   for (int i = 0; i < (NEXTENT_ARR); i++) {
     curAllocUnit = extentArrIdx2BlockAllocUnit(i);
@@ -1764,12 +1763,12 @@ void FsImpl::initDataBlockAllocNextFreeBlockIdx() {
     nextDataBlockAllocCurBlkBitNo[curAllocUnit] = -1;
   }
 
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::fillInodeDentryPositionAfterLookup(FsReq *req, InMemInode *inode,
                                                 int dentryNo) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(dentryNo == 0 || dentryNo == 1);
   int curInodeDentryWithinBlockIdx = 0;
   InMemInode *parInode = req->getDirInode();
@@ -1795,13 +1794,13 @@ void FsImpl::fillInodeDentryPositionAfterLookup(FsReq *req, InMemInode *inode,
                                       curInodeDentryWithinBlockIdx);
   }
 
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::_fsExitFlushSingleBlockBuffer(FsProcWorker *procHandler,
                                            BlockBuffer *blkbuf, bool forceFlush,
                                            bool dbg) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto bufferItems = blkbuf->getAllBufferItems();
   SPDLOG_INFO("Buffer-{} has {} dirty blocks. wid:{}", blkbuf->getBufferName(),
               blkbuf->getDirtyItemNum(), procHandler->getWid());
@@ -1830,12 +1829,12 @@ void FsImpl::_fsExitFlushSingleBlockBuffer(FsProcWorker *procHandler,
                                 std::string(" was flushed for number blocks:") +
                                 std::to_string(writeCnt));
 
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::_fsExitFlushSingleSectorBuffer(FsProcWorker *procHandler,
                                             BlockBuffer *blkbuf) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("fsExitFlushSector");
   auto bufferItems = blkbuf->getAllBufferItems();
   int rc;
@@ -1848,11 +1847,11 @@ void FsImpl::_fsExitFlushSingleSectorBuffer(FsProcWorker *procHandler,
     rc = procHandler->submitDirectWriteDevReq(&req);
     assert(rc == 0);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::flushMetadataOnExit(FsProcWorker *procHandler) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_INFO("Flushing data block bitmaps");
   _fsExitFlushSingleBlockBuffer(procHandler, bmapBlockBuf_, /*forceFlush*/ true,
                                 /*dbg*/ false);
@@ -1889,11 +1888,11 @@ void FsImpl::flushMetadataOnExit(FsProcWorker *procHandler) {
                  FsBlockReqType::WRITE_BLOCKING);
   int rc = procHandler->submitDirectWriteDevReq(&sbreq);
   if (rc != 0) throw std::runtime_error("Failed to write superblock");
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 int FsImpl::installInode(InMemInode *inode) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto it = inodeMap_.find(inode->i_no);
   if (it != inodeMap_.end()) {
     // TODO (ask jing): if we call installInode when secondary is returning
@@ -1909,12 +1908,12 @@ int FsImpl::installInode(InMemInode *inode) {
     dirtyInodeSet_.emplace(inode->i_no);
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 void FsImpl::uninstallInode(InMemInode *inode) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // TODO: instead, have an export and import inode where we return all the
   // state that a worker needs to import it.
   inodeMap_.erase(inode->i_no);
@@ -1922,30 +1921,30 @@ void FsImpl::uninstallInode(InMemInode *inode) {
 #if CFS_JOURNAL(ON)
   unlinkedInodeSet_.erase(inode->i_no);
 #endif
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::splitInodeDataBlockBufferSlot(
     InMemInode *inode, std::unordered_set<BlockBufferItem *> &items) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(inode->i_no == inode->inodeData->i_no);
   dataBlockBuf_->splitBufferItemsByIndex(inode->i_no, items);
   if (dataBlockBuf_->GetCurrentItemNum() <= kBufferSlowLowWatermark) {
     fprintf(stderr, "migrate disallow due to slots\n");
     datablock_buf_allow_migrate = false;
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::installInodeDataBlockBufferSlot(
     InMemInode *inode, const std::unordered_set<BlockBufferItem *> &items) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   dataBlockBuf_->installBufferItemsOfIndex(inode->i_no, items);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 int FsImpl::dumpAllInodesToFile(const char *dirname) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #define DUMP_PACK_INMEMINODE_ATTR_TO_JSON(j, inode, attr) \
   (j[#attr] = inode->attr)
   int ret = 0;
@@ -2019,12 +2018,12 @@ int FsImpl::dumpAllInodesToFile(const char *dirname) {
 #undef DUMP_PACK_INMEMINODE_ATTR_TO_JSON
 #undef DUMP_PACK_DINODE_ATTR_TO_JSON
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return ret;
 }
 
 void FsImpl::addPathInodeCacheItem(FsReq *req, InMemInode *inode) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   FsPermission::LevelMap *dummy;
   SPDLOG_DEBUG("addPathInodeCacheItem: name:{} ino:{}", req->getLeafName(),
                inode->i_no);
@@ -2032,42 +2031,42 @@ void FsImpl::addPathInodeCacheItem(FsReq *req, InMemInode *inode) {
       req->getDirMap(), req->getLeafName(),
       std::make_pair(inode->inodeData->i_uid, inode->inodeData->i_gid), inode,
       &dummy);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FsImpl::addSecondPathInodeCacheItem(FsReq *req, InMemInode *inode) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   FsPermission::LevelMap *dummy;
   permission->setPermission(
       req->getDstDirMap(), req->getNewLeafName(),
       std::make_pair(inode->inodeData->i_uid, inode->inodeData->i_gid), inode,
       &dummy);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 int FsImpl::removePathInodeCacheItem(FsReq *req,
                                      FsPermission::MapEntry *entry) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("removeCache leafName:{} dirMapNull?:{}", req->getLeafName(),
                req->getDirMap() == nullptr);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return permission->deleteEntry(req->getDirMap(), req->getLeafName(), entry);
 }
 
 int FsImpl::removeSecondPathInodeCacheItem(FsReq *req,
                                            FsPermission::MapEntry *entry) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int ret = permission->deleteEntry(req->getDstDirMap(), req->getNewLeafName(),
                                     entry);
   SPDLOG_DEBUG("remove newFileName:{} ret:{} dirMapNull?{}",
                req->getNewLeafName(), ret, req->getDstDirMap() == nullptr);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return ret;
 }
 
 void FsImpl::printSuperBlock() {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto *sb = (struct cfs_superblock *)&(sbBlockPtr_->blk);
   printSuperBlockToStream(stdout, sb);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }

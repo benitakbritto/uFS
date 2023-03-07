@@ -261,6 +261,8 @@ class FileMng {
     static void ProcessReq(FileMng *mng, FsReq *req);
     // Handles all errors and submit completion
     static void PrimaryHandleError(FileMng *mng, FsReq *req);
+    // Handles idempotent unlink
+    static void PrimaryHandleRetry(FileMng *mng, FsReq *req);
     // Loads the parent directory which may not be in memory
     static void PrimaryLoadParentInode(FileMng *mng, FsReq *req);
     // Extracts the inode from the directory

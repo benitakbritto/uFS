@@ -293,6 +293,14 @@ void FileMng::UnlinkOp::PrimaryHandleError(FileMng *mng, FsReq *req) {
   mng->fsWorker_->submitFsReqCompletion(req);
 }
 
+void FileMng::UnlinkOp::PrimaryHandleRetry(FileMng *mng, FsReq *req) {
+  assert(mng->fsWorker_->isMasterWorker());
+  assert(req->getState() == FsReqState::UNLINK_PRIMARY_RETRY);
+  req->getClientOp()->op.unlink.ret = 0;
+  req->resetErr();
+  mng->fsWorker_->submitFsReqCompletion(req);
+}
+
 void FileMng::UnlinkOp::PrimaryLoadParentInode(FileMng *mng, FsReq *req) {
   assert(mng->fsWorker_->isMasterWorker());
   assert(req->getState() == FsReqState::UNLINK_PRIMARY_LOAD_PRT_INODE);
@@ -338,7 +346,12 @@ void FileMng::UnlinkOp::PrimaryGetFileInum(FileMng *mng, FsReq *req) {
   uint32_t fileIno =
       mng->fsImpl_->lookupDir(req, dirInode, req->getLeafName(), is_err);
   if (is_err) {
-    req->setState(FsReqState::UNLINK_ERR);
+    if (!req->isRetry) {
+      req->setState(FsReqState::UNLINK_ERR);
+    } else {
+      req->setState(FsReqState::UNLINK_PRIMARY_RETRY);
+    }
+    
     return;
   }
 
@@ -716,9 +729,11 @@ void FileMng::UnlinkOp::ProcessReq(FileMng *mng, FsReq *req) {
     auto curState = req->getState();
     switch (curState) {
       case FsReqState::UNLINK_PRIMARY_LOAD_PRT_INODE:
+        std::cout << "UNLINK_PRIMARY_LOAD_PRT_INODE" << std::endl;
         UnlinkOp::PrimaryLoadParentInode(mng, req);
         break;
       case FsReqState::UNLINK_PRIMARY_GET_FILE_INUM:
+        std::cout << "UNLINK_PRIMARY_GET_FILE_INUM" << std::endl;
         UnlinkOp::PrimaryGetFileInum(mng, req);
         break;
       case FsReqState::UNLINK_PRIMARY_LOAD_INODE:
@@ -733,7 +748,12 @@ void FileMng::UnlinkOp::ProcessReq(FileMng *mng, FsReq *req) {
       case FsReqState::UNLINK_PRIMARY_HANDOFF_TO_OWNER:
         UnlinkOp::PrimaryHandoffToOwner(mng, req);
         break;
+      case FsReqState::UNLINK_PRIMARY_RETRY:
+        std::cout << "UNLINK_PRIMARY_RETRY" << std::endl;
+        UnlinkOp::PrimaryHandleRetry(mng, req);
+        break;
       case FsReqState::UNLINK_ERR:
+        std::cout << "UNLINK_ERR" << std::endl;
         UnlinkOp::PrimaryHandleError(mng, req);
         return;  // <-- early return
       default:

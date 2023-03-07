@@ -472,7 +472,6 @@ end:
 // called whenever a journal write completes
 void JournalManager::writeComplete(void *arg,
                                    const struct spdk_nvme_cpl *completion) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   JournalEntry *je = (JournalEntry *)arg;
   JournalManager *mgr = je->getManager();
 

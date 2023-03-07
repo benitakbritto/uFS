@@ -266,7 +266,7 @@ void shmipc_mgr_put_msg(struct shmipc_mgr *mgr, off_t ring_idx,
 // If -1 is returned it means that server did not respond
 int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off_t ring_idx,
                         struct shmipc_msg *msg) {  
-  int sleep_time_init = 1;
+  int sleep_time_init = 2;
   int retry_count = 5;
   int ret = -1;
   int count = 0;

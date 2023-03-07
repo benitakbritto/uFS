@@ -158,7 +158,7 @@ BlkDevSpdk::~BlkDevSpdk() {
 }
 
 int BlkDevSpdk::devInit() {
-  std::cout << "[BENITA]" << __func__ << __LINE__ << std::endl; 
+  // std::cout << "[BENITA]" << __func__ << __LINE__ << std::endl; 
   int rc;
   std::lock_guard<std::mutex> lock(lmtx);
   {
@@ -351,13 +351,13 @@ int BlkDevSpdk::submitBlockingDevReq(uint64_t blockNo, char *data,
 }
 
 int BlkDevSpdk::read(uint64_t blockNo, char *data) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return submitDevReq(blockNo, /*blockNoSeqNo*/ 0, data,
                       BlkDevReqType::BLK_DEV_REQ_READ);
 }
 
 int BlkDevSpdk::write(uint64_t blockNo, uint64_t blockNoSeqNo, char *data) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #if 0
   int curWid = tidWidMap[cfsGetTid()];
   threadInflightWriteReqNumMap[curWid]++;
@@ -374,7 +374,7 @@ int BlkDevSpdk::write(uint64_t blockNo, uint64_t blockNoSeqNo, char *data) {
 }
 
 void *BlkDevSpdk::zmallocBuf(uint64_t size, uint64_t align) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   void *addr = spdk_dma_malloc(size, align, NULL);
   if (addr == NULL) {
     SPDLOG_ERROR("zmallocBuf failed");
@@ -383,7 +383,7 @@ void *BlkDevSpdk::zmallocBuf(uint64_t size, uint64_t align) {
 }
 
 int BlkDevSpdk::freeBuf(void *ptr) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   spdk_dma_free(ptr);
   return 0;
 }
@@ -394,18 +394,18 @@ int BlkDevSpdk::devExit() {
 }
 
 int BlkDevSpdk::blockingRead(uint64_t blockNo, char *data) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return submitBlockingDevReq(blockNo, data, BlkDevReqType::BLK_DEV_REQ_READ);
 }
 
 int BlkDevSpdk::blockingWrite(uint64_t blockNo, char *data) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return submitBlockingDevReq(blockNo, data, BlkDevReqType::BLK_DEV_REQ_WRITE);
 }
 
 int BlkDevSpdk::blockingWriteMultiBlocks(uint64_t blockStartNo, int numBlocks,
                                          char *data) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int rc = -1;
   assert(numBlocks >= 1);
   uint64_t lbaStartNo;
@@ -569,7 +569,7 @@ int BlkDevSpdk::blockingReadSector(uint64_t sectorNo, char *data) {
 
 int BlkDevSpdk::writeSector(uint64_t sectorNo, uint64_t sectorNoSeqNo,
                             char *data) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return submitDevReq(sectorNo, sectorNoSeqNo, data,
                       BlkDevReqType::BLK_DEV_REQ_SECTOR_WRITE, (SSD_SEC_SIZE));
 }
@@ -747,10 +747,7 @@ BlkDevPosix::BlkDevPosix(const std::string &path, uint32_t blockNum,
 BlkDevPosix::~BlkDevPosix() {}
 
 int BlkDevPosix::devInit() {
-  std::cout << "[BENITA] devPath.c_str() = " << devPath << std::endl;
-  std::cout << "[BENITA] devInit() " << std::endl;
   diskFile = fopen(devPath.c_str(), "r+");
-  std::cout << "[BENITA] diskFile = " << diskFile << std::endl;
   if (!diskFile) {
     SPDLOG_WARN("ERROR cannot open DISK_FILE:{}. errStr:{}", devPath,
                 strerror(errno));

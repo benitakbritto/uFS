@@ -28,7 +28,7 @@ extern FsProc *gFsProcPtr;
 FileMng::FileMng(FsProcWorker *worker, const char *memPtr,
                  float dataDirtyFlushRatio, int numPartitions)
     : fsWorker_(worker), memPtr_(memPtr) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (worker->isMasterWorker()) {
     fsImpl_ = new FsImpl(worker, memPtr, dataDirtyFlushRatio, numPartitions);
   } else {
@@ -36,14 +36,14 @@ FileMng::FileMng(FsProcWorker *worker, const char *memPtr,
         "FileMng constructor is called for whole memPtr but not master. "
         "FORBIDDEN");
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FileMng::FileMng(FsProcWorker *worker, const char *bmapMemPtr,
                  char *dataBlockMemPtr, uint32_t numBmapBlocksTotal,
                  float dataDirtyFlushRatio, int numPartitions)
     : fsWorker_(worker), memPtr_(nullptr) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (worker->isMasterWorker()) {
     SPDLOG_ERROR("FileMng construct should not be master for partial mng");
   } else {
@@ -51,7 +51,7 @@ FileMng::FileMng(FsProcWorker *worker, const char *bmapMemPtr,
         new FsImpl(worker, bmapMemPtr, dataBlockMemPtr, numBmapBlocksTotal,
                    dataDirtyFlushRatio, numPartitions);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FileMng::~FileMng() { delete fsImpl_; }
@@ -72,7 +72,7 @@ int64_t FileMng::checkAndFlushBufferDirtyItems() {
 }
 
 int FileMng::processReq(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::OP_OWNERSHIP_UNKNOWN) {
     req->setError(FS_REQ_ERROR_INODE_IN_TRANSFER);
     fsWorker_->submitFsReqCompletion(req);
@@ -195,14 +195,14 @@ int FileMng::processReq(FsReq *req) {
       // FIXME: memory leak. Mark as failure and reclaim req memory.
       SPDLOG_ERROR("FileMng::processReq not supported");
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 void FileMng::submitFsGeneratedRequestsCheckSinglePendingMap(
     FsReq *req, iou_map_t::const_iterator beginIt,
     iou_map_t::const_iterator endIt, bool isSector) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("submitFsGeneratedReqs isSector:{}", isSector);
 #ifndef USE_SPDK
   // POSIX DEV
@@ -271,11 +271,11 @@ void FileMng::submitFsGeneratedRequestsCheckSinglePendingMap(
     req->submittedSectorReqDone(secno);
   }
 #endif
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::submitFsGeneratedRequests(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->numPendingBlockReq() > 0) {
     submitFsGeneratedRequestsCheckSinglePendingMap(
         req, req->blockPendingBegin(), req->blockPendingEnd());
@@ -285,34 +285,34 @@ void FileMng::submitFsGeneratedRequests(FsReq *req) {
         req, req->sectorPendingBegin(), req->sectorPendingEnd(), true);
   }
   req->stopOnCpuTimer();
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FileMng *FileMng::generateSubFileMng(FsProcWorker *curWorker) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(curWorker != nullptr);
   assert(!curWorker->isMasterWorker());
   auto fm = new FileMng(
       curWorker, fsImpl_->getBmapMemPtr(), fsImpl_->getDataBlockMemPtr(),
       fsImpl_->getOnDiskNumBmapBlocksTotal(), fsImpl_->getDataDirtuFlushRatio(),
       fsImpl_->getNumPartitions());
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return fm;
 }
 
 void FileMng::installInode(InMemInode *inode) { fsImpl_->installInode(inode); }
 
 void FileMng::addFdMappingOnOpen(pid_t pid, FileObj *fobj) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(fobj != nullptr);
   auto inodePtr = fobj->ip;
   inodePtr->addFd(pid, fobj);
   ownerAppFdMap_[pid].emplace(fobj->readOnlyFd, fobj);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::delFdMappingOnClose(pid_t pid, FileObj *fobj) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(fobj != nullptr);
   auto inodePtr = fobj->ip;
   inodePtr->delFd(pid, fobj);
@@ -327,11 +327,11 @@ void FileMng::delFdMappingOnClose(pid_t pid, FileObj *fobj) {
   // ownerAppFdMap_, please also consider modifying closeAllFileDescriptors as
   // that is a batch optimized version of this function.
   delete fobj;
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::closeAllFileDescriptors(pid_t pid) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("[wid={}] closing all fd's for pid {}", fsWorker_->getWid(),
                pid);
   auto search = ownerAppFdMap_.find(pid);
@@ -356,24 +356,24 @@ void FileMng::closeAllFileDescriptors(pid_t pid) {
   }
 
   ownerAppFdMap_.erase(search);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 // When importing an inode, all the file descriptor mappings need to be copied
 // to an outer level so fd's can be resolved.
 void FileMng::addImportedInodeFdMappings(const InMemInode *inodePtr) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (const auto &[pid, inodeFdMap] : inodePtr->getAppFdMap()) {
     auto &fdMap = ownerAppFdMap_[pid];
     fdMap.insert(inodeFdMap.begin(), inodeFdMap.end());
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 // When exporting an inode, all outer level mappings must be deleted so this fd
 // can never be resolved.
 void FileMng::delExportedInodeFdMappings(const InMemInode *inodePtr) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (const auto &[pid, inodeFdMap] : inodePtr->getAppFdMap()) {
     auto search = ownerAppFdMap_.find(pid);
     if (search == ownerAppFdMap_.end()) continue;
@@ -387,11 +387,11 @@ void FileMng::delExportedInodeFdMappings(const InMemInode *inodePtr) {
 
     if (fdMap.empty()) ownerAppFdMap_.erase(search);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FileObj *FileMng::getFileObjForFd(pid_t pid, int fd) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto outer_search = ownerAppFdMap_.find(pid);
   if (outer_search == ownerAppFdMap_.end()) return nullptr;
 
@@ -399,7 +399,7 @@ FileObj *FileMng::getFileObjForFd(pid_t pid, int fd) {
   auto inner_search = fdMap.find(fd);
   if (inner_search == fdMap.end()) return nullptr;
 
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return inner_search->second;
 }
 
@@ -414,7 +414,7 @@ void FileMng::blockingStoreInode(cfs_ino_t inum) {
 }
 
 bool FileMng::exportInode(cfs_ino_t inum, ExportedInode &exp) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // NOTE: exportInode only exports the inode and removes all state related to
   // it from the FileMng. It does not update primary about the export. Caller
   // must inform the primary about ownership changes.
@@ -450,12 +450,12 @@ bool FileMng::exportInode(cfs_ino_t inum, ExportedInode &exp) {
 
   bool canReset = exp.inode->setManageWorkerUnknown(exp.exporter_wid);
   assert(canReset);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return true;
 }
 
 void FileMng::importInode(const ExportedInode &exp) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // NOTE: importInode only imports into the FileMng. It does not update primary
   // about the import. Caller must inform the primary about ownership change.
   // NOTE: primary should have already set this inode wid to the importer while
@@ -495,11 +495,11 @@ void FileMng::importInode(const ExportedInode &exp) {
   if (!exp.block_buffers.empty()) {
     installDataBlockBufferSlot(exp.inode, exp.block_buffers);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processCreate(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // req->incrNumFsm();
   if (req->getState() == FsReqState::CREATE_GET_PRT_INODE) {
     InMemInode *parInode = req->getDirInode();
@@ -659,11 +659,11 @@ void FileMng::processCreate(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processOpen(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (fsWorker_->isMasterWorker()) {
     if (req->getState() == FsReqState::OPEN_GET_CACHED_INODE) {
       int fullPathDepth = req->getStandardPathDepth();
@@ -766,13 +766,13 @@ void FileMng::processOpen(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processWrite(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::WRITE_MODIFY) {
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.write.rwOp.count;
     // if (fileObj != nullptr) {
@@ -795,13 +795,13 @@ void FileMng::processWrite(FsReq *req) {
         req->setState(FsReqState::WRITE_RET_ERR);
       } else {
         if (req->numTotalPendingIoReq() == 0) {
-          std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+          // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
           // success
           req->getClientOp()->op.write.rwOp.ret = nWrite;
           // fileObj->off += nWrite;
           req->setState(FsReqState::WRITE_UPDATE_INODE);
         } else {
-          std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+          // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
           submitFsGeneratedRequests(req);
         }
       }
@@ -812,7 +812,7 @@ void FileMng::processWrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::WRITE_UPDATE_INODE) {
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.write.rwOp.count;
     if (reqCount > RING_DATA_ITEM_SIZE || reqCount <= 0) {
@@ -837,22 +837,22 @@ void FileMng::processWrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::WRITE_MODIFY_DONE) {
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     fsWorker_->submitFsReqCompletion(req);
   }
 
   if (req->getState() == FsReqState::WRITE_RET_ERR) {
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processPwrite(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::PWRITE_MODIFY) {
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.pwrite.rwOp.count;
     uint64_t fobjStartOff = req->getClientOp()->op.pwrite.offset;
@@ -875,14 +875,14 @@ void FileMng::processPwrite(FsReq *req) {
         req->setState(FsReqState::PWRITE_RET_ERR);
       } else {
         if (req->numTotalPendingIoReq() == 0) {
-          std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+          // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
           // success
           req->getClientOp()->op.pwrite.rwOp.ret = nWrite;
           //// do not update offset fo pwrite
           //// fileObj->off += nWrite;
           req->setState(FsReqState::PWRITE_UPDATE_INODE);
         } else {
-          std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+          // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
           submitFsGeneratedRequests(req);
         }
       }
@@ -893,7 +893,7 @@ void FileMng::processPwrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::PWRITE_UPDATE_INODE) {
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.pwrite.rwOp.count;
     if (reqCount > RING_DATA_ITEM_SIZE || reqCount <= 0) {
@@ -920,7 +920,7 @@ void FileMng::processPwrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::PWRITE_MODIFY_DONE) {
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     fsWorker_->submitFsReqCompletion(req);
   }
 
@@ -928,11 +928,11 @@ void FileMng::processPwrite(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processRead(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::READ_FETCH_DATA) {
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.read.rwOp.count;
@@ -983,16 +983,16 @@ void FileMng::processRead(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processPread(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::PREAD_FETCH_DATA) {
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.pread.rwOp.count;
     uint64_t fobjStartOff = req->getClientOp()->op.pread.offset;
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << "\t" << fobjStartOff << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << "\t" << fobjStartOff << std::endl;
     // SPDLOG_DEBUG(
     //     "processPread - fd:{} offset: {} count:{} fsize:{} wid:{} "
     //     "isAppCacheAvailable:{}",
@@ -1005,22 +1005,18 @@ void FileMng::processPread(FsReq *req) {
     InMemInode *fileInode = fsImpl_->getInode(req->fd, req, false);
     if (fileInode != nullptr) {
       // fsWorker_->onTargetInodeFiguredOut(req, fileObj->ip);
-      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+      // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       fsWorker_->onTargetInodeFiguredOut(req, fileInode);
     } else {
-      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+      // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       req->setState(FsReqState::PREAD_RET_ERR);
       goto PREAD_ERR_PROCESS;
     }
 
-    std::cout << "[BENITA] " << "\t" << "fobjStartOff = " << fobjStartOff << std::endl;
-    std::cout << "[BENITA] " << "\t" << "reqCount = " << reqCount << std::endl;
-    std::cout << "[BENITA] " << "\t" << "fileInode->inodeData->size = " << fileInode->inodeData->size << std::endl;
-
     // TODO [BENITA] size is 0 on restart
     // if (fobjStartOff + reqCount > fileObj->ip->inodeData->size) {
     if (fobjStartOff + reqCount > fileInode->inodeData->size) {
-      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+      // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       req->setState(FsReqState::PREAD_RET_ERR);
       goto PREAD_ERR_PROCESS;
     }
@@ -1035,10 +1031,10 @@ void FileMng::processPread(FsReq *req) {
       int64_t nRead =
           fsImpl_->readInode(req, fileInode, dst, fobjStartOff, reqCount);
       if (nRead < 0) {
-        std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+        // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
         req->setState(FsReqState::PREAD_RET_ERR);
       } else {
-        std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+        // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
         if (req->numTotalPendingIoReq() == 0) {
           // req success, set the return value, set state
           req->getClientOp()->op.pread.rwOp.ret = nRead;
@@ -1047,34 +1043,34 @@ void FileMng::processPread(FsReq *req) {
           req->setState(FsReqState::PREAD_FETCH_DONE);
           SPDLOG_DEBUG("===> readInode CACHE HIT wid:{}", fsWorker_->getWid());
         } else {
-          std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+          // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
           SPDLOG_DEBUG("===> readInode CACHE MISS wid:{}", fsWorker_->getWid());
           submitFsGeneratedRequests(req);
         }
       }
       fileInode->unLock();
     } else {
-      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+      // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       req->setState(FsReqState::PREAD_RET_ERR);
     }
   }
 
   if (req->getState() == FsReqState::PREAD_FETCH_DONE) {
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     fsWorker_->submitFsReqCompletion(req);
   }
 
 PREAD_ERR_PROCESS:
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::PREAD_RET_ERR) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processPreadUC(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::UCPREAD_GEN_READ_PLAN) {
 #ifdef USE_UC_PAGE_CACHE
     // FileObj *fileObj = req->getFileObj();
@@ -1226,11 +1222,11 @@ void FileMng::processPreadUC(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processAllocWrite(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // req->incrNumFsm();
   if (req->getState() == FsReqState::ALLOCWRITE_TOCACHE_MODIFY) {
     // FileObj *fileObj = req->getFileObj();
@@ -1365,11 +1361,11 @@ void FileMng::processAllocWrite(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processAllocPwrite(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::ALLOCPWRITE_TOCACHE_MODIFY) {
     // TO be implemented
     throw std::runtime_error("allocpwrite not supported");
@@ -1435,11 +1431,11 @@ void FileMng::processAllocPwrite(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processAllocRead(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::ALLOCREAD_FETCH_DATA) {
     // FileObj *fileObj = req->getFileObj();
     size_t reqCount = req->getClientOp()->op.allocread.rwOp.count;
@@ -1528,11 +1524,11 @@ void FileMng::processAllocRead(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processAllocPread(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::ALLOCPREAD_UNCACHE_FETCH_DATA) {
     // FileObj *fileObj = req->getFileObj();
     req->getRwOp()->realOffset = req->getClientOp()->op.allocpread.offset;
@@ -1668,11 +1664,11 @@ void FileMng::processAllocPread(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processCacheLeaseRenew(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("processCachedLeaseRenew wid:{} reqType:{}", req->getWid(),
                getFsReqTypeOutputString(req->getType()));
   // TODO (jingliu): currently we assume all the extension is succeed
@@ -1680,11 +1676,11 @@ void FileMng::processCacheLeaseRenew(FsReq *req) {
   setLeaseTermTsIntoRwOp(req->getRwOp(), FsLeaseCommon::genTimestamp());
   req->getRwOp()->ret = 0;
   fsWorker_->submitFsReqCompletion(req);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 int FileMng::_renewLeaseForRead(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   FsProcLeaseType type;
   bool leaseFound = leaseMng_.queryValidExistingLease(req->getFileInum(), type);
   struct FsProcWorkerInodeLeaseCtx *leaseCtxPtr = nullptr;
@@ -1722,12 +1718,12 @@ int FileMng::_renewLeaseForRead(FsReq *req) {
   SPDLOG_DEBUG("will set startTs to:{}", leaseCtxPtr->startTs);
   setLeaseTermTsIntoRwOp(req->getRwOp(), leaseCtxPtr->startTs);
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 void FileMng::processLseek(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::LSEEK_INIT) {
     // FileObj *fileObj = req->getFileObj();
     // if (fileObj != nullptr) {
@@ -1780,11 +1776,11 @@ void FileMng::processLseek(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processClose(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::CLOSE_INIT) {
     // FileObj *fileObj = req->getFileObj();
     // if (fileObj != nullptr) {
@@ -1809,11 +1805,11 @@ void FileMng::processClose(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processStat(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   bool isMaster = fsWorker_->isMasterWorker();
   if (isMaster) {
     if (req->getState() == FsReqState::STAT_GET_CACHED_INODE) {
@@ -1956,11 +1952,11 @@ void FileMng::processStat(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processFstat(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::FSTAT_INIT) {
     // FileObj *fileObj = req->getFileObj();
     // if (fileObj != nullptr) {
@@ -1988,13 +1984,13 @@ void FileMng::processFstat(FsReq *req) {
     fsWorker_->submitFsReqCompletion(req);
   }
 
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 void FileMng::processRename(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // req->incrNumFsm();
   // only master can execute rename
   assert(fsWorker_->getWid() == FsProcWorker::kMasterWidConst);
@@ -2388,21 +2384,21 @@ void FileMng::processRename(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }  // RENAME_ERROR
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }  // processRename()
 #pragma GCC diagnostic pop
 
 #if CFS_JOURNAL(ON)
 inline static BitmapChangeOps *getOrCreateBitmapChangeOpsForWid(
     std::unordered_map<int, BitmapChangeOps *> &m, int wid) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto search = m.find(wid);
   if (search != m.end()) return search->second;
 
   auto value = new BitmapChangeOps();
   m[wid] = value;
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return value;
 }
 #endif
@@ -2411,19 +2407,19 @@ inline static BitmapChangeOps *getOrCreateBitmapChangeOpsForWid(
 inline static void updateWidToBitmapChangeOps(
     std::unordered_map<int, BitmapChangeOps *> &m, int wid, bool add_or_del,
     uint64_t block_no) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto changeOps = getOrCreateBitmapChangeOpsForWid(m, wid);
   if (add_or_del)
     changeOps->blocksToSet.push_back(block_no);
   else
     changeOps->blocksToClear.push_back(block_no);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 #endif
 
 #if CFS_JOURNAL(ON)
 void FileMng::updateBitmapsOnJournalWriteComplete(JournalEntry *jentry) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // TODO How much of a performance penalty are we paying by using this lambda
   // instead of just duplicating the code for those variables?
   auto glambda = [](std::unordered_map<int, BitmapChangeOps *> &m,
@@ -2464,13 +2460,13 @@ void FileMng::updateBitmapsOnJournalWriteComplete(JournalEntry *jentry) {
     fsWorker_->messenger->send_message(iter.first, msg);
   }
 
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 #endif
 
 #if CFS_JOURNAL(ON)
 void FileMng::onJournalWriteComplete(void *arg, bool success) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto ctxPtr = (std::tuple<FileMng *, FsReq *, JournalEntry *> *)arg;
   FileMng *mng;
   FsReq *req;
@@ -2513,7 +2509,7 @@ void FileMng::onJournalWriteComplete(void *arg, bool success) {
     return true;
   }(jentry->inode_alloc_dealloc));
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   delete jentry;
   delete ctxPtr;
 }
@@ -2523,7 +2519,7 @@ void FileMng::onJournalWriteComplete(void *arg, bool success) {
 void FileMng::updateBlockBitmaps(std::vector<uint64_t> &blocks_to_set,
                                  std::vector<uint64_t> &blocks_to_clear,
                                  std::unordered_set<cfs_bno_t> &bmaps_cleared) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // NOTE: in release mode, this function does not check if the bitmap changes
   // are for bitmaps owned by this FileMng worker. The caller / message creator
   // is responsible for ensuring the message reaches the right worker.
@@ -2571,14 +2567,14 @@ void FileMng::updateBlockBitmaps(std::vector<uint64_t> &blocks_to_set,
     block_clear_bit(lba % BPB, dirty_bmap->getBufPtr());
     fsImpl_->releaseLockedDirtyBitmap(dirty_bmap);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 #endif
 
 #if CFS_JOURNAL(ON)
 void FileMng::processInodeBitmapChanges(
     std::unordered_map<cfs_ino_t, bool> &inodeBitmapChanges) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto wid = fsWorker_->getWid();
   if (inodeBitmapChanges.size() > 0 && wid != FsProcWorker::kMasterWidConst) {
     throw std::runtime_error(
@@ -2600,13 +2596,13 @@ void FileMng::processInodeBitmapChanges(
       block_clear_bit(ino % BPB, dirtyInodeBitmap);
     }
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 #endif
 
 #if CFS_JOURNAL(ON)
 bool FileMng::allBitmapsInMemory(BitmapChangeOps *changes) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   std::unordered_set<cfs_bno_t> bmap_blocks;
   for (cfs_bno_t pba : changes->blocksToSet) {
     bmap_blocks.insert(get_bmap_block_for_pba(pba));
@@ -2627,7 +2623,7 @@ bool FileMng::allBitmapsInMemory(BitmapChangeOps *changes) {
     }
   }
 
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return true;
 }
 #endif
@@ -2636,7 +2632,7 @@ bool FileMng::allBitmapsInMemory(BitmapChangeOps *changes) {
 // When the journal is enabled, we process bitmap changes when things are
 // written to the journal that involved bitmaps from other workers.
 void FileMng::processRemoteBitmapChanges(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   BitmapChangeOps *changes =
       static_cast<BitmapChangeOps *>(req->completionCallbackCtx);
   auto state = req->getState();
@@ -2673,7 +2669,7 @@ void FileMng::processRemoteBitmapChanges(FsReq *req) {
   } else {
     processRemoteBitmapChanges(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 #else
 // When the journal is NOT enabled, we process bitmap changes when an inode is
@@ -2743,7 +2739,7 @@ end:
 #if CFS_JOURNAL(ON)
 void FileMng::processBitmapChanges(BitmapChangeOps *changes,
                                    bool journalled_locally) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(allBitmapsInMemory(changes));
   processInodeBitmapChanges(changes->inodeBitmapChanges);
   std::unordered_set<cfs_bno_t> bmaps_cleared;
@@ -2771,12 +2767,12 @@ void FileMng::processBitmapChanges(BitmapChangeOps *changes,
   // sure to still keep those bmaps locked after checkpointing completes.
   fsWorker_->jmgr->registerBitmapsWithDeallocations(bmaps_cleared);
 #endif  // CFS_JOURNAL(LOCAL_JOURNAL)
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 #endif
 
 void FileMng::onFdataSyncComplete(FsReq *req, bool success) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // TODO recordInoAppFsyncDone marks the inode clean. Do we want to do that
   // on failure?
   fsWorker_->recordInoAppFsyncDone(req->getFileInum());
@@ -2794,7 +2790,7 @@ void FileMng::onFdataSyncComplete(FsReq *req, bool success) {
     req->setState(FsReqState::SYNCALL_ERR);
   }
   fsWorker_->submitReadyReq(req);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 // Specialized for ldb
@@ -2804,7 +2800,7 @@ void FileMng::onFdataSyncComplete(FsReq *req, bool success) {
 // Assume the inode can be 100% resolved by retrieve its fd
 // Assume the inode never shared with other applications
 void FileMng::processLdbWsync(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::WSYNC_ALLOC_ENTIRE) {
     auto req_control_it = inflight_wsync_req.find(req);
     if (req_control_it == inflight_wsync_req.end()) {
@@ -2964,11 +2960,11 @@ void FileMng::processLdbWsync(FsReq *req) {
     onFdataSyncComplete(req, /*success*/ false);
     // fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processFdataSync(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::FSYNC_DATA_BIO) {
     InMemInode *fileInode = req->getTargetInode();
     if (fileInode != nullptr && fileInode->i_no > 0) {
@@ -3100,11 +3096,11 @@ void FileMng::processFdataSync(FsReq *req) {
   if (req->getState() == FsReqState::FSYNC_ERR) {
     onFdataSyncComplete(req, /*success*/ false);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::ProcessSyncUnlinkedBeforeSyncall(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // can only be called in the initial state of syncall
   assert(req->getState() == FsReqState::SYNCALL_INIT);
   struct LocalReqCtx {
@@ -3143,11 +3139,11 @@ void FileMng::ProcessSyncUnlinkedBeforeSyncall(FsReq *req) {
   // for now choosing same tid as syncall_req
   sync_unlinked_req->tid = req->tid;
   processSyncunlinked(sync_unlinked_req);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processSyncall(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("WORKER {} is processing SYNCALL", fsWorker_->getWid());
   if (req->getState() == FsReqState::SYNCALL_GUARD) {
     if (syncall_in_progress_) {
@@ -3224,12 +3220,12 @@ void FileMng::processSyncall(FsReq *req) {
       processSyncall(queued_req);
     }
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 #if CFS_JOURNAL(ON)
 void FileMng::onBatchedJournalWriteComplete(void *arg, bool success) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto ctx = reinterpret_cast<SyncBatchedContext *>(arg);
   FsReq *req = ctx->req;
   FileMng *mng = ctx->mng;
@@ -3261,7 +3257,7 @@ end:
     // it here directly instead.
     mng->fsWorker_->submitReadyReq(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 #endif
 
@@ -3269,7 +3265,7 @@ end:
 void FileMng::submitSyncBatches(FsReq *req,
                                 std::unordered_set<cfs_ino_t> &inodes) {
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (inodes.empty()) {
     req->setState(FsReqState::SYNC_BATCHES_COMPLETE);
     return;
@@ -3307,13 +3303,13 @@ void FileMng::submitSyncBatches(FsReq *req,
     fsWorker_->jmgr->submitJournalEntry(ctx->jentry,
                                         onBatchedJournalWriteComplete, ctx);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 #endif
 
 #if CFS_JOURNAL(ON)
 void FileMng::processSyncunlinked(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // NOTE: each function can change state, so we always call the function
   // getState again.
   if (req->getState() == FsReqState::SYNCUNLINKED_GUARD) {
@@ -3349,7 +3345,7 @@ void FileMng::processSyncunlinked(FsReq *req) {
       processSyncunlinked(queued_req);
     }
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 #else
 void FileMng::processSyncunlinked(FsReq *req) {
@@ -3360,7 +3356,7 @@ void FileMng::processSyncunlinked(FsReq *req) {
 #endif
 
 void FileMng::processMkdir(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // req->incrNumFsm();
   if (req->getState() == FsReqState::MKDIR_GET_PRT_INODE) {
     bool is_err;
@@ -3548,11 +3544,11 @@ void FileMng::processMkdir(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processOpendir(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::OPENDIR_GET_CACHED_INODE) {
     int fullPathDepth = req->getStandardPathDepth();
     InMemInode *inodePtr = nullptr;
@@ -3661,11 +3657,11 @@ void FileMng::processOpendir(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processNewShmAllocated(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::NEW_SHM_ALLOC_SEND_MSG) {
     SPDLOG_DEBUG("FsReq::processNewShmAllocated wid:{} reqType:{}",
                  req->getWid(), getFsReqTypeOutputString(req->getType()));
@@ -3695,19 +3691,19 @@ void FileMng::processNewShmAllocated(FsReq *req) {
       fsWorker_->submitFsReqCompletion(req);
     }
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processPing(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // to mark completion
   req->getClientOp()->op.ping.ret = 0;
   fsWorker_->submitFsReqCompletion(req);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processDumpInodes(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   std::stringstream ss;
   ss << "/tmp/dumpInodesPid_";
   ss << fsWorker_->getWid();
@@ -3719,12 +3715,12 @@ void FileMng::processDumpInodes(FsReq *req) {
   req->getClientOp()->op.dumpinodes.ret =
       fsImpl_->dumpAllInodesToFile(dumpDirname.c_str());
   fsWorker_->submitFsReqCompletion(req);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::fromInMemInode2Statbuf(InMemInode *inodePtr,
                                      struct stat *cur_stat_ptr) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG(
       "fromInMemInode2Statbuf inode data fields - in-mem_ino:{}, "
       "size:{}, i_block_count",
@@ -3744,25 +3740,25 @@ void FileMng::fromInMemInode2Statbuf(InMemInode *inodePtr,
   cur_stat_ptr->st_nlink = inodePtr->inodeData->nlink;
   cur_stat_ptr->st_ino = inodePtr->inodeData->i_no;
   assert(cur_stat_ptr->st_ino == inodePtr->i_no);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::splitInodeDataBlockBufferSlot(
     InMemInode *inode, std::unordered_set<BlockBufferItem *> &items) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   fsImpl_->splitInodeDataBlockBufferSlot(inode, items);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::installDataBlockBufferSlot(
     InMemInode *inode, const std::unordered_set<BlockBufferItem *> &items) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   fsImpl_->installInodeDataBlockBufferSlot(inode, items);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsPermission::PCR FileMng::checkPermission(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   InMemInode *temp = nullptr;
   auto ret = fsImpl_->permission->checkPermission(req->getPathTokens(), {0, 0},
                                                   &req->parDirMap,
@@ -3771,12 +3767,12 @@ FsPermission::PCR FileMng::checkPermission(FsReq *req) {
   if (req->getPathTokens().size() == 1) {
     req->parDirInodePtr = fsImpl_->root_inode_;
   }
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return ret;
 }
 
 FsPermission::PCR FileMng::checkDstPermission(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   InMemInode *temp = nullptr;
   auto ret = fsImpl_->permission->checkPermission(
       req->getDstPathTokens(), {0, 0}, &req->dstParDirMap,
@@ -3786,7 +3782,7 @@ FsPermission::PCR FileMng::checkDstPermission(FsReq *req) {
     req->dstParDirInodePtr = fsImpl_->root_inode_;
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return ret;
 }
 
@@ -3803,14 +3799,14 @@ InMemInode::InMemInode(uint32_t ino, int wid)
       mngWid_(wid) {}
 
 void InMemInode::initNewAllocatedDinodeContent(mode_t tp) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(inodeData != nullptr);
   memset(inodeData, 0, sizeof(cfs_dinode));
   inodeData->type = tp;
   setNlink(1);
   inodeData->i_no = i_no;
   logEntry->set_mode(tp);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 bool InMemInode::tryLock() {
@@ -3850,9 +3846,9 @@ bool InMemInode::unLock() {
 }
 
 bool InMemInode::isAppProcReferring(pid_t pid) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto it = appFdMap_.find(pid);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return !((it == appFdMap_.end()) || it->second.empty());
 }
 
@@ -3860,7 +3856,7 @@ void InMemInode::addDentryDataBlockPosition(InMemInode *parInode,
                                             const std::string &fileName,
                                             block_no_t dentryDataBlockNo,
                                             int withinBlockDentryIndex) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // assert(parInode != nullptr);
   auto it = inodeDentryDataBlockPosMap_.find(parInode);
   if (it == inodeDentryDataBlockPosMap_.end()) {
@@ -3869,12 +3865,12 @@ void InMemInode::addDentryDataBlockPosition(InMemInode *parInode,
   }
   (inodeDentryDataBlockPosMap_[parInode])[fileName] =
       std::make_pair(dentryDataBlockNo, withinBlockDentryIndex);
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 inode_dentry_dbpos_t *InMemInode::getDentryDataBlockPosition(
     InMemInode *parInode, const std::string &fileName) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(parInode != nullptr);
   auto it = inodeDentryDataBlockPosMap_.find(parInode);
   if (it != inodeDentryDataBlockPosMap_.end()) {
@@ -3884,13 +3880,13 @@ inode_dentry_dbpos_t *InMemInode::getDentryDataBlockPosition(
     }
   }
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return nullptr;
 }
 
 int InMemInode::delDentryDataBlockPosition(InMemInode *parInode,
                                            const std::string &fileName) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(parInode != nullptr);
   auto it = inodeDentryDataBlockPosMap_.find(parInode);
   assert(it != inodeDentryDataBlockPosMap_.end());
@@ -3898,6 +3894,6 @@ int InMemInode::delDentryDataBlockPosition(InMemInode *parInode,
   assert(inIt != (it->second).end());
   (it->second).erase(inIt);
   
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }

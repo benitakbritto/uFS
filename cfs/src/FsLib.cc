@@ -80,15 +80,15 @@ void print_close(int fd, bool ldb = false) {
           threadFsTid);
 }
 
-void print_pread(int fd, void *buf, size_t count, off_t offset,
+void print_pread(int fd, void *buf, size_t count, off_t offset, uint64_t requestId = 0,
                  bool ldb = false) {
-  fprintf(stderr, "-- pread%s(%d, %p, %lu, %ld) from tid %d --\n", ldb ? "_ldb" : "",
-          fd, buf, count, offset, threadFsTid);
+  fprintf(stderr, "-- Req #%ld: pread%s(%d, %p, %lu, %ld) from tid %d --\n", requestId,
+        ldb ? "_ldb" : "", fd, buf, count, offset, threadFsTid);
 }
 
-void print_read(int fd, void *buf, size_t count, bool ldb = false) {
-  fprintf(stderr, "-- read%s(%d, %p, %lu) from tid %d --\n", ldb ? "_ldb" : "", fd,
-          buf, count, threadFsTid);
+void print_read(int fd, void *buf, size_t count, uint64_t requestId = 0, bool ldb = false) {
+  fprintf(stderr, "-- Req #%ld: read%s(%d, %p, %lu) from tid %d --\n", requestId,
+        ldb ? "_ldb" : "", fd, buf, count, threadFsTid);
 }
 
 void print_write(int fd, const void *buf, size_t count, uint64_t requestId = 0, 
@@ -836,9 +836,11 @@ struct unlinkOp *fillUnlinkOp(struct clientOp *curCop, const char *pathname) {
 }
 
 static inline void prepare_unlinkOp(struct shmipc_msg *msg, struct unlinkOp *op,
-                                    const char *pathname) {
+                                    const char *pathname, bool isRetry, uint64_t reqId) {
   msg->type = CFS_OP_UNLINK;
   adjustPath(pathname, &(op->path[0]));
+  op->isRetry = isRetry;
+  op->requestId = reqId;
   EmbedThreadIdToAsOpRet(op->ret);
 }
 
@@ -1490,7 +1492,6 @@ int fs_dumpinodes_internal(FsService *fsServ) {
   return ret;
 }
 
-// TODO: Change this
 // TODO: Lock
 // NOTE: For testing purposes only
 int fs_dump_pendingops() {
@@ -1510,6 +1511,9 @@ int fs_dump_pendingops() {
           break;
         case CFS_OP_PREAD:
           std::cout << "pread" << std::endl;
+          break;
+        case CFS_OP_UNLINK:
+          std::cout << "unlink" << std::endl;
           break;
         default:
           std::cout << type << " unknown" << std::endl;
@@ -1622,6 +1626,11 @@ void handle_pread_retry(uint64_t reqId) {
   }
 }
 
+void handle_unlink_retry(uint64_t reqId) {
+  auto op = gServMngPtr->queueMgr->getPendingXreq<struct unlinkOp>(gServMngPtr->reqRingMap[reqId][0]);
+  std::cout << fs_unlink(op->path, true, reqId) << std::endl;
+}
+
 void fs_retry_pending_ops() {
   if (gServMngPtr->reqRingMap.size() == 0) {
     std::cout << "[INFO] No ops to retry" << std::endl;
@@ -1644,12 +1653,13 @@ void fs_retry_pending_ops() {
         handle_pwrite_retry(req.first);
         break;
       case CFS_OP_CREATE:
-        // TODO
         handle_create_retry(req.first);
         break;
       case CFS_OP_PREAD:
-        // TODO
         handle_pread_retry(req.first);
+        break;
+      case CFS_OP_UNLINK:
+        handle_unlink_retry(req.first);
         break;
       default:
         std::cout << "[ERR] Not supported" << std::endl;
@@ -2107,7 +2117,7 @@ retry:
   return rc;
 }
 
-int fs_unlink_internal(FsService *fsServ, const char *pathname) {
+int fs_unlink_internal(FsService *fsServ, const char *pathname, bool isRetry = false, uint64_t reqId = 0) {
 #ifdef LDB_PRINT_CALL
   print_unlink(pathname);
 #endif
@@ -2119,10 +2129,17 @@ int fs_unlink_internal(FsService *fsServ, const char *pathname) {
   memset(&msg, 0, sizeof(msg));
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   unlkop = (struct unlinkOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
-  prepare_unlinkOp(&msg, unlkop, pathname);
+  prepare_unlinkOp(&msg, unlkop, pathname, isRetry, reqId);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
       print_server_unavailable(__func__);
+
+      if (gServMngPtr->reqRingMap.count(reqId) == 0) {
+        auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+        gServMngPtr->queueMgr->enqueuePendingXreq<struct unlinkOp>(unlkop, off);
+        gServMngPtr->reqRingMap[reqId].push_back(off);
+      }
+
       return -1;
     }
 
@@ -2134,19 +2151,22 @@ int fs_unlink_internal(FsService *fsServ, const char *pathname) {
   return ret;
 }
 
+// TODO: Add unlink to metadata ops & pending until notify clears it
 // Man page of unlink:
 // unlink() deletes a name from the filesystem.  If that name was the last link
 // to a file and no processes have the file open, the file is deleted and the
 // space it was using is made available for reuse.
-int fs_unlink(const char *pathname) {
+int fs_unlink(const char *pathname, bool isRetry, uint64_t retryRequestId) {
   int delixArr[32];
   int dummy;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_UNLINK);
 #endif
+
+  auto reqId = isRetry ? retryRequestId : getNewRequestId();
   char *standardPath = filepath2TokensStandardized(pathname, delixArr, dummy);
   // NOTE: For now, unlink will always go to the primary worker
-  int rt = fs_unlink_internal(gServMngPtr->primaryServ, standardPath);
+  int rt = fs_unlink_internal(gServMngPtr->primaryServ, standardPath, isRetry, reqId);
   if (rt == 0) {
     // unlink succeed, remove path from pathWidmap
     updatePathWidMap(/*newWid*/ 0, standardPath);
@@ -2156,7 +2176,8 @@ int fs_unlink(const char *pathname) {
       delete it->second;
       gLibSharedContext->pathLDBLeaseMap.unsafe_erase(it);
     }
-  }
+  } 
+
   if (rt < 0 && rt >= FS_REQ_ERROR_INODE_IN_TRANSFER) rt = -1;
   free(standardPath);
 #ifdef CFS_LIB_SAVE_API_TS
@@ -2642,9 +2663,6 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
 }
 
 ssize_t fs_read(int fd, void *buf, size_t count, bool fromRetry, uint64_t retryRequestId) {
-#ifdef LDB_PRINT_CALL
-  print_read(fd, buf, count);
-#endif
   int wid = -1;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_READ);
@@ -2652,6 +2670,9 @@ ssize_t fs_read(int fd, void *buf, size_t count, bool fromRetry, uint64_t retryR
 
   auto requestId = fromRetry ? retryRequestId : getNewRequestId();
   bool isOpRetried = false;
+#ifdef LDB_PRINT_CALL
+  print_read(fd, buf, count, requestId);
+#endif
 
 retry:
   auto service = getFsServiceForFD(fd, wid);
@@ -2678,9 +2699,6 @@ retry:
 }
 
 ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset, bool fromRetry, uint64_t retryRequestId) {
-#ifdef LDB_PRINT_CALL
-  print_pread(fd, buf, count, offset);
-#endif
   int wid = -1;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_PREAD);
@@ -2688,6 +2706,9 @@ ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset, bool fromRetry, 
 
   auto requestId = fromRetry ? retryRequestId : getNewRequestId();
   bool isOpRetried = fromRetry;
+#ifdef LDB_PRINT_CALL
+  print_pread(fd, buf, count, offset, requestId);
+#endif
 
 retry:
   auto service = getFsServiceForFD(fd, wid);

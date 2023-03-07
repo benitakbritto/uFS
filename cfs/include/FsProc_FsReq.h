@@ -411,6 +411,7 @@ enum class FsReqState {
   UNLINK_PRIMARY_REMOVE_DENTRY,
   UNLINK_PRIMARY_NOTIFY_USER,
   UNLINK_PRIMARY_HANDOFF_TO_OWNER,
+  UNLINK_PRIMARY_RETRY,
   UNLINK_ERR,  // TODO: have common error func
   // rename
   RENAME_LOOKUP_SRC [[deprecated]],
@@ -932,6 +933,7 @@ class FsReq {
   FsReqType reqType;
   int reqTypeFlags;
   FsReqState reqState{FsReqState::OP_STATE_DEFAULT_OR_SOMETHING_WRONG};
+  bool isRetry{false};
 
   struct clientOp *copPtr{nullptr};
   // save the rwCommon op here, must be set when de-code App request

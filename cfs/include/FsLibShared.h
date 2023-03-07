@@ -344,6 +344,8 @@ struct wsyncOp {
 struct unlinkOp {
   int ret;
   char path[MULTI_DIRSIZE];
+  bool isRetry;
+  uint64_t requestId;
 };
 
 struct renameOp {

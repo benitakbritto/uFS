@@ -63,6 +63,7 @@ int fs_dumpinodes(int wid);
 
 int fs_dump_pendingops();
 int fs_poll_notification();
+void fs_retry_pending_ops();
 ////////////////////////////////////////////////////////////////////////////////
 // POSIX API
 
@@ -122,13 +123,13 @@ off_t fs_lseek(int fd, long int offset, int whence);
 
 // data plane operations
 // ~= read()
-ssize_t fs_read(int fd, void *buf, size_t count);
+ssize_t fs_read(int fd, void *buf, size_t count, bool fromRetry = false, uint64_t retryRequestId = 0);
 // ~= pread()
-ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset);
+ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset, bool fromRetry = false, uint64_t retryRequestId = 0);
 // ~=write()
-ssize_t fs_write(int fd, const void *buf, size_t count);
+ssize_t fs_write(int fd, const void *buf, size_t count, bool fromRetry = false, uint64_t retryRequestId = 0);
 // ~=pwrite()
-ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset);
+ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset, bool fromRetry = false, uint64_t retryRequestId = 0);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Copy reduction APIs

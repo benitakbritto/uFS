@@ -2134,6 +2134,9 @@ void FsProcWorker::processClientControlPlaneReq(FsReq *req) {
     case FsReqType::THREAD_REASSIGN:
       ProcessManualThreadReassign(req);
       goto end;
+    case FsReqType::PING:
+      fileManager->processPing(req);
+      goto end;
     default:
       throw std::runtime_error("Unknown client control plane request");
   }
@@ -2625,16 +2628,20 @@ void FsProcWorker::opStatsAccountSingleOpDone(FsReqType reqType, size_t bytes) {
 void FsProcWorker::notifyAllWriteOps() {
   std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (auto &[appPid, inodeReqMap]: flushPendingDataOpMap) {
+    std::cout << "[BENITA] appPid = " << appPid << std::endl; 
     for (auto &[inodeNum, reqIdList]: inodeReqMap) {
+      std::cout << "[BENITA] inodeNum = " << inodeNum << std::endl;
       for (auto reqId: reqIdList) {
+        std::cout << "[BENITA] reqId = " << reqId << std::endl;
         // put msg in ring buff
         struct shmipc_msg msg;
         off_t ring_idx;
         memset(&msg, 0, sizeof(msg));
         ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
         msg.retval = reqId;
-        std::cout << "[BENITA] reqId = " << reqId << std::endl;
+        
         shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
+         std::cout << "[BENITA] done with put for reqId = " << reqId << std::endl;
       }
     }
   } 

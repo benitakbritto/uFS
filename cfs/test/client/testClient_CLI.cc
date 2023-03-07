@@ -106,6 +106,8 @@ void printHelp() {
                           "\n");
   printf(ANSI_COLOR_GREEN "poll_notification" ANSI_COLOR_RESET
                           "\n");
+  printf(ANSI_COLOR_GREEN "retry_ops" ANSI_COLOR_RESET
+                          "\n");                          
 }
 
 void printReturnValue(std::string const &cmd, ssize_t v) {
@@ -636,8 +638,15 @@ void process(std::string const &line) {
         printReturnValue(tokens[0], ret);
         #endif
       }
-    } 
-    else {
+    } else if (tokens[0] == "retry_ops") {
+      if (tokens.size() != 1) {
+        printHelp();
+      } else {
+        #ifndef TEST_VFS_INSTEAD
+        fs_retry_pending_ops();
+        #endif
+      }
+    } else {
       printHelp();
     }
   }

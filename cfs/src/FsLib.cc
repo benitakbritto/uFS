@@ -61,8 +61,7 @@ uint64_t inline getNewRequestId() {
 
 // TODO: Add retry module here
 void print_server_unavailable(const char *func_name) {
-  fprintf(stderr, "[WARN] Server is unavailable for function %s. \
-          Retry operation later.\n", func_name);
+  fprintf(stderr, "[WARN] Server is unavailable for function %s. Retry operation later.\n", func_name);
 }
 
 void print_admin_inode_reassignment(int type, uint32_t inode, int curOwner,
@@ -394,7 +393,7 @@ off_t PendingQueueMgr::enqueuePendingMsg(struct shmipc_msg* msgSrc) {
   assert(shmMgr != nullptr);
 
   struct shmipc_msg queueMsg;
-  memcpy(&queueMsg, msgSrc, sizeof(msgSrc));
+  memcpy(&queueMsg, msgSrc, sizeof(*msgSrc));
 
   off_t ringIdx = shmipc_mgr_alloc_slot_dbg(shmMgr);
   
@@ -1495,22 +1494,27 @@ int fs_dumpinodes_internal(FsService *fsServ) {
 // TODO: Lock
 // NOTE: For testing purposes only
 int fs_dump_pendingops() {
-  // for (auto &[key, val]: gPendingRequestMap) {
-  //   if (val->status == FS_PENDING_STATUS) {
-  //     std::cout << "req #" << key << " " << "pending" << std::endl;
-  //   } else if (val->status == FS_SPECULATIVE_STATUS) {
-  //     std::cout << "req #" << key << " " << "speculative" << std::endl;
-  //   } else if (val->status == FS_COMPLETED_STATUS) {
-  //     std::cout << "req #" << key << " " << "completed" << std::endl;
-  //   }
-  // }
-
   for (auto &[key, ringList]: gServMngPtr->reqRingMap) {
     for (auto ringIdx: ringList) {
       std::cout << "Req: " << key << "\t"
-      << "ringIdx: " << ringIdx << "\t"
-      << "request type: " << gServMngPtr->queueMgr->getMessageType(ringIdx)
-      << std::endl;
+      << "ringIdx: " << ringIdx << "\t" 
+      << "request type: ";
+
+      auto type = unsigned(gServMngPtr->queueMgr->getMessageType(ringIdx));
+      switch(type) {
+        case CFS_OP_PWRITE:
+          std::cout << "pwrite" << std::endl;
+          break;
+        case CFS_OP_CREATE:
+          std::cout << "create" << std::endl;
+          break;
+        case CFS_OP_PREAD:
+          std::cout << "pread" << std::endl;
+          break;
+        default:
+          std::cout << type << " unknown" << std::endl;
+          break;
+      }
     }
   }
 
@@ -1533,6 +1537,125 @@ int fs_dumpinodes(int wid) {
     return fs_dumpinodes_internal(serv->second);
   } else {
     return -1;
+  }
+}
+
+int check_primary_server_availability() {
+  int status = shmipc_STATUS_READY_FOR_SERVER;
+  auto service = gServMngPtr->primaryServ;
+  int threshold = 5; // TODO: configure
+  int count = 0;
+  int ret = -1;
+
+  while (ret == -1 && count < threshold) {
+    std::cout << "[INFO] Attempt at pinging primary: " << count + 1 << std::endl;
+    
+    struct shmipc_msg msg;
+    struct pingOp *eop;
+    off_t ring_idx;
+    memset(&msg, 0, sizeof(msg));
+    ring_idx = shmipc_mgr_alloc_slot_dbg(service->shmipc_mgr);
+    eop = (struct pingOp *)IDX_TO_XREQ(service->shmipc_mgr, ring_idx);
+    prepare_pingOp(&msg, eop);
+    
+    shmipc_mgr_put_msg_nowait(service->shmipc_mgr, ring_idx, &msg, shmipc_STATUS_READY_FOR_SERVER);
+    sleep(2); // TODO: configure
+    ret = shmipc_mgr_poll_msg(service->shmipc_mgr, ring_idx, &msg);
+    
+    shmipc_mgr_dealloc_slot(service->shmipc_mgr, ring_idx);
+
+    count++;
+  }
+  
+  return count >= threshold ? -1 : 0;
+}
+
+void handle_pwrite_retry(uint64_t reqId) {
+  int count = 0;
+  void *data = nullptr;
+  int offset = 0;
+  auto ringOffsetList = gServMngPtr->reqRingMap[reqId];
+  int fd = 0;
+
+  // get count
+  for (auto ringIndex: ringOffsetList) {
+    count += gServMngPtr->queueMgr->getPendingXreq<struct pwriteOpPacked>(ringIndex)->rwOp.count;
+  }
+
+  // get offset & inode
+  fd = gServMngPtr->queueMgr->getPendingXreq<struct pwriteOpPacked>(ringOffsetList[0])->rwOp.fd;
+  offset = gServMngPtr->queueMgr->getPendingXreq<struct pwriteOpPacked>(ringOffsetList[0])->offset;
+
+  // get data
+  data = (char *) calloc(count, sizeof(char));
+  for (auto ringIndex: ringOffsetList) {
+    memcpy(data, 
+      gServMngPtr->queueMgr->getPendingData(ringIndex), 
+      gServMngPtr->queueMgr->getPendingXreq<struct pwriteOpPacked>(ringIndex)->rwOp.count);
+  }
+  
+  // retry
+  fs_pwrite(fd, data, count, offset, true /*fromRetry*/, reqId /*retryRequestId*/);
+
+  // cleanup
+  if (data != nullptr) {
+    free(data);
+  }
+}
+
+void handle_create_retry(uint64_t reqId) {
+  auto op = gServMngPtr->queueMgr->getPendingXreq<struct openOp>(gServMngPtr->reqRingMap[reqId][0]);
+  fs_open(op->path, op->flags, op->mode);
+}
+
+void handle_pread_retry(uint64_t reqId) {
+  auto op = gServMngPtr->queueMgr->getPendingXreq<struct preadOpPacked>(gServMngPtr->reqRingMap[reqId][0]);
+  void *buf = calloc(op->rwOp.count, sizeof(char));
+  if (fs_pread(op->rwOp.fd, buf, op->rwOp.count, op->offset, true, reqId) > 0) {
+    assert(buf != nullptr);
+    std::cout << "Result: " << (char *) buf << std::endl;
+
+    // clean up
+    gServMngPtr->queueMgr->dequePendingMsg(reqId);
+    gServMngPtr->reqRingMap.erase(reqId); // TODO: Fix, causing seg fault. Need to erase separately
+    free(buf);
+  }
+}
+
+void fs_retry_pending_ops() {
+  if (gServMngPtr->reqRingMap.size() == 0) {
+    std::cout << "[INFO] No ops to retry" << std::endl;
+    return;
+  }
+ 
+  std::cout << "[INFO] Checking connection with server" << std::endl;
+
+  auto ret = check_primary_server_availability();
+  if (ret == -1) {
+    print_server_unavailable(__func__);
+    return;
+  } else {
+    std::cout << "[INFO] Connection to server successful" << std::endl;
+    for (auto &req: gServMngPtr->reqRingMap) {
+      std::cout << "Retrying request #" << req.first << std::endl;
+      auto type = gServMngPtr->queueMgr->getMessageType(gServMngPtr->reqRingMap[req.first][0]);
+      switch(type) {
+      case CFS_OP_PWRITE:
+        handle_pwrite_retry(req.first);
+        break;
+      case CFS_OP_CREATE:
+        // TODO
+        handle_create_retry(req.first);
+        break;
+      case CFS_OP_PREAD:
+        // TODO
+        handle_pread_retry(req.first);
+        break;
+      default:
+        std::cout << "[ERR] Not supported" << std::endl;
+        break;
+      }
+    }
   }
 }
 
@@ -2469,7 +2592,8 @@ ssize_t fs_read_internal(FsService *fsServ, int fd, void *buf, size_t count) {
 }
 
 static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
-                                 size_t count, off_t offset) {
+                                 size_t count, off_t offset, uint64_t requestId,
+                                 bool isOpRetried) {
   ssize_t rc;
 #ifdef _CFS_LIB_PRINT_REQ_
   pid_t curPid = syscall(__NR_gettid);
@@ -2488,6 +2612,13 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
     if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
       print_server_unavailable(__func__);
+      std::cout << "requestId = " << requestId << std::endl;
+      if (gServMngPtr->reqRingMap.count(requestId) == 0) {
+        auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+        gServMngPtr->queueMgr->enqueuePendingXreq<struct preadOpPacked>(prop_p, off);
+        gServMngPtr->reqRingMap[requestId].push_back(off);
+      }
+      shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
       return -1;
     }
 
@@ -2510,7 +2641,7 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
   return rc;
 }
 
-ssize_t fs_read(int fd, void *buf, size_t count) {
+ssize_t fs_read(int fd, void *buf, size_t count, bool fromRetry, uint64_t retryRequestId) {
 #ifdef LDB_PRINT_CALL
   print_read(fd, buf, count);
 #endif
@@ -2518,15 +2649,25 @@ ssize_t fs_read(int fd, void *buf, size_t count) {
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_READ);
 #endif
+
+  auto requestId = fromRetry ? retryRequestId : getNewRequestId();
+  bool isOpRetried = false;
+
 retry:
   auto service = getFsServiceForFD(fd, wid);
   // ssize_t rc = fs_read_internal(service, fd, buf, count);
   auto prevOffset = service->getOffset(fd);
-  ssize_t rc = fs_pread_internal(service, fd, buf, count, prevOffset);
+  ssize_t rc = fs_pread_internal(service, fd, buf, count, prevOffset, requestId, isOpRetried);
   if (rc < 0) {
-    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
+    if (handle_inode_in_transfer(static_cast<int>(rc))) {
+      isOpRetried = true;
+      goto retry;
+    }
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
-    if (should_retry) goto retry;
+    if (should_retry) {
+      isOpRetried = true;
+      goto retry;
+    }
   } else {
     service->updateOffset(fd, prevOffset + rc);
   }
@@ -2536,7 +2677,7 @@ retry:
   return rc;
 }
 
-ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset) {
+ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset, bool fromRetry, uint64_t retryRequestId) {
 #ifdef LDB_PRINT_CALL
   print_pread(fd, buf, count, offset);
 #endif
@@ -2544,13 +2685,23 @@ ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset) {
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_PREAD);
 #endif
+
+  auto requestId = fromRetry ? retryRequestId : getNewRequestId();
+  bool isOpRetried = fromRetry;
+
 retry:
   auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_pread_internal(service, fd, buf, count, offset);
+  ssize_t rc = fs_pread_internal(service, fd, buf, count, offset, requestId, isOpRetried);
   if (rc < 0) {
-    if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
+    if (handle_inode_in_transfer(static_cast<int>(rc))) {
+      isOpRetried = true;
+      goto retry;
+    }
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
-    if (should_retry) goto retry;
+    if (should_retry) {
+      isOpRetried = true;
+      goto retry;
+    }
   }
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_PREAD, tsIdx);
@@ -2693,8 +2844,6 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     ssize_t rc = pwop_p->rwOp.ret;
     if (rc < 0) {
       shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
-      gServMngPtr->queueMgr->dequePendingMsg(requestId);
-      gServMngPtr->reqRingMap.erase(requestId);
       return rc;
     } 
 
@@ -2707,17 +2856,17 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
   return total_rc;
 }
 
-ssize_t fs_write(int fd, const void *buf, size_t count) {
+ssize_t fs_write(int fd, const void *buf, size_t count, bool fromRetry, uint64_t retryRequestId) {
   if (count == 0) return 0;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_WRITE);
 #endif
-  auto requestId = getNewRequestId();
+  auto requestId = getNewRequestId(); // TODO: from retry should reuse requestId
 #ifdef LDB_PRINT_CALL
   print_write(fd, buf, count, requestId);
 #endif
   int wid = -1;
-  bool isOpRetried = false;
+  bool isOpRetried = fromRetry;
 retry:
   auto service = getFsServiceForFD(fd, wid);
   auto prevOffset = service->getOffset(fd);
@@ -2743,17 +2892,17 @@ retry:
   return rc;
 }
 
-ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset) {
+ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset, bool fromRetry, uint64_t retryRequestId) {
   if (count == 0) return 0;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_PWRITE);
 #endif
   int wid = -1;
-  auto requestId = getNewRequestId();
+  auto requestId = fromRetry ? retryRequestId : getNewRequestId();
 #ifdef LDB_PRINT_CALL
   print_pwrite(fd, buf, count, offset, requestId);
 #endif
-  bool isOpRetried = false;
+  bool isOpRetried = fromRetry;
 retry:
   auto service = getFsServiceForFD(fd, wid);
   ssize_t rc = fs_pwrite_internal(service, fd, buf, count, offset, requestId, isOpRetried);
@@ -3993,9 +4142,9 @@ off_t fs_lseek_internal(FsService *fsServ, int fd, long int offset,
   prepare_lseekOp(&msg, op, fd, offset, whence, file_offset);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+    print_server_unavailable(__func__);
+    return -1;
+  }
 
   ret = op->ret;
 

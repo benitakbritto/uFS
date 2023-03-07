@@ -150,7 +150,7 @@ struct FsLibServiceMng {
   std::unordered_map<int, FsService *> multiFsServMap;
   std::atomic_int multiFsServNum{0};
   FsService *primaryServ{nullptr};
-  std::unordered_map<uint64_t, std::vector<off_t>> reqRingMap; 
+  std::map<uint64_t, std::vector<off_t>> reqRingMap;  // TODO: must process in sorted order
   PendingQueueMgr *queueMgr{nullptr};
 };
 

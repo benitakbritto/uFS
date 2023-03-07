@@ -102,6 +102,11 @@ void print_pwrite(int fd, const void *buf, size_t count, off_t offset, uint64_t 
           fd, (char *)buf, count, offset);
 }
 
+void print_mkdir(const char *pathname, mode_t mode, uint64_t requestId = 0) {
+  fprintf(stderr, "-- Req #%ld: mkdir(%s, %dd)\n --", requestId,
+          pathname, mode);
+}
+
 void print_fsync(int fd, bool ldb = false) {
   fprintf(stderr, "-- fsync%s(%d) from tid %d --\n", ldb ? "_ldb" : "", fd,
           threadFsTid);
@@ -408,7 +413,7 @@ void PendingQueueMgr::enqueuePendingXreq(T *opSrc, off_t idx) {
   assert(shmMgr != nullptr);
   
   T *opDest = (T *)IDX_TO_XREQ(shmMgr, idx);
-  memcpy(opDest, opSrc, sizeof(opSrc));
+  memcpy(opDest, opSrc, sizeof(*opSrc));
 }
 
 void PendingQueueMgr::enqueuePendingData(void *dataStr, off_t idx, 
@@ -756,9 +761,12 @@ struct mkdirOp *fillMkdirOp(struct clientOp *curCop, const char *pathname,
 }
 
 static inline void prepare_mkdirOp(struct shmipc_msg *msg, struct mkdirOp *op,
-                                   const char *path, mode_t mode) {
+                                   const char *path, mode_t mode, bool isRetry, 
+                                   uint64_t reqId) {
   msg->type = CFS_OP_MKDIR;
   op->mode = mode;
+  op->isRetry = isRetry;
+  op->requestId = reqId;
   EmbedThreadIdToAsOpRet(op->ret);
   adjustPath(path, &(op->pathname[0]));
 }
@@ -1515,6 +1523,9 @@ int fs_dump_pendingops() {
         case CFS_OP_UNLINK:
           std::cout << "unlink" << std::endl;
           break;
+        case CFS_OP_MKDIR:
+          std::cout << "mkdir" << std::endl;
+          break;
         default:
           std::cout << type << " unknown" << std::endl;
           break;
@@ -1599,7 +1610,9 @@ void handle_pwrite_retry(uint64_t reqId) {
   }
   
   // retry
-  fs_pwrite(fd, data, count, offset, true /*fromRetry*/, reqId /*retryRequestId*/);
+  std::cout << "Return: " << 
+    fs_pwrite(fd, data, count, offset, true /*fromRetry*/, reqId /*retryRequestId*/) 
+    << std::endl;
 
   // cleanup
   if (data != nullptr) {
@@ -1609,7 +1622,7 @@ void handle_pwrite_retry(uint64_t reqId) {
 
 void handle_create_retry(uint64_t reqId) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct openOp>(gServMngPtr->reqRingMap[reqId][0]);
-  fs_open(op->path, op->flags, op->mode);
+  std::cout << "Return: " << fs_open(op->path, op->flags, op->mode) << std::endl;
 }
 
 bool handle_pread_retry(uint64_t reqId) {
@@ -1630,7 +1643,13 @@ bool handle_pread_retry(uint64_t reqId) {
 
 void handle_unlink_retry(uint64_t reqId) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct unlinkOp>(gServMngPtr->reqRingMap[reqId][0]);
-  std::cout << fs_unlink(op->path, true, reqId) << std::endl;
+  std::cout << "Return: " << fs_unlink(op->path, true, reqId) << std::endl;
+}
+
+void handle_mkdir_retry(uint64_t reqId) {
+  std::cout << __func__ << std::endl;
+  auto op = gServMngPtr->queueMgr->getPendingXreq<struct mkdirOp>(gServMngPtr->reqRingMap[reqId][0]);
+  std::cout << "Return: " << fs_mkdir(op->pathname, op->mode, true, reqId) << std::endl;
 }
 
 void fs_retry_pending_ops() {
@@ -1669,6 +1688,10 @@ void fs_retry_pending_ops() {
           break;
         case CFS_OP_UNLINK:
           handle_unlink_retry(reqId);
+          itr++;
+          break;
+        case CFS_OP_MKDIR:
+          handle_mkdir_retry(reqId);
           itr++;
           break;
         default:
@@ -2202,7 +2225,7 @@ int fs_unlink(const char *pathname, bool isRetry, uint64_t retryRequestId) {
   return rt;
 }
 
-int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode) {
+int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode, bool isRetry = false, uint64_t reqId = 0) {
   struct shmipc_msg msg;
   struct mkdirOp *mop;
   off_t ring_idx;
@@ -2211,12 +2234,24 @@ int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode) {
   memset(&msg, 0, sizeof(msg));
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   mop = (struct mkdirOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
-  prepare_mkdirOp(&msg, mop, pathname, mode);
+  prepare_mkdirOp(&msg, mop, pathname, mode, isRetry, reqId);
 
-  // Note: Do not use exponential backoff here, as non-idempotent
-  shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
+  if (gServMngPtr->reqRingMap.count(reqId) == 0) {
+    auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+    gServMngPtr->queueMgr->enqueuePendingXreq<struct mkdirOp>(mop, off);
+    gServMngPtr->reqRingMap[reqId].push_back(off);
+  }
+
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg)) {
+    print_server_unavailable(__func__);
+    return -1;
+  }
 
   ret = mop->ret;
+  if (ret != 0) {
+    gServMngPtr->queueMgr->dequePendingMsg(reqId);
+    gServMngPtr->reqRingMap.erase(reqId);
+  }
 #ifdef _CFS_LIB_PRINT_REQ_
   fprintf(stdout, "fs_mkdir(%s) ret:%d\n", pathname, ret);
 #endif
@@ -2224,11 +2259,15 @@ int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode) {
   return ret;
 }
 
-int fs_mkdir(const char *pathname, mode_t mode) {
+int fs_mkdir(const char *pathname, mode_t mode, bool isRetry, uint64_t retryReqId) {
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_MKDIR);
 #endif
-  int rt = fs_mkdir_internal(gServMngPtr->primaryServ, pathname, mode);
+  auto reqId = isRetry ? retryReqId : getNewRequestId();
+#ifdef LDB_PRINT_CALL
+  print_mkdir(pathname, mode, reqId);
+#endif
+  int rt = fs_mkdir_internal(gServMngPtr->primaryServ, pathname, mode, isRetry, reqId);
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_MKDIR, tsIdx);
 #endif

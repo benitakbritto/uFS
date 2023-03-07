@@ -3374,7 +3374,12 @@ void FileMng::processMkdir(FsReq *req) {
       if (curInode != nullptr) {
         // here we do a trick to check if this dir's name is already
         // existing in target directory by checking the path cache.
-        req->setState(FsReqState::MKDIR_ERR);
+        if (req->isRetry) {
+          fsWorker_->onTargetInodeFiguredOut(req, curInode);
+          req->setState(FsReqState::MKDIR_FINI);
+        } else {
+          req->setState(FsReqState::MKDIR_ERR);
+        }
       } else {
         parInode = req->getDirInode();
         if (parInode != nullptr) {

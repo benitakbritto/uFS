@@ -311,6 +311,8 @@ struct mkdirOp {
   int ret;
   mode_t mode;
   char pathname[MULTI_DIRSIZE];
+  uint64_t requestId;
+  bool isRetry;
 };
 
 struct statOp {

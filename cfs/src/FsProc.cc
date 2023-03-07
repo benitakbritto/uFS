@@ -762,6 +762,7 @@ void FsReq::initReqFromCop(AppProc *curApp, off_t curSlotId,
     case CFS_OP_MKDIR: {
       setType(FsReqType::MKDIR);
       reqState = FsReqState::MKDIR_GET_PRT_INODE;
+      isRetry = copPtr->op.mkdir.isRetry;
       standardFullPath = filepath2TokensStandardized(copPtr->op.mkdir.pathname,
                                                      standardFullPathDelimIdx,
                                                      standardFullPathDepth);

@@ -90,7 +90,7 @@ int fs_close_lease(int fd);
 // ~= unlink()
 int fs_unlink(const char *pathname, bool isRetry = false, uint64_t retryRequestId = 0);
 // ~= mkdir()
-int fs_mkdir(const char *pathname, mode_t mode);
+int fs_mkdir(const char *pathname, mode_t mode, bool isRetry = false, uint64_t retryRequestId = 0);
 // ~= opendir()
 struct CFS_DIR *fs_opendir(const char *name);
 // ~= readdir()

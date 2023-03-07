@@ -107,6 +107,8 @@ void printHelp() {
   printf(ANSI_COLOR_GREEN "poll_notification" ANSI_COLOR_RESET
                           "\n");
   printf(ANSI_COLOR_GREEN "retry_ops" ANSI_COLOR_RESET
+                          "\n"); 
+  printf(ANSI_COLOR_GREEN "cp" ANSI_COLOR_RESET
                           "\n");                          
 }
 

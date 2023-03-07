@@ -1647,7 +1647,6 @@ void handle_unlink_retry(uint64_t reqId) {
 }
 
 void handle_mkdir_retry(uint64_t reqId) {
-  std::cout << __func__ << std::endl;
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct mkdirOp>(gServMngPtr->reqRingMap[reqId][0]);
   std::cout << "Return: " << fs_mkdir(op->pathname, op->mode, true, reqId) << std::endl;
 }

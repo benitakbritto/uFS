@@ -393,6 +393,7 @@ enum class FsReqState {
   MKDIR_UPDATE_PAR_DIR_DATA,
   MKDIR_INODES_SET_DIRTY,
   MKDIR_FINI,
+  MKDIR_RETRY,
   MKDIR_ERR,  // end of mkdir
   // stat
   STAT_GET_CACHED_INODE,
@@ -933,7 +934,6 @@ class FsReq {
   FsReqType reqType;
   int reqTypeFlags;
   FsReqState reqState{FsReqState::OP_STATE_DEFAULT_OR_SOMETHING_WRONG};
-  bool isRetry{false};
 
   struct clientOp *copPtr{nullptr};
   // save the rwCommon op here, must be set when de-code App request

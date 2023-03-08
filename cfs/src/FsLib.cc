@@ -765,7 +765,6 @@ static inline void prepare_mkdirOp(struct shmipc_msg *msg, struct mkdirOp *op,
                                    uint64_t reqId) {
   msg->type = CFS_OP_MKDIR;
   op->mode = mode;
-  op->isRetry = isRetry;
   op->requestId = reqId;
   EmbedThreadIdToAsOpRet(op->ret);
   adjustPath(path, &(op->pathname[0]));
@@ -847,7 +846,6 @@ static inline void prepare_unlinkOp(struct shmipc_msg *msg, struct unlinkOp *op,
                                     const char *pathname, bool isRetry, uint64_t reqId) {
   msg->type = CFS_OP_UNLINK;
   adjustPath(pathname, &(op->path[0]));
-  op->isRetry = isRetry;
   op->requestId = reqId;
   EmbedThreadIdToAsOpRet(op->ret);
 }
@@ -1646,9 +1644,14 @@ void handle_unlink_retry(uint64_t reqId) {
   std::cout << "Return: " << fs_unlink(op->path, true, reqId) << std::endl;
 }
 
-void handle_mkdir_retry(uint64_t reqId) {
+int handle_mkdir_retry(uint64_t reqId) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct mkdirOp>(gServMngPtr->reqRingMap[reqId][0]);
-  std::cout << "Return: " << fs_mkdir(op->pathname, op->mode, true, reqId) << std::endl;
+  auto ret = fs_mkdir(op->pathname, op->mode, true, reqId);
+  // if (ret == 1) {
+  //   gServMngPtr->queueMgr->dequePendingMsg(reqId);
+  // }
+  std::cout << "Return: " << ret << std::endl;
+  return ret;
 }
 
 void fs_retry_pending_ops() {
@@ -1690,6 +1693,11 @@ void fs_retry_pending_ops() {
           itr++;
           break;
         case CFS_OP_MKDIR:
+          // if (handle_mkdir_retry(reqId) == 1) {
+          //   gServMngPtr->reqRingMap.erase(itr++);
+          // } else {
+          //   itr++;
+          // }
           handle_mkdir_retry(reqId);
           itr++;
           break;
@@ -2247,7 +2255,7 @@ int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode, bool
   }
 
   ret = mop->ret;
-  if (ret != 0) {
+  if (ret < 0) {
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
     gServMngPtr->reqRingMap.erase(reqId);
   }

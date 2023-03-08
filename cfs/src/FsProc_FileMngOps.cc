@@ -296,7 +296,7 @@ void FileMng::UnlinkOp::PrimaryHandleError(FileMng *mng, FsReq *req) {
 void FileMng::UnlinkOp::PrimaryHandleRetry(FileMng *mng, FsReq *req) {
   assert(mng->fsWorker_->isMasterWorker());
   assert(req->getState() == FsReqState::UNLINK_PRIMARY_RETRY);
-  req->getClientOp()->op.unlink.ret = 0;
+  req->getClientOp()->op.unlink.ret = 1;
   req->resetErr();
   mng->fsWorker_->submitFsReqCompletion(req);
 }
@@ -346,12 +346,7 @@ void FileMng::UnlinkOp::PrimaryGetFileInum(FileMng *mng, FsReq *req) {
   uint32_t fileIno =
       mng->fsImpl_->lookupDir(req, dirInode, req->getLeafName(), is_err);
   if (is_err) {
-    if (!req->isRetry) {
-      req->setState(FsReqState::UNLINK_ERR);
-    } else {
-      req->setState(FsReqState::UNLINK_PRIMARY_RETRY);
-    }
-    
+      req->setState(FsReqState::UNLINK_PRIMARY_RETRY);    
     return;
   }
 

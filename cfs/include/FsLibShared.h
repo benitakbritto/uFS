@@ -312,7 +312,6 @@ struct mkdirOp {
   mode_t mode;
   char pathname[MULTI_DIRSIZE];
   uint64_t requestId;
-  bool isRetry;
 };
 
 struct statOp {
@@ -346,7 +345,6 @@ struct wsyncOp {
 struct unlinkOp {
   int ret;
   char path[MULTI_DIRSIZE];
-  bool isRetry;
   uint64_t requestId;
 };
 

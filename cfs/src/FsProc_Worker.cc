@@ -1041,7 +1041,6 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         cop->op.mkdir.ret = getReturnValueForFailedReq(fsReq);
         SPDLOG_DEBUG("mkdir-err set return value to:{}", cop->op.mkdir.ret);
       } else {
-        // TODO
         flushPendingMetadataOpMap[app->getPid()][fsReq->getTargetInode()->i_no].push_back(cop->op.mkdir.requestId);
       }
       cop->opStatus = OP_DONE;

@@ -3007,102 +3007,144 @@ retry:
 
 /* #endregion */
 
-void fs_cp_internal_file() {
+int fs_cp_internal_file(const char *filePathDest, int srcInodeNum = -1, const char *srcPath = nullptr) {
+  // create in dest
+  int destInodeNum = fs_open(filePathDest, O_CREAT, 0644);
+  if (destInodeNum < 0) {
+    return destInodeNum;
+  }
 
+  if (srcInodeNum == -1) {
+    assert(srcPath != nullptr);
+    srcInodeNum = fs_open(srcPath, O_RDONLY, 0);
+    assert(srcInodeNum > 0);
+  }
+
+  // read the contents from src & write to dest
+  int bufferSize = RING_DATA_ITEM_SIZE;
+  char *buf = (char *)malloc(bufferSize); 
+  memset(buf, 0, bufferSize);
+  ssize_t count;
+
+  fs_lseek(srcInodeNum, 0, SEEK_SET);
+  fs_lseek(destInodeNum, 0, SEEK_SET);
+
+  // get size of src file
+  struct stat statbuf;
+  int ret;
+  if ((ret = fs_fstat(srcInodeNum, &statbuf)) != 0) {
+    return ret;
+  }
+
+  auto srcFileSize = statbuf.st_size;
+  bufferSize = srcFileSize > RING_DATA_ITEM_SIZE ? RING_DATA_ITEM_SIZE : srcFileSize;
+  srcFileSize -= bufferSize;
+
+  std::cout << "bufferSize = " << bufferSize << std::endl;
+        
+  while ((count = fs_read(srcInodeNum, buf, bufferSize)) > 0) {
+    std::cout << "count = " << count << std::endl;
+    if ((ret = fs_write(destInodeNum, buf, count)) < 0) {
+      return ret;
+    }
+
+    // update next read size
+    bufferSize = srcFileSize > RING_DATA_ITEM_SIZE ? RING_DATA_ITEM_SIZE : srcFileSize;
+    srcFileSize -= bufferSize;
+  }
+
+  std::cout << "count = " << count << std::endl;
+
+  return 0;
 }
 
-void fs_cp_internal_dir() {
+int fs_cp_internal_dir(const char *srcPath, const char *destPath) {
+  std::cout << __func__ << "(" << srcPath << "," << destPath << ")" << std::endl;
+  
+  int ret;
+  struct stat statbuf;
 
+  // Step 1: Create dest dir
+  {
+    std::cout << "step 1 begin" << std::endl;
+    if ((ret = fs_mkdir(destPath, 0)) < 0)  {
+      return ret;
+    }
+    std::cout << "step 1 end" << std::endl;
+  }
+
+  // Step 2: lsdir on source
+  {
+    std::cout << "step 2 begin" << std::endl;
+    auto dentryPtr = fs_opendir(srcPath);
+    std::cout << "numEntry:" << dentryPtr->dentryNum << std::endl;
+    struct dirent *dp;
+    while ((dp = fs_readdir(dentryPtr)) != NULL) {
+      std::cout << "readdir result -- ino:" << dp->d_ino
+                << " name: " << dp->d_name << std::endl;
+
+      // ignore
+      if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0) {
+        continue;
+      }
+
+      // TODO: Rewrite this section
+      unsigned int destFilePathLen = strlen(destPath) + 1 + strlen(dp->d_name) + 1;      
+      char delim[] = {'/'};
+      char *filePathDest = (char *)malloc(destFilePathLen);
+      memset(filePathDest, 0, destFilePathLen);
+      strcat(filePathDest, destPath);
+      strcat(filePathDest, delim);
+      strcat(filePathDest, dp->d_name);
+      std::cout << "filePathDest = " << filePathDest << std::endl;
+
+      // TODO: Rewrite this section
+      unsigned int srcFilePathLen = strlen(srcPath) + 1 + strlen(dp->d_name) + 1;
+      char *filePathSrc = (char *)malloc(srcFilePathLen);
+      memset(filePathSrc, 0, srcFilePathLen);
+      strcat(filePathSrc, srcPath);
+      strcat(filePathSrc, delim);
+      strcat(filePathSrc, dp->d_name);
+      std::cout << "filePathSrc = " << filePathSrc << std::endl;
+
+      // TODO: rewrite
+      if ((ret = fs_stat(filePathSrc, &statbuf)) != 0) {
+        return ret;
+      }
+
+      switch (statbuf.st_mode & S_IFMT) {
+        case S_IFREG: {
+          fs_cp_internal_file(filePathDest, dp->d_ino);
+        } case S_IFDIR: {
+          return fs_cp(filePathSrc, filePathDest);
+        } default: {
+          return -1; // TODO print
+          break;
+        }
+      }
+    }
+  }
+  return 0;
 }
 
-// TODO
 ssize_t fs_cp(const char *srcPath, const char *destPath) {
   struct stat statbuf;
   int ret;
-  
-  // TODO: Assume for now that srcPath is a dir
-  
+
   // check if srcPath exists
   if ((ret = fs_stat(srcPath, &statbuf)) != 0) {
     return ret;
   }
 
-  std::cout << __func__ << "(" << srcPath << "," << destPath << ")" << std::endl;
-  // Step 1: Create dest dir
-  std::cout << "step 1 begin" << std::endl;
-  
-  if ((ret = fs_mkdir(destPath, 0)) < 0)  {
-    return ret;
+  switch (statbuf.st_mode & S_IFMT) {
+    case S_IFREG: {
+      return fs_cp_internal_file(destPath, -1, srcPath);
+    } case S_IFDIR: {
+      return fs_cp_internal_dir(srcPath, destPath);
+    } default: {
+      return -1;
+    }
   }
-  std::cout << "step 1 end" << std::endl;
-
-  // Step 2: lsdir on source
-  std::cout << "step 2 begin" << std::endl;
-  auto dentryPtr = fs_opendir(srcPath);
-  std::cout << "numEntry:" << dentryPtr->dentryNum << std::endl;
-  struct dirent *dp;
-  while ((dp = fs_readdir(dentryPtr)) != NULL) {
-    std::cout << "readdir result -- ino:" << dp->d_ino
-              << " name: " << dp->d_name << std::endl;
-
-    if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0) {
-      continue;
-    }
-
-    std::cout << __LINE__ << std::endl;
-
-    // TODO: Rewrite this section
-    unsigned int destFilePathLen = strlen(destPath) + 1 + strlen(dp->d_name) + 1;      
-    char delim[] = {'/'};
-    char *filePathDest = (char *)malloc(destFilePathLen);
-    memset(filePathDest, 0, destFilePathLen);
-    strcat(filePathDest, destPath);
-    strcat(filePathDest, delim);
-    strcat(filePathDest, dp->d_name);
-    std::cout << "filePathDest = " << filePathDest << std::endl;
-
-    // TODO: Rewrite this section
-    unsigned int srcFilePathLen = strlen(srcPath) + 1 + strlen(dp->d_name) + 1;
-    char *filePathSrc = (char *)malloc(srcFilePathLen);
-    memset(filePathSrc, 0, srcFilePathLen);
-    strcat(filePathSrc, srcPath);
-    strcat(filePathSrc, delim);
-    strcat(filePathSrc, dp->d_name);
-    std::cout << "filePathSrc = " << filePathSrc << std::endl;
-
-    // TODO: rewrite
-    if ((ret = fs_stat(filePathSrc, &statbuf)) != 0) {
-      return ret;
-    }
-
-    switch (statbuf.st_mode & S_IFMT) {
-      case S_IFREG: {
-        // create in dest
-        int fileDestIno = fs_open(filePathDest, O_CREAT, 0644);
-        if (ret < 0) {
-          return ret;
-        }
-
-        // read the contents from src & write to dest
-        int bufferSize = 100; // TODO decide size
-        char *buf = (char *)malloc(bufferSize); 
-        memset(buf, 0, bufferSize);
-        ssize_t count;
-        while ((count = fs_read(dp->d_ino, buf, sizeof(buf))) != 0) {
-          fs_write(fileDestIno, buf, count); // TODO check ret
-        }
-        std::cout << "step 2 end" << std::endl;
-        break;
-      } case S_IFDIR: {
-        return fs_cp(filePathSrc, filePathDest);
-      } default: {
-        return -1; // TODO print
-        break;
-      }
-    }
-    
-  }
-
   return 0;
 }
 

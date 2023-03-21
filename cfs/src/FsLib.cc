@@ -3128,6 +3128,12 @@ int fs_cp_internal_dir(const char *srcPath, const char *destPath) {
 }
 
 ssize_t fs_cp(const char *srcPath, const char *destPath) {
+  if (srcPath == nullptr 
+    || destPath == nullptr 
+    || strcmp(srcPath, destPath) == 0) {
+      return -1;
+  }
+
   struct stat statbuf;
   int ret;
 

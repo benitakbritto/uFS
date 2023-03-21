@@ -44,7 +44,6 @@ bool interactive = true;
 #define fs_migrate
 #define fs_start_dump_load_stats
 #define fs_stop_dump_load_stats
-#define fs_cp cp
 void clean_exit() { exit(0); };
 int cur_dir_fd = 0;
 #else
@@ -109,8 +108,8 @@ void printHelp() {
                           "\n");
   printf(ANSI_COLOR_GREEN "retry_ops" ANSI_COLOR_RESET
                           "\n"); 
-  printf(ANSI_COLOR_GREEN "cp" ANSI_COLOR_RESET
-                          "\n");                          
+  printf(ANSI_COLOR_GREEN "cp -r" ANSI_COLOR_RESET
+                          " <PATH & FILENAME src> <PATH & FILENAME dest>\n");                          
 }
 
 void printReturnValue(std::string const &cmd, ssize_t v) {
@@ -407,9 +406,9 @@ void process(std::string const &line) {
 #endif
         printReturnValue(tokens[0], ret);
         std::cout << "return: " << std::endl;
-        std::cout << "st_size:" << statbuf.st_size
+         std::cout << "st_size:" << statbuf.st_size
                   << " nblocks:" << statbuf.st_blocks << std::endl;
-      }
+      } 
 
     } else if (tokens[0] == "fstat") {
       if (tokens.size() != 2) {
@@ -650,11 +649,11 @@ void process(std::string const &line) {
         #endif
       }
     } else if (tokens[0] == "cp") {
-      if (tokens.size() != 4) {
-        // TODO
+      if (tokens.size() == 4) {
+        #ifndef TEST_VFS_INSTEAD
         int ret = fs_cp(tokens[2].c_str(), tokens[3].c_str());
-        
         printReturnValue(tokens[0].c_str(), ret);
+        #endif
       } else {
         printHelp();
       }

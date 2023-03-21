@@ -502,6 +502,7 @@ void FileMng::processCreate(FsReq *req) {
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // req->incrNumFsm();
   if (req->getState() == FsReqState::CREATE_GET_PRT_INODE) {
+    std::cout << __func__ << "\t" << __LINE__ << std::endl;
     InMemInode *parInode = req->getDirInode();
     if (parInode != nullptr) {
       // successfully retrieve parent's inode from cache
@@ -525,6 +526,7 @@ void FileMng::processCreate(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::CREATE_ALLOC_INODE) {
+    std::cout << __func__ << "\t" << __LINE__ << std::endl;
     InMemInode *dirInode = req->getDirInode();
     while (!dirInode->tryLock()) {
       // spin
@@ -534,10 +536,12 @@ void FileMng::processCreate(FsReq *req) {
     bool is_err;
     uint32_t fileIno =
         fsImpl_->lookupDir(req, dirInode, req->getLeafName(), is_err);
-    if (is_err) {
+    if (fileIno != 0) {
+      std::cout << __func__ << "\t" << __LINE__ << std::endl;
       req->setFileIno(fileIno);
-      req->setState(FsReqState::RETRY); 
+      req->setState(FsReqState::CREATE_RETRY); 
     } else {
+      std::cout << __func__ << "\t" << __LINE__ << std::endl;
       // FIXME: AllocateInode can perform io and so we return here if that
       // happens. However, can we do more processing for this request that doesn't
       // require i/o while the i/o is being done.
@@ -580,6 +584,7 @@ void FileMng::processCreate(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::CREATE_INODE_ALLOCED_NOT_IN_MEM) {
+    std::cout << __func__ << "\t" << __LINE__ << std::endl;
     SPDLOG_DEBUG("CREATE_INODE_ALLOCED_NOT_IN_MEM inum:{}", req->getFileInum());
     if (req->numTotalPendingIoReq() > 0) {
       submitFsGeneratedRequests(req);
@@ -600,6 +605,7 @@ void FileMng::processCreate(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::CREATE_FILL_DIR) {
+    std::cout << __func__ << "\t" << __LINE__ << std::endl;
     SPDLOG_DEBUG("CREATE_FILL_DIR");
     InMemInode *dirInode = req->getDirInode();
     InMemInode *fileInode = req->getTargetInode();
@@ -630,6 +636,7 @@ void FileMng::processCreate(FsReq *req) {
   // Set this created file's inode and its parent directory's inode to flags
   // If necessary, issue the writing to device
   if (req->getState() == FsReqState::CREATE_UPDATE_INODE) {
+    std::cout << __func__ << "\t" << __LINE__ << std::endl;
     InMemInode *dirInode = req->getDirInode();
     InMemInode *fileInode = req->getTargetInode();
     while ((!dirInode->tryLock()) || (!fileInode->tryLock())) {
@@ -655,6 +662,7 @@ void FileMng::processCreate(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::CREATE_FINI) {
+    std::cout << __func__ << "\t" << __LINE__ << std::endl;
 #ifdef KP_SPECIAL_NUM_CREATE
     req->getApp()->IncrementNumCreate(tid);
 #endif
@@ -668,11 +676,13 @@ void FileMng::processCreate(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::CREATE_ERR) {
+    std::cout << __func__ << "\t" << __LINE__ << std::endl;
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
   
   if (req->getState() == FsReqState::CREATE_RETRY) {
+    std::cout << __func__ << "\t" << __LINE__ << std::endl;
     req->resetErr();
     fsWorker_->submitFsReqCompletion(req);
   }

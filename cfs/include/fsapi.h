@@ -131,6 +131,9 @@ ssize_t fs_write(int fd, const void *buf, size_t count, bool fromRetry = false, 
 // ~=pwrite()
 ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset, bool fromRetry = false, uint64_t retryRequestId = 0);
 
+// ~=cp()
+ssize_t fs_cp(const char *sourcePath, const char *destPath);
+
 ////////////////////////////////////////////////////////////////////////////////
 // Copy reduction APIs
 

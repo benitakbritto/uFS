@@ -374,6 +374,7 @@ enum class FsReqState {
   CREATE_FILL_DIR,
   CREATE_UPDATE_INODE,
   CREATE_FINI,
+  CREATE_RETRY,
   CREATE_ERR,  // end of create
   // open
   OPEN_GET_CACHED_INODE,

@@ -44,6 +44,7 @@ bool interactive = true;
 #define fs_migrate
 #define fs_start_dump_load_stats
 #define fs_stop_dump_load_stats
+#define fs_cp cp
 void clean_exit() { exit(0); };
 int cur_dir_fd = 0;
 #else
@@ -647,6 +648,15 @@ void process(std::string const &line) {
         #ifndef TEST_VFS_INSTEAD
         fs_retry_pending_ops();
         #endif
+      }
+    } else if (tokens[0] == "cp") {
+      if (tokens.size() != 4) {
+        // TODO
+        int ret = fs_cp(tokens[2].c_str(), tokens[3].c_str());
+        
+        printReturnValue(tokens[0].c_str(), ret);
+      } else {
+        printHelp();
       }
     } else {
       printHelp();

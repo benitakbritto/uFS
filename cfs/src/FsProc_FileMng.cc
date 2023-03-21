@@ -530,40 +530,52 @@ void FileMng::processCreate(FsReq *req) {
       // spin
     }
 
-    // FIXME: AllocateInode can perform io and so we return here if that
-    // happens. However, can we do more processing for this request that doesn't
-    // require i/o while the i/o is being done.
-    InMemInode *inode = fsImpl_->AllocateInode(req);
-    if (req->numTotalPendingIoReq() > 0) {
-      dirInode->unLock();
-      submitFsGeneratedRequests(req);
-      return;
+    // Check if file already exists
+    bool is_err;
+    uint32_t fileIno =
+        fsImpl_->lookupDir(req, dirInode, req->getLeafName(), is_err);
+    if (is_err) {
+      req->setFileIno(fileIno);
+      req->setState(FsReqState::RETRY); 
+    } else {
+      // FIXME: AllocateInode can perform io and so we return here if that
+      // happens. However, can we do more processing for this request that doesn't
+      // require i/o while the i/o is being done.
+      InMemInode *inode = fsImpl_->AllocateInode(req);
+      if (req->numTotalPendingIoReq() > 0) {
+        dirInode->unLock();
+        submitFsGeneratedRequests(req);
+        return;
+      }
+
+      if (inode != nullptr) {
+        SPDLOG_DEBUG("AllocateInode() for CREAT return i_no:{} d:i_no:{}",
+                    inode->i_no, inode->inodeData->i_no);
+        req->setFileIno(inode->i_no);
+      } else {
+        // force FSP down since cannot allocate inode
+        throw std::runtime_error("CREATE_ALLOC_INODE cannot allocate inode");
+      }
+      if (req->numTotalPendingIoReq() == 0) {
+        // TODO Currently, the inode table for this inode is populated in memory
+        // and not read from disk. This will cause syncID to be 0 instead of
+        // whatever it is on disk. Read a few free inodes into memory and maintain
+        // a pool so that create is fast and doesn't have to read from disk.
+        // initNewAllocatedDinodeContent(inode->inodeData, T_FILE, inode->i_no);
+        inode->initNewAllocatedDinodeContent(T_FILE);
+        fsWorker_->onTargetInodeFiguredOut(req, inode);
+        gFsProcPtr->CheckNewedInMemInodeDst(fsWorker_->getWid(), inode->i_no,
+                                            req->getApp()->getPid(),
+                                            req->getTid());
+        req->setState(FsReqState::CREATE_FILL_DIR);
+
+      }
+      else {
+        req->setState(FsReqState::CREATE_INODE_ALLOCED_NOT_IN_MEM);
+        // submitFsGeneratedRequests(req);
+      }
     }
 
-    if (inode != nullptr) {
-      SPDLOG_DEBUG("AllocateInode() for CREAT return i_no:{} d:i_no:{}",
-                   inode->i_no, inode->inodeData->i_no);
-      req->setFileIno(inode->i_no);
-    } else {
-      // force FSP down since cannot allocate inode
-      throw std::runtime_error("CREATE_ALLOC_INODE cannot allocate inode");
-    }
-    if (req->numTotalPendingIoReq() == 0) {
-      // TODO Currently, the inode table for this inode is populated in memory
-      // and not read from disk. This will cause syncID to be 0 instead of
-      // whatever it is on disk. Read a few free inodes into memory and maintain
-      // a pool so that create is fast and doesn't have to read from disk.
-      // initNewAllocatedDinodeContent(inode->inodeData, T_FILE, inode->i_no);
-      inode->initNewAllocatedDinodeContent(T_FILE);
-      fsWorker_->onTargetInodeFiguredOut(req, inode);
-      gFsProcPtr->CheckNewedInMemInodeDst(fsWorker_->getWid(), inode->i_no,
-                                          req->getApp()->getPid(),
-                                          req->getTid());
-      req->setState(FsReqState::CREATE_FILL_DIR);
-    } else {
-      req->setState(FsReqState::CREATE_INODE_ALLOCED_NOT_IN_MEM);
-      // submitFsGeneratedRequests(req);
-    }
     dirInode->unLock();
   }
 
@@ -657,6 +669,11 @@ void FileMng::processCreate(FsReq *req) {
 
   if (req->getState() == FsReqState::CREATE_ERR) {
     req->setError();
+    fsWorker_->submitFsReqCompletion(req);
+  }
+  
+  if (req->getState() == FsReqState::CREATE_RETRY) {
+    req->resetErr();
     fsWorker_->submitFsReqCompletion(req);
   }
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;

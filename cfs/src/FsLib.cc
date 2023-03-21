@@ -3007,6 +3007,59 @@ retry:
 
 /* #endregion */
 
+void fs_cp_internal_file() {
+
+}
+
+void fs_cp_internal_dir() {
+
+}
+
+// TODO
+ssize_t fs_cp(const char *sourcePath, const char *destPath) {
+  // TODO: Assume for now that sourcePath is a dir and it exists
+  
+  // Step 1: Create dest dir
+  if ((int ret = fs_mkdir(destPath, 0)) < 0)  {
+    return ret;
+  }
+
+  // Step 2: lsdir on source
+  auto dentryPtr = fs_opendir(sourcePath);
+  std::cout << "numEntry:" << dentryPtr->dentryNum << std::endl;
+  std::cout << "now do readdir()" << std::endl;
+  struct dirent *dp;
+  while ((dp = fs_readdir(dentryPtr)) != NULL) {
+    std::cout << "readdir result -- ino:" << dp->d_ino
+              << " name: " << dp->d_name << std::endl;
+    if (dp->d_type == "file") { // TODO
+      auto filePathDest = destPath + '/' + dp->d_name; // TODO might need to use strcpy
+      auto filePathSrc = sourcePath + '/' + dp->d_name;
+      
+      // create in dest
+      int fileDestIno = fs_open(filePathDest.c_str(), O_CREAT, 0644);
+      if (ret < 0) {
+        return ret;
+      }
+
+      // read the contents from src & write to dest
+      int bufferSize = 100; // TODO decide size
+      char *buf = (char *)malloc(bufferSize); 
+      memset(buf, 0, bufferSize);
+      while ((count = fs_read(dp->d_ino, buffer, sizeof(buffer))) != 0) {
+        fs_write(fileDestIno, buffer, count); // TODO check ret
+      }
+    
+    } 
+    else if (dp->type == "dir") { // TODO
+      auto dirPathDest = destPath + '/' + dp->d_name;
+      auto dirPathSrc = srcPath + '/' + dp->d_name;
+
+      return fs_cp(dirPathSrc, dirPathDest);
+    }
+  }
+}
+
 /* #region lease */
 OpenLeaseMapEntry *LeaseRef(const char *path) {
   assert(false);

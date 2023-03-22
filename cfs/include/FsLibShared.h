@@ -90,6 +90,7 @@ enum CfsOpCode {
   CFS_OP_RENAME = 22,
   CFS_OP_OPENDIR = 23,
   CFS_OP_RMDIR = 24,
+  CFS_OP_CP = 25,
   // NOTE: both fsync and fdatasync will use this op code.
   CFS_OP_FSYNC = 31,
   CFS_OP_SYNCALL = 33,  // we reserve one for fsync
@@ -363,6 +364,13 @@ struct opendirOp {
 struct rmdirOp {
   int ret;
   char pathname[MULTI_DIRSIZE];
+};
+
+struct cpOp {
+  char srcPath[MULTI_DIRSIZE];
+  char destPath[MULTI_DIRSIZE];
+  uint64_t requestId;
+  int ret; 
 };
 
 struct syncallOp {

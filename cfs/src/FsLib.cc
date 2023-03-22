@@ -229,6 +229,28 @@ static void dumpAllocatedOpCommon(allocatedOpCommonPacked *alOp) {
 }
 
 /* #region Notification handling start */
+void inline handleSingleOpNotification(uint64_t reqId) {
+  gServMngPtr->queueMgr->dequePendingMsg(reqId);
+  gServMngPtr->reqRingMap.erase(reqId);
+}
+
+void handleCompositeOpNotification(uint64_t individualId) {
+  // std::cout << "Inside " << __func__ << std::endl;
+  assert(gServMngPtr->childToParentCompositeIdMap.count(individualId) != 0);
+  uint64_t compositeId = gServMngPtr->childToParentCompositeIdMap[individualId];
+
+  gServMngPtr->compositeRequestIdMap[compositeId].second.erase(individualId);
+  gServMngPtr->childToParentCompositeIdMap.erase(individualId);
+
+  if (gServMngPtr->compositeRequestIdMap[compositeId].first == true &&
+    gServMngPtr->compositeRequestIdMap[compositeId].second.size() == 0) {
+      gServMngPtr->compositeRequestIdMap.erase(compositeId);
+      handleSingleOpNotification(compositeId);
+   }
+
+  // std::cout << "Exiting " << __func__ << std::endl;
+}
+
 void FsService::notificationListenerLoop() {
   while(true) {
     uint8_t count = 0;
@@ -251,8 +273,11 @@ void FsService::notificationListenerLoop() {
 }
 
 void FsService::handleServerNotification(int64_t requestId) {
-  gServMngPtr->queueMgr->dequePendingMsg(requestId);
-  gServMngPtr->reqRingMap.erase(requestId);
+  if (gServMngPtr->childToParentCompositeIdMap.count(requestId) != 0) {
+    handleCompositeOpNotification(requestId);
+  } else {
+    handleSingleOpNotification(requestId);
+  }
 }
 
 void FsService::cleanupNotificationListener() {
@@ -1524,6 +1549,9 @@ int fs_dump_pendingops() {
         case CFS_OP_MKDIR:
           std::cout << "mkdir" << std::endl;
           break;
+        case CFS_OP_CP:
+          std::cout << "cp" << std::endl;
+          break;
         default:
           std::cout << type << " unknown" << std::endl;
           break;
@@ -1654,6 +1682,12 @@ int handle_mkdir_retry(uint64_t reqId) {
   return ret;
 }
 
+void handle_cp_retry(uint64_t reqId) {
+  auto op = gServMngPtr->queueMgr->getPendingXreq<struct cpOp>(gServMngPtr->reqRingMap[reqId][0]);
+  auto ret = fs_cp(op->srcPath, op->destPath, true, reqId);
+  std::cout << "Return: " << ret << std::endl;
+}
+
 void fs_retry_pending_ops() {
   if (gServMngPtr->reqRingMap.size() == 0) {
     std::cout << "[INFO] No ops to retry" << std::endl;
@@ -1699,6 +1733,10 @@ void fs_retry_pending_ops() {
           //   itr++;
           // }
           handle_mkdir_retry(reqId);
+          itr++;
+          break;
+        case CFS_OP_CP:
+          handle_cp_retry(reqId);
           itr++;
           break;
         default:
@@ -1884,6 +1922,7 @@ cleanup:
   return ret;
 }
 
+// TODO: Add to pending 
 int fs_stat(const char *pathname, struct stat *statbuf) {
 #ifdef LDB_PRINT_CALL
   print_stat(pathname);
@@ -1946,21 +1985,27 @@ cleanup:
   return ret;
 }
 
+// TODO: Add to pending 
+// TODO: Fix, when widIt not know, go with primary
 int fs_fstat(int fd, struct stat *statbuf) {
 #ifdef LDB_PRINT_CALL
   print_fstat(fd);
 #endif
   auto widIt = gLibSharedContext->fdWidMap.find(fd);
-  if (widIt != gLibSharedContext->fdWidMap.end()) {
-    return fs_fstat_internal(gServMngPtr->multiFsServMap[widIt->second], fd,
-                             statbuf);
+  FsService *fsServ; 
+  if (widIt == gLibSharedContext->fdWidMap.end()) {
+    fsServ = gServMngPtr->primaryServ;
+  } else {
+    fsServ = gServMngPtr->multiFsServMap[widIt->second];
   }
-  return -1;
+    
+  return fs_fstat_internal(fsServ, fd, statbuf);
+  // return -1;
 }
 
 static int fs_open_internal(FsService *fsServ, const char *path, int flags,
                             mode_t mode, uint64_t requestId, bool isOpRetried, 
-                            uint64_t *size = nullptr) {
+                            uint64_t *size = nullptr, bool bypassPending = false) {
   struct shmipc_msg msg;
   struct openOp *oop;
   off_t ring_idx;
@@ -1982,7 +2027,7 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
       return -1;
     }
 
-  if (!isOpRetried && msg.type == CFS_OP_CREATE) {
+  if (!bypassPending && !isOpRetried && msg.type == CFS_OP_CREATE) {
     auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
     gServMngPtr->queueMgr->enqueuePendingXreq<struct openOp>(oop, pendingOpIdx);
     gServMngPtr->reqRingMap[requestId].push_back(pendingOpIdx);
@@ -2035,7 +2080,8 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
 }
 
 // TODO [BENITA] Should set offset correctly
-int fs_open(const char *path, int flags, mode_t mode) {
+int fs_open(const char *path, int flags, mode_t mode, uint64_t *requestIdPtr,
+  bool bypassPending) {
   int delixArr[32];
   int dummy;
 #ifdef CFS_LIB_SAVE_API_TS
@@ -2051,12 +2097,15 @@ int fs_open(const char *path, int flags, mode_t mode) {
   //(void) check_app_thread_mem_buf_ready();
   assert(threadFsTid != 0);
   uint64_t requestId = getNewRequestId();
+  if (requestIdPtr) { 
+    *requestIdPtr = requestId;
+  }
   bool isOpRetried = false;
   // TODO: how to know if new file was created Only for create
 retry:
   int wid = -1;
   auto service = getFsServiceForPath(standardPath, wid);
-  int rc = fs_open_internal(service, standardPath, flags, mode, requestId, isOpRetried);
+  int rc = fs_open_internal(service, standardPath, flags, mode, requestId, isOpRetried, nullptr, bypassPending);
 
   if (rc > 0) {
     gLibSharedContext->fdWidMap[rc] = wid;
@@ -2232,7 +2281,8 @@ int fs_unlink(const char *pathname, bool isRetry, uint64_t retryRequestId) {
   return rt;
 }
 
-int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode, bool isRetry = false, uint64_t reqId = 0) {
+int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode, 
+  bool isRetry = false, uint64_t reqId = 0, bool bypassPending = false) {
   struct shmipc_msg msg;
   struct mkdirOp *mop;
   off_t ring_idx;
@@ -2243,7 +2293,7 @@ int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode, bool
   mop = (struct mkdirOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_mkdirOp(&msg, mop, pathname, mode, isRetry, reqId);
 
-  if (gServMngPtr->reqRingMap.count(reqId) == 0) {
+  if (!bypassPending && gServMngPtr->reqRingMap.count(reqId) == 0) {
     auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
     gServMngPtr->queueMgr->enqueuePendingXreq<struct mkdirOp>(mop, off);
     gServMngPtr->reqRingMap[reqId].push_back(off);
@@ -2266,15 +2316,19 @@ int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode, bool
   return ret;
 }
 
-int fs_mkdir(const char *pathname, mode_t mode, bool isRetry, uint64_t retryReqId) {
+int fs_mkdir(const char *pathname, mode_t mode, bool isRetry, uint64_t retryReqId, 
+  uint64_t *requestIdPtr, bool bypassPending) {
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_MKDIR);
 #endif
   auto reqId = isRetry ? retryReqId : getNewRequestId();
+  if (requestIdPtr) {
+    *requestIdPtr = reqId;
+  }
 #ifdef LDB_PRINT_CALL
   print_mkdir(pathname, mode, reqId);
 #endif
-  int rt = fs_mkdir_internal(gServMngPtr->primaryServ, pathname, mode, isRetry, reqId);
+  int rt = fs_mkdir_internal(gServMngPtr->primaryServ, pathname, mode, isRetry, reqId, bypassPending);
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_MKDIR, tsIdx);
 #endif
@@ -2349,6 +2403,7 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name) {
   return dirp;
 }
 
+// TODO: add to pending
 CFS_DIR *fs_opendir(const char *name) {
 #ifdef LDB_PRINT_CALL
   print_opendir(name);
@@ -2676,7 +2731,7 @@ ssize_t fs_read_internal(FsService *fsServ, int fd, void *buf, size_t count) {
 
 static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
                                  size_t count, off_t offset, uint64_t requestId,
-                                 bool isOpRetried) {
+                                 bool isOpRetried, bool bypassPending) {
   ssize_t rc;
 #ifdef _CFS_LIB_PRINT_REQ_
   pid_t curPid = syscall(__NR_gettid);
@@ -2695,10 +2750,12 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
     if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
       print_server_unavailable(__func__);
-      if (gServMngPtr->reqRingMap.count(requestId) == 0) {
-        auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
-        gServMngPtr->queueMgr->enqueuePendingXreq<struct preadOpPacked>(prop_p, off);
-        gServMngPtr->reqRingMap[requestId].push_back(off);
+      if (!bypassPending) {
+        if (gServMngPtr->reqRingMap.count(requestId) == 0) {
+          auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+          gServMngPtr->queueMgr->enqueuePendingXreq<struct preadOpPacked>(prop_p, off);
+          gServMngPtr->reqRingMap[requestId].push_back(off);
+        }
       }
       shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
       return -1;
@@ -2723,7 +2780,8 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
   return rc;
 }
 
-ssize_t fs_read(int fd, void *buf, size_t count, bool fromRetry, uint64_t retryRequestId) {
+ssize_t fs_read(int fd, void *buf, size_t count, bool fromRetry, 
+  uint64_t retryRequestId, bool bypassPending) {
   int wid = -1;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_READ);
@@ -2739,7 +2797,7 @@ retry:
   auto service = getFsServiceForFD(fd, wid);
   // ssize_t rc = fs_read_internal(service, fd, buf, count);
   auto prevOffset = service->getOffset(fd);
-  ssize_t rc = fs_pread_internal(service, fd, buf, count, prevOffset, requestId, isOpRetried);
+  ssize_t rc = fs_pread_internal(service, fd, buf, count, prevOffset, requestId, isOpRetried, bypassPending);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) {
       isOpRetried = true;
@@ -2759,7 +2817,8 @@ retry:
   return rc;
 }
 
-ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset, bool fromRetry, uint64_t retryRequestId) {
+ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset, bool fromRetry, 
+  uint64_t retryRequestId, bool bypassPending) {
   int wid = -1;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_PREAD);
@@ -2773,7 +2832,7 @@ ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset, bool fromRetry, 
 
 retry:
   auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_pread_internal(service, fd, buf, count, offset, requestId, isOpRetried);
+  ssize_t rc = fs_pread_internal(service, fd, buf, count, offset, requestId, isOpRetried, bypassPending);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) {
       isOpRetried = true;
@@ -2883,7 +2942,7 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
 
 static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
                                   size_t count, off_t offset, uint64_t requestId,
-                                  bool isOpRetried) {
+                                  bool isOpRetried, bool bypassPending) {
   ssize_t total_rc = 0;
   size_t bytes = 0;
   size_t toWrite = count;
@@ -2911,7 +2970,7 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     memcpy(curDataPtr, ((char *)buf + bytes), tmpBytes);
 #endif
 
-    if (!isOpRetried) {
+    if (!bypassPending && !isOpRetried) {
       auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
       gServMngPtr->queueMgr->enqueuePendingXreq<struct pwriteOpPacked>(pwop_p, pendingOpIdx);
       gServMngPtr->queueMgr->enqueuePendingData(curDataPtr, pendingOpIdx, tmpBytes);
@@ -2938,12 +2997,16 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
   return total_rc;
 }
 
-ssize_t fs_write(int fd, const void *buf, size_t count, bool fromRetry, uint64_t retryRequestId) {
+ssize_t fs_write(int fd, const void *buf, size_t count, bool fromRetry, 
+  uint64_t retryRequestId, uint64_t *requestIdPtr, bool bypassPending) {
   if (count == 0) return 0;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_WRITE);
 #endif
   auto requestId = getNewRequestId(); // TODO: from retry should reuse requestId
+  if (requestIdPtr) {
+    *requestIdPtr = requestId;
+  }
 #ifdef LDB_PRINT_CALL
   print_write(fd, buf, count, requestId);
 #endif
@@ -2953,7 +3016,7 @@ retry:
   auto service = getFsServiceForFD(fd, wid);
   auto prevOffset = service->getOffset(fd);
   
-  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, prevOffset, requestId, isOpRetried);
+  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, prevOffset, requestId, isOpRetried, bypassPending);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) {
       isOpRetried = true;
@@ -2974,20 +3037,24 @@ retry:
   return rc;
 }
 
-ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset, bool fromRetry, uint64_t retryRequestId) {
+ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset, bool fromRetry, 
+  uint64_t retryRequestId, uint64_t *requestIdPtr, bool bypassPending) {
   if (count == 0) return 0;
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_PWRITE);
 #endif
   int wid = -1;
   auto requestId = fromRetry ? retryRequestId : getNewRequestId();
+  if (requestIdPtr) {
+    *requestIdPtr = requestId;
+  }
 #ifdef LDB_PRINT_CALL
   print_pwrite(fd, buf, count, offset, requestId);
 #endif
   bool isOpRetried = fromRetry;
 retry:
   auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, offset, requestId, isOpRetried);
+  ssize_t rc = fs_pwrite_internal(service, fd, buf, count, offset, requestId, isOpRetried, bypassPending);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) {
       isOpRetried = true;
@@ -3007,18 +3074,51 @@ retry:
 
 /* #endregion */
 
-int fs_cp_internal_file(const char *filePathDest, int srcInodeNum = -1, const char *srcPath = nullptr) {
+static inline void prepare_cpOp(struct shmipc_msg *msg, struct cpOp *op,
+                                  const char *srcPath,const char *destPath,
+                                  uint64_t requestId = 0) {
+  op->requestId = requestId;
+  msg->type = CFS_OP_CP;
+  EmbedThreadIdToAsOpRet(op->ret);
+  adjustPath(srcPath, &(op->srcPath[0]));
+  adjustPath(destPath, &(op->destPath[0]));
+}
+
+void inline updateCompositeDataStructures(uint64_t compositeId, uint64_t individualId) {
+  // std::cout << "Inside " << __func__ << std::endl;
+  auto reqIdList = gServMngPtr->compositeRequestIdMap[compositeId].second;
+  reqIdList.insert(individualId);
+  gServMngPtr->compositeRequestIdMap[compositeId] = std::make_pair(false, reqIdList);
+
+  gServMngPtr->childToParentCompositeIdMap[individualId] = compositeId;
+  // std::cout << "Exiting " << __func__ << std::endl;
+}
+
+int fs_cp_internal_file(const char *filePathDest, uint64_t compositeRequestId, int srcInodeNum = -1, 
+  const char *srcPath = nullptr, bool fromRetry = false) {
+  // std::cout << "Inside " << __func__ << std::endl;
+  uint64_t *requestIdPtr = (uint64_t*) malloc(sizeof(uint64_t));
+  assert(requestIdPtr != nullptr);
+  
   // create in dest
-  int destInodeNum = fs_open(filePathDest, O_CREAT, 0644);
+  int destInodeNum = fs_open(filePathDest, O_CREAT, 0644, requestIdPtr, true /*bypassPending*/);
+  if (!fromRetry) {
+    updateCompositeDataStructures(compositeRequestId, *requestIdPtr);
+  }
+
   if (destInodeNum < 0) {
+    // std::cout << "Exiting " << __func__ << std::endl;
     return destInodeNum;
   }
 
   if (srcInodeNum == -1) {
+    // std::cout << __func__ << ": getting src inode" << std::endl;
     assert(srcPath != nullptr);
-    srcInodeNum = fs_open(srcPath, O_RDONLY, 0);
+    srcInodeNum = fs_open(srcPath, O_RDONLY, 0, nullptr, true /*bypassPending*/);
     assert(srcInodeNum > 0);
   }
+
+  // std::cout << __func__ << ": source inode = " << srcInodeNum << "\t" << "dest inode = " << destInodeNum << std::endl;
 
   // read the contents from src & write to dest
   int bufferSize = RING_DATA_ITEM_SIZE;
@@ -3026,26 +3126,36 @@ int fs_cp_internal_file(const char *filePathDest, int srcInodeNum = -1, const ch
   memset(buf, 0, bufferSize);
   ssize_t count;
 
-  fs_lseek(srcInodeNum, 0, SEEK_SET);
-  fs_lseek(destInodeNum, 0, SEEK_SET);
-
   // get size of src file
   struct stat statbuf;
   int ret;
   if ((ret = fs_fstat(srcInodeNum, &statbuf)) != 0) {
+    free(requestIdPtr);
+    free(buf);
     return ret;
   }
 
   auto srcFileSize = statbuf.st_size;
+  // std::cout << __func__ << ": srcFileSize = " << srcFileSize << std::endl;
   bufferSize = srcFileSize > RING_DATA_ITEM_SIZE ? RING_DATA_ITEM_SIZE : srcFileSize;
   srcFileSize -= bufferSize;
 
-  std::cout << "bufferSize = " << bufferSize << std::endl;
+  // std::cout << __func__ << ": bufferSize = " << bufferSize << std::endl;
         
-  while ((count = fs_read(srcInodeNum, buf, bufferSize)) > 0) {
-    std::cout << "count = " << count << std::endl;
-    if ((ret = fs_write(destInodeNum, buf, count)) < 0) {
+  fs_lseek(srcInodeNum, 0, SEEK_SET);
+  fs_lseek(destInodeNum, 0, SEEK_SET);
+
+  while ((count = fs_read(srcInodeNum, buf, bufferSize, false, 0, true /*bypassPending*/)) > 0) {
+    // std::cout << __func__ << ": read count = " << count << std::endl;
+    if ((ret = fs_write(destInodeNum, buf, count, false, 0, requestIdPtr, true /*bypassPending*/)) < 0) {
+      // std::cout << __func__ << ": write failed" << std::endl;
+      free(requestIdPtr);
+      free(buf);
       return ret;
+    }
+
+    if (!fromRetry) {
+      updateCompositeDataStructures(compositeRequestId, *requestIdPtr);
     }
 
     // update next read size
@@ -3053,35 +3163,46 @@ int fs_cp_internal_file(const char *filePathDest, int srcInodeNum = -1, const ch
     srcFileSize -= bufferSize;
   }
 
-  std::cout << "count = " << count << std::endl;
+  free(requestIdPtr);
+  free(buf);
 
+  // std::cout << "Exiting " << __func__ << std::endl;
   return 0;
 }
 
-int fs_cp_internal_dir(const char *srcPath, const char *destPath) {
-  std::cout << __func__ << "(" << srcPath << "," << destPath << ")" << std::endl;
-  
+int fs_cp_internal_dir(const char *srcPath, const char *destPath, uint64_t compositeRequestId, 
+  bool fromRetry = false) {
+  // std::cout << __func__ << "(" << srcPath << "," << destPath << ")" << std::endl;
+  uint64_t *requestIdPtr = (uint64_t*) malloc(sizeof(uint64_t));
+  assert(requestIdPtr != nullptr);
+
   int ret;
   struct stat statbuf;
 
   // Step 1: Create dest dir
   {
-    std::cout << "step 1 begin" << std::endl;
-    if ((ret = fs_mkdir(destPath, 0)) < 0)  {
+    if ((ret = fs_mkdir(destPath, 0, false, 0, requestIdPtr, true /*bypassPending*/)) < 0)  {
+      free(requestIdPtr);
       return ret;
     }
-    std::cout << "step 1 end" << std::endl;
+
+    if (!fromRetry) {
+      updateCompositeDataStructures(compositeRequestId, *requestIdPtr);
+    }
   }
 
   // Step 2: lsdir on source
   {
-    std::cout << "step 2 begin" << std::endl;
+    // std::cout << "step 2 begin" << std::endl;
     auto dentryPtr = fs_opendir(srcPath);
-    std::cout << "numEntry:" << dentryPtr->dentryNum << std::endl;
+    if (dentryPtr == nullptr) { // Assuming server unavailable
+      return -1;
+    }
+    // std::cout << "numEntry:" << dentryPtr->dentryNum << std::endl;
     struct dirent *dp;
     while ((dp = fs_readdir(dentryPtr)) != NULL) {
-      std::cout << "readdir result -- ino:" << dp->d_ino
-                << " name: " << dp->d_name << std::endl;
+      // std::cout << "readdir result -- ino:" << dp->d_ino
+                // << " name: " << dp->d_name << std::endl;
 
       // ignore
       if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0) {
@@ -3096,7 +3217,7 @@ int fs_cp_internal_dir(const char *srcPath, const char *destPath) {
       strcat(filePathDest, destPath);
       strcat(filePathDest, delim);
       strcat(filePathDest, dp->d_name);
-      std::cout << "filePathDest = " << filePathDest << std::endl;
+      // std::cout << "filePathDest = " << filePathDest << std::endl;
 
       // TODO: Rewrite this section
       unsigned int srcFilePathLen = strlen(srcPath) + 1 + strlen(dp->d_name) + 1;
@@ -3105,34 +3226,73 @@ int fs_cp_internal_dir(const char *srcPath, const char *destPath) {
       strcat(filePathSrc, srcPath);
       strcat(filePathSrc, delim);
       strcat(filePathSrc, dp->d_name);
-      std::cout << "filePathSrc = " << filePathSrc << std::endl;
+      // std::cout << "filePathSrc = " << filePathSrc << std::endl;
 
       // TODO: rewrite
       if ((ret = fs_stat(filePathSrc, &statbuf)) != 0) {
+        free(requestIdPtr);
         return ret;
       }
 
       switch (statbuf.st_mode & S_IFMT) {
         case S_IFREG: {
-          fs_cp_internal_file(filePathDest, dp->d_ino);
+          ret = fs_cp_internal_file(filePathDest, compositeRequestId,dp->d_ino, nullptr);
+          break;
         } case S_IFDIR: {
-          return fs_cp(filePathSrc, filePathDest);
+          ret = fs_cp_internal_dir(filePathSrc, filePathDest, compositeRequestId);
+          break;
         } default: {
+          free(requestIdPtr);
           return -1; // TODO print
           break;
         }
       }
     }
+
+    // successful completion
+    if (ret == 0) {
+      gServMngPtr->compositeRequestIdMap[compositeRequestId].first = true;
+    }
   }
-  return 0;
+
+  free(requestIdPtr);
+  // std::cout << "Exiting " << __func__ << std::endl;
+  return ret;
 }
 
-ssize_t fs_cp(const char *srcPath, const char *destPath) {
+// TODO: rename funct
+uint64_t fs_cp_internal(const char *srcPath, const char *destPath) {
+  auto requestId = getNewRequestId();
+
+  struct shmipc_msg msg;
+  struct cpOp *cpop;
+  off_t ring_idx;
+  int ret;
+  memset(&msg, 0, sizeof(msg));
+  cpop = (struct cpOp *)malloc(sizeof(struct cpOp));
+  prepare_cpOp(&msg, cpop, srcPath, destPath, requestId);
+
+  auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+  gServMngPtr->queueMgr->enqueuePendingXreq<struct cpOp>(cpop, pendingOpIdx);
+  gServMngPtr->reqRingMap[requestId].push_back(pendingOpIdx);
+
+  return requestId;
+}
+
+// TODO: garbage collect
+ssize_t fs_cp(const char *srcPath, const char *destPath, bool fromRetry, uint64_t retryRequestId) {
   if (srcPath == nullptr 
-    || destPath == nullptr 
-    || strcmp(srcPath, destPath) == 0) {
+      || destPath == nullptr 
+      || strcmp(srcPath, destPath) == 0) {
       return -1;
   }
+  
+  // TODO: create print funct
+  std::cout << "-- fs_cp(" << srcPath << "," << destPath << ") -- " << std::endl;
+
+  // Mark pending
+  auto compositeReqId = fromRetry ? retryRequestId : fs_cp_internal(srcPath, destPath);
+  // std::cout << "compositeReqId: " << compositeReqId << std::endl;
 
   struct stat statbuf;
   int ret;
@@ -3144,14 +3304,22 @@ ssize_t fs_cp(const char *srcPath, const char *destPath) {
 
   switch (statbuf.st_mode & S_IFMT) {
     case S_IFREG: {
-      return fs_cp_internal_file(destPath, -1, srcPath);
+      ret = fs_cp_internal_file(destPath, compositeReqId, -1, srcPath, fromRetry);
+      break;
     } case S_IFDIR: {
-      return fs_cp_internal_dir(srcPath, destPath);
+      ret = fs_cp_internal_dir(srcPath, destPath, compositeReqId, fromRetry);
+      break;
     } default: {
       return -1;
     }
   }
-  return 0;
+
+  // successful completion of cp
+  if (ret >= 0) {
+    gServMngPtr->compositeRequestIdMap[compositeReqId].first = true;
+  }
+
+  return ret;
 }
 
 /* #region lease */
@@ -4376,6 +4544,7 @@ off_t fs_lseek_internal(FsService *fsServ, int fd, long int offset,
   }
 
   ret = op->ret;
+  fsServ->setOffset(fd, ret);
 
 #ifdef _CFS_LIB_PRINT_REQ_
   fprintf(stdout, "fs_lseek(fd:%d) ret:%d\n", fd, ret);

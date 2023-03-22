@@ -102,6 +102,10 @@ class FsService {
     inodeOffsetMap[inode] += offset;
   }
 
+  void setOffset(ino_t inode, off_t offset) {
+    inodeOffsetMap[inode] = offset;
+  }
+  
   off_t getOffset(ino_t inode) {
     return inodeOffsetMap.count(inode) == 0 ? 0 : inodeOffsetMap[inode];
   }
@@ -150,8 +154,11 @@ struct FsLibServiceMng {
   std::unordered_map<int, FsService *> multiFsServMap;
   std::atomic_int multiFsServNum{0};
   FsService *primaryServ{nullptr};
-  std::map<uint64_t, std::vector<off_t>> reqRingMap;  // TODO: must process in sorted order
+  // must process in sorted order of id
+  std::map<uint64_t, std::vector<off_t>> reqRingMap;
   PendingQueueMgr *queueMgr{nullptr};
+  std::unordered_map<uint64_t, std::pair<bool, std::unordered_set<uint64_t>>> compositeRequestIdMap;
+  std::unordered_map<uint64_t, uint64_t> childToParentCompositeIdMap;
 };
 
 // NOTE: enable this flag will record the entry and exit timestamp

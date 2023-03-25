@@ -791,6 +791,8 @@ static inline void prepare_mkdirOp(struct shmipc_msg *msg, struct mkdirOp *op,
   msg->type = CFS_OP_MKDIR;
   op->mode = mode;
   op->requestId = reqId;
+  op->isRetry = isRetry;
+  std::cout << "isRetry = " << op->isRetry << std::endl;
   EmbedThreadIdToAsOpRet(op->ret);
   adjustPath(path, &(op->pathname[0]));
 }

@@ -925,9 +925,15 @@ class FsReq {
   void setReqBgGC(bool b) { isBgGC = b; }
   bool isReqBgGC() { return isBgGC; }
 
+  // used for non-idempotent ops (mkdir)
+  void setRetry(bool isRetry) { this->isRetry = isRetry; }
+  bool isRetryOp() { return this->isRetry; }
+
  private:
   AppProc *app{nullptr};
   off_t appRingSlotId;
+
+  bool isRetry = false;
 
   bool in_use = false;
   int tid = 0;

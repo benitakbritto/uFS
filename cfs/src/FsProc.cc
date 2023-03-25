@@ -767,6 +767,7 @@ void FsReq::initReqFromCop(AppProc *curApp, off_t curSlotId,
                                                      standardFullPathDepth);
       pathTokens = absl::StrSplit(standardFullPath, "/");
       tid = cop->op.mkdir.ret;
+      setRetry(cop->op.mkdir.isRetry);
       break;
     }
     case CFS_OP_STAT: {

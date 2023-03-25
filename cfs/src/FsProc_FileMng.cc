@@ -3373,7 +3373,6 @@ void FileMng::processSyncunlinked(FsReq *req) {
 #endif
 
 void FileMng::processMkdir(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // req->incrNumFsm();
   if (req->getState() == FsReqState::MKDIR_GET_PRT_INODE) {
     bool is_err;
@@ -3391,8 +3390,13 @@ void FileMng::processMkdir(FsReq *req) {
       if (curInode != nullptr) {
         // here we do a trick to check if this dir's name is already
         // existing in target directory by checking the path cache.
-        fsWorker_->onTargetInodeFiguredOut(req, curInode);
-        req->setState(FsReqState::MKDIR_RETRY);
+        if (req->isRetry) {
+          std::cout << "within retry" << std::endl;
+          fsWorker_->onTargetInodeFiguredOut(req, curInode);
+          req->setState(FsReqState::MKDIR_RETRY);
+        } else {
+          req->setState(FsReqState::MKDIR_ERR);
+        }
       } else {
         parInode = req->getDirInode();
         if (parInode != nullptr) {
@@ -3567,7 +3571,6 @@ void FileMng::processMkdir(FsReq *req) {
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processOpendir(FsReq *req) {

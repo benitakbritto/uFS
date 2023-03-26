@@ -63,7 +63,7 @@ int fs_dumpinodes(int wid);
 
 int fs_dump_pendingops();
 int fs_poll_notification();
-void fs_retry_pending_ops();
+int fs_retry_pending_ops(void* buf = nullptr);
 ////////////////////////////////////////////////////////////////////////////////
 // POSIX API
 

@@ -61,7 +61,7 @@ uint64_t inline getNewRequestId() {
 
 // TODO: Add retry module here
 void print_server_unavailable(const char *func_name) {
-  fprintf(stderr, "[WARN] Server is unavailable for function %s. Retry operation later.\n", func_name);
+  fprintf(stderr, "[WARN] Server is unavailable for function %s. Retrying all pending operations.\n", func_name);
 }
 
 void print_admin_inode_reassignment(int type, uint32_t inode, int curOwner,
@@ -381,6 +381,29 @@ int FsService::submitReq(int slotId) {
   return ret;
 }
 /* #endregion */
+
+int get_server_pid() {
+  // std::cout << "Inside " << __func__ << std::endl;
+  // server pid will be placed in master shm
+  auto primaryServer = gServMngPtr->primaryServ;
+  shmipc_msg msg;
+  off_t ringIdx = 0;
+  assert(primaryServer->shmipc_mgr != nullptr);
+  // go over entire ring once
+  do {
+    memset(&msg, 0, sizeof(struct shmipc_msg));
+    auto ret = shmipc_mgr_poll_pid_msg(primaryServer->shmipc_mgr, ringIdx, &msg);
+    if (ret != -1) {                        
+      gServMngPtr->fsServPid = msg.retval;
+      std::cout << "Received pid = " << msg.retval << std::endl;
+      shmipc_mgr_dealloc_slot(primaryServer->shmipc_mgr, ringIdx);     
+      return 0; // success 
+    }
+    ringIdx++;
+  } while (ringIdx < RING_SIZE);
+
+  return -1; // failure 
+}
 
 /* #region PendingQueueMgr start */
 PendingQueueMgr::PendingQueueMgr(key_t shmKey) {
@@ -960,10 +983,11 @@ static int send_noargop(FsService *fsServ, CfsOpCode opcode) {
 
   // send msg
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    ret = fs_retry_pending_ops();
+      
+  }
 
   // extract result
   ret = op->ret;
@@ -1583,37 +1607,47 @@ int fs_dumpinodes(int wid) {
   }
 }
 
+// TODO
 int check_primary_server_availability() {
-  int status = shmipc_STATUS_READY_FOR_SERVER;
-  auto service = gServMngPtr->primaryServ;
-  int threshold = 5; // TODO: configure
+  // int status = shmipc_STATUS_READY_FOR_SERVER;
+  // auto service = gServMngPtr->primaryServ;
+  // int threshold = 5; // TODO: configure
+  // int count = 0;
+  // int ret = -1;
+
+  // while (ret == -1 && count < threshold) {
+  //   std::cout << "[INFO] Attempt at pinging primary: " << count + 1 << std::endl;
+    
+  //   struct shmipc_msg msg;
+  //   struct pingOp *eop;
+  //   off_t ring_idx;
+  //   memset(&msg, 0, sizeof(msg));
+  //   ring_idx = shmipc_mgr_alloc_slot_dbg(service->shmipc_mgr);
+  //   eop = (struct pingOp *)IDX_TO_XREQ(service->shmipc_mgr, ring_idx);
+  //   prepare_pingOp(&msg, eop);
+    
+  //   shmipc_mgr_put_msg_nowait(service->shmipc_mgr, ring_idx, &msg, shmipc_STATUS_READY_FOR_SERVER);
+  //   sleep(2); // TODO: configure
+  //   ret = shmipc_mgr_poll_msg(service->shmipc_mgr, ring_idx, &msg);
+    
+  //   shmipc_mgr_dealloc_slot(service->shmipc_mgr, ring_idx);
+
+  //   count++;
+  // }
+  
+  // return count >= threshold ? -1 : 0;
+
+  // TODO: How many times to try
   int count = 0;
-  int ret = -1;
-
-  while (ret == -1 && count < threshold) {
-    std::cout << "[INFO] Attempt at pinging primary: " << count + 1 << std::endl;
-    
-    struct shmipc_msg msg;
-    struct pingOp *eop;
-    off_t ring_idx;
-    memset(&msg, 0, sizeof(msg));
-    ring_idx = shmipc_mgr_alloc_slot_dbg(service->shmipc_mgr);
-    eop = (struct pingOp *)IDX_TO_XREQ(service->shmipc_mgr, ring_idx);
-    prepare_pingOp(&msg, eop);
-    
-    shmipc_mgr_put_msg_nowait(service->shmipc_mgr, ring_idx, &msg, shmipc_STATUS_READY_FOR_SERVER);
-    sleep(2); // TODO: configure
-    ret = shmipc_mgr_poll_msg(service->shmipc_mgr, ring_idx, &msg);
-    
-    shmipc_mgr_dealloc_slot(service->shmipc_mgr, ring_idx);
-
+  while (get_server_pid() != 0) {
+    // std::cout << "#" << count << ": Trying to establish connection with server" << std::endl;
     count++;
   }
-  
-  return count >= threshold ? -1 : 0;
+
+  return 0;
 }
 
-void handle_pwrite_retry(uint64_t reqId) {
+ssize_t handle_pwrite_retry(uint64_t reqId) {
   int count = 0;
   void *data = nullptr;
   int offset = 0;
@@ -1638,70 +1672,65 @@ void handle_pwrite_retry(uint64_t reqId) {
   }
   
   // retry
-  std::cout << "Return: " << 
-    fs_pwrite(fd, data, count, offset, true /*fromRetry*/, reqId /*retryRequestId*/) 
-    << std::endl;
+  auto ret = fs_pwrite(fd, data, count, offset, true /*fromRetry*/, reqId /*retryRequestId*/);
 
   // cleanup
   if (data != nullptr) {
     free(data);
   }
+
+  return ret;
 }
 
-void handle_create_retry(uint64_t reqId) {
+int handle_create_retry(uint64_t reqId) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct openOp>(gServMngPtr->reqRingMap[reqId][0]);
-  std::cout << "Return: " << fs_open(op->path, op->flags, op->mode) << std::endl;
+  auto ret = fs_open(op->path, op->flags, op->mode);
+  return ret;
 }
 
-bool handle_pread_retry(uint64_t reqId) {
+ssize_t handle_pread_retry(uint64_t reqId, void* buf) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct preadOpPacked>(gServMngPtr->reqRingMap[reqId][0]);
-  void *buf = calloc(op->rwOp.count, sizeof(char));
-  if (fs_pread(op->rwOp.fd, buf, op->rwOp.count, op->offset, true, reqId) > 0) {
-    assert(buf != nullptr);
-    std::cout << "Result: " << (char *) buf << std::endl;
-
+  // void *buf = calloc(op->rwOp.count, sizeof(char));
+  auto ret = fs_pread(op->rwOp.fd, buf, op->rwOp.count, op->offset, true, reqId);
+  if (ret > 0) {
     // clean up
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
-    free(buf);
-    return true;
+    // free(buf);
   }
 
-  return false;
+  return ret;
 }
 
-void handle_unlink_retry(uint64_t reqId) {
+int handle_unlink_retry(uint64_t reqId) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct unlinkOp>(gServMngPtr->reqRingMap[reqId][0]);
-  std::cout << "Return: " << fs_unlink(op->path, true, reqId) << std::endl;
+  int ret = fs_unlink(op->path, true, reqId);
+  return ret;
 }
 
 int handle_mkdir_retry(uint64_t reqId) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct mkdirOp>(gServMngPtr->reqRingMap[reqId][0]);
   auto ret = fs_mkdir(op->pathname, op->mode, true, reqId);
-  // if (ret == 1) {
-  //   gServMngPtr->queueMgr->dequePendingMsg(reqId);
-  // }
-  std::cout << "Return: " << ret << std::endl;
   return ret;
 }
 
+// TODO: Del
 void handle_cp_retry(uint64_t reqId) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct cpOp>(gServMngPtr->reqRingMap[reqId][0]);
   auto ret = fs_cp(op->srcPath, op->destPath, true, reqId);
   std::cout << "Return: " << ret << std::endl;
 }
 
-void fs_retry_pending_ops() {
+int fs_retry_pending_ops(void *buf) {
   if (gServMngPtr->reqRingMap.size() == 0) {
     std::cout << "[INFO] No ops to retry" << std::endl;
-    return;
+    return 0;
   }
  
   std::cout << "[INFO] Checking connection with server" << std::endl;
-
   auto ret = check_primary_server_availability();
   if (ret == -1) {
     print_server_unavailable(__func__);
-    return;
+    return -1;
   } else {
     std::cout << "[INFO] Connection to server successful" << std::endl;
     for (auto itr = gServMngPtr->reqRingMap.begin(); itr != gServMngPtr->reqRingMap.end(); ) {
@@ -1710,35 +1739,27 @@ void fs_retry_pending_ops() {
       auto type = gServMngPtr->queueMgr->getMessageType(gServMngPtr->reqRingMap[reqId][0]);
       switch(type) {
         case CFS_OP_PWRITE:
-          handle_pwrite_retry(reqId);
+          ret = handle_pwrite_retry(reqId);
           itr++;
           break;
         case CFS_OP_CREATE:
-          handle_create_retry(reqId);
+          ret = handle_create_retry(reqId);
           itr++;
           break;
         case CFS_OP_PREAD:
-          if (handle_pread_retry(reqId)) {
+          ret = handle_pread_retry(reqId, buf);
+          if (ret > 0) {
             gServMngPtr->reqRingMap.erase(itr++);
           } else {
             itr++;
           }
           break;
         case CFS_OP_UNLINK:
-          handle_unlink_retry(reqId);
+          ret = handle_unlink_retry(reqId);
           itr++;
           break;
         case CFS_OP_MKDIR:
-          // if (handle_mkdir_retry(reqId) == 1) {
-          //   gServMngPtr->reqRingMap.erase(itr++);
-          // } else {
-          //   itr++;
-          // }
-          handle_mkdir_retry(reqId);
-          itr++;
-          break;
-        case CFS_OP_CP:
-          handle_cp_retry(reqId);
+          ret = handle_mkdir_retry(reqId);
           itr++;
           break;
         default:
@@ -1747,6 +1768,8 @@ void fs_retry_pending_ops() {
           break;
       }
     }
+
+    return ret;
   }
 }
 
@@ -1860,6 +1883,11 @@ int fs_init_multi(int num_key, const key_t *keys) {
             std::make_pair(curWid, new FsService(curWid, key)));
       }
       gServMngPtr->primaryServ = gServMngPtr->multiFsServMap[gPrimaryServWid];
+      if (get_server_pid() != 0) {
+        std::cout << "[ERR] did not receive server pid" << std::endl;
+        gMultiFsServLock.clear(std::memory_order_release);
+        return -1;
+      }
       gServMngPtr->primaryServ->inUse = true;
       // NOTE: 1 key is used for private shm (pending ops)
       gServMngPtr->multiFsServNum = num_key - 1; 
@@ -1905,10 +1933,10 @@ int fs_stat_internal(FsService *fsServ, const char *pathname,
   statOp = (struct statOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_statOp(&msg, statOp, pathname);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    ret = fs_retry_pending_ops();
+  }
 
   ret = statOp->ret;
   if (ret != 0) goto cleanup;
@@ -1973,10 +2001,10 @@ int fs_fstat_internal(FsService *fsServ, int fd, struct stat *statbuf) {
   fstatOp = (struct fstatOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_fstatOp(&msg, fstatOp, fd);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    ret = fs_retry_pending_ops();
+  }
 
   ret = fstatOp->ret;
   if (ret != 0) goto cleanup;
@@ -2024,10 +2052,10 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
   prepare_openOp(&msg, oop, path, flags, mode, size, requestId);
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    ret = fs_retry_pending_ops();
+  }
 
   if (!bypassPending && !isOpRetried && msg.type == CFS_OP_CREATE) {
     auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
@@ -2150,10 +2178,10 @@ int fs_close_internal(FsService *fsServ, int fd) {
   cloOp = (struct closeOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_closeOp(&msg, cloOp, fd);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    ret = fs_retry_pending_ops();
+  }
 
   ret = cloOp->ret;
 
@@ -2230,9 +2258,9 @@ int fs_unlink_internal(FsService *fsServ, const char *pathname, bool isRetry = f
   }
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
-    return -1;
+    ret = fs_retry_pending_ops();
   }
 
   ret = unlkop->ret;
@@ -2301,9 +2329,9 @@ int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode,
     gServMngPtr->reqRingMap[reqId].push_back(off);
   }
 
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg)) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid)) {
     print_server_unavailable(__func__);
-    return -1;
+    ret = fs_retry_pending_ops();
   }
 
   ret = mop->ret;
@@ -2367,10 +2395,10 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name) {
   odop->alOp.dataPtrId = dataPtrId;
 
   // send request
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return nullptr;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    fs_retry_pending_ops(); // TODO: need to set appropriate return type
+  }
 
   // TODO ensure that the operation was successful
   numTotalDentry = odop->numDentry;
@@ -2475,9 +2503,9 @@ int fs_rmdir_internal(FsService *fsServ, const char *pathname) {
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   rmdOp = (struct rmdirOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_rmdirOp(&msg, rmdOp, pathname);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
       print_server_unavailable(__func__);
-      return -1;
+      ret = fs_retry_pending_ops();
     }
 
   ret = rmdOp->ret;
@@ -2512,9 +2540,9 @@ int fs_rename_internal(FsService *fsServ, const char *oldpath,
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   rnmOp = (struct renameOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_renameOp(&msg, rnmOp, oldpath, newpath);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
       print_server_unavailable(__func__);
-      return -1;
+      ret = fs_retry_pending_ops();
     }
 
   ret = rnmOp->ret;
@@ -2554,10 +2582,10 @@ int fs_fsync_internal(FsService *fsServ, int fd, bool isDataSync) {
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   fsyncOp = (struct fsyncOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_fsyncOp(&msg, fsyncOp, fd, isDataSync);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    ret = fs_retry_pending_ops();
+  }
 
   ret = fsyncOp->ret;
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
@@ -2700,9 +2728,9 @@ ssize_t fs_read_internal(FsService *fsServ, int fd, void *buf, size_t count) {
     ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
     rop_p = (struct readOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
     prepare_readOp(&msg, rop_p, fd, count);
-    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
       print_server_unavailable(__func__);
-      return -1;
+      rc = fs_retry_pending_ops();
     }
 
     // NOTE: FIXME This doesn't look right. If MIMIC_APP_ZC is defined, then we
@@ -2750,8 +2778,7 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
     prop_p = (struct preadOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
     prepare_preadOp(&msg, prop_p, fd, count, offset);
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
+    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
       if (!bypassPending) {
         if (gServMngPtr->reqRingMap.count(requestId) == 0) {
           auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
@@ -2759,8 +2786,10 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
           gServMngPtr->reqRingMap[requestId].push_back(off);
         }
       }
+      
+      print_server_unavailable(__func__);
       shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
-      return -1;
+      return fs_retry_pending_ops(buf);
     }
 
 #ifndef MIMIC_APP_ZC
@@ -2881,9 +2910,9 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
 #endif
 
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
       print_server_unavailable(__func__);
-      return -1;
+      rc = fs_retry_pending_ops();
     }
 
     rc = wop_p->rwOp.ret;
@@ -2919,9 +2948,9 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
 #endif
 
       // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-      if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+      if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
       print_server_unavailable(__func__);
-      return -1;
+      rc = fs_retry_pending_ops();
     }
       
 
@@ -2980,10 +3009,11 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     }
     
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
       print_server_unavailable(__func__);
-      return -1;
+      total_rc = fs_retry_pending_ops(); // TODO: not sure
     }
+
     ssize_t rc = pwop_p->rwOp.ret;
     if (rc < 0) {
       shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
@@ -3500,9 +3530,9 @@ static ssize_t fs_allocated_read_internal(FsService *fsServ, int fd, void *buf,
   arop_p->alOp.dataPtrId = dataPtrId;
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    rc = fs_retry_pending_ops();
   }
   unpack_allocatedReadOp(arop_p, &arop);
   rc = arop_p->rwOp.ret;
@@ -3552,10 +3582,10 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
   aprop_p->rwOp.realCount = 0;
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    rc = fs_retry_pending_ops();
+  }
   unpack_allocatedPreadOp(aprop_p, &aprop);
   rc = aprop.rwOp.ret;
 
@@ -3653,10 +3683,10 @@ static ssize_t fs_allocated_write_internal(FsService *fsServ, int fd, void *buf,
   awop_p->alOp.dataPtrId = dataPtrId;
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    rc = fs_retry_pending_ops();
+  }
   unpack_allocatedWriteOp(awop_p, &awop);
   rc = awop.rwOp.ret;
 
@@ -3709,10 +3739,10 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
   apwop_p->alOp.dataPtrId = dataPtrId;
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    rc = fs_retry_pending_ops();  
+  }
   rc = apwop_p->rwOp.ret;
 
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
@@ -4382,10 +4412,10 @@ ssize_t fs_uc_pread_renewonly_internal(FsService *fsServ, int fd,
   prepare_preadOpForUC(&msg, prop_p, fd, 0, 0);
   setLeaseOpRenewOnly(prop_p);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    rc = fs_retry_pending_ops();
+  }
   unpack_preadOp(prop_p, &prop);
   rc = prop.rwOp.ret;
 
@@ -4414,10 +4444,10 @@ ssize_t fs_uc_pread_internal(FsService *fsServ, int fd, void *buf,
   setLeaseOpForReadUC<preadOpPacked>(prop_p);
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    rc = fs_retry_pending_ops();
+  }
 
   unpack_preadOp(prop_p, &prop);
   rc = prop.rwOp.ret;
@@ -4540,9 +4570,9 @@ off_t fs_lseek_internal(FsService *fsServ, int fd, long int offset,
   op = (struct lseekOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_lseekOp(&msg, op, fd, offset, whence, file_offset);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
-    return -1;
+    ret = fs_retry_pending_ops();
   }
 
   ret = op->ret;
@@ -4801,10 +4831,10 @@ static ssize_t fs_allocated_pread_internal_ldb(FsService *fsServ, int fd,
   aprop_p->rwOp.realCount = mem_offset;
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    rc = fs_retry_pending_ops();
+  }
   unpack_allocatedPreadOp(aprop_p, &aprop);
   rc = aprop.rwOp.ret;
 
@@ -4944,10 +4974,10 @@ int fs_wsync_internal(FsService *fsServ, int fd, bool isDataSync, off_t offset) 
   }
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg) == -1) {
-      print_server_unavailable(__func__);
-      return -1;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    ret = fs_retry_pending_ops();
+  }
 
   ret = wsyncOp->ret;
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);

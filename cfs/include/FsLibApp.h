@@ -151,6 +151,7 @@ class PendingQueueMgr {
 };
 
 struct FsLibServiceMng {
+  pid_t fsServPid;
   std::unordered_map<int, FsService *> multiFsServMap;
   std::atomic_int multiFsServNum{0};
   FsService *primaryServ{nullptr};

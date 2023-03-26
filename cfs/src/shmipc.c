@@ -1,6 +1,7 @@
 #include "shmipc/shmipc.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
 
 static_assert(sizeof(struct shmipc_msg) <= 64,
               "struct shmipc_msg must fit cacheline");
@@ -35,12 +37,12 @@ struct shmipc_qp *shmipc_qp_get(const char *name, size_t size, int create) {
   // the fd. That way, only processes that have the fd can access the
   // shared memory.
   old_mask = umask((mode_t)0);
-  // if (create)
-  //   qp->fd = shm_open(name, O_RDWR | O_CREAT, 0666);
-  // else
-  //   qp->fd = shm_open(name, O_RDWR, 0666);
+  if (create)
+    qp->fd = shm_open(name, O_RDWR | O_CREAT, 0666);
+  else
+    qp->fd = shm_open(name, O_RDWR, 0666);
 
-  qp->fd = shm_open(name, O_RDWR | O_CREAT, 0666);
+  // qp->fd = shm_open(name, O_RDWR | O_CREAT, 0666);
 
   tmp_mask = umask(old_mask);  // reset umask
 
@@ -262,30 +264,38 @@ void shmipc_mgr_put_msg(struct shmipc_mgr *mgr, off_t ring_idx,
   memcpy(msg, rmsg, 64);  // 40 cycles
 }
 
+int is_server_up(pid_t pid) {
+  if (kill(pid, 0) != 0 && errno == ESRCH) {
+    return 0;
+  }
+
+  return 1;
+}
+
 // TODO [BENITA] make macros/config
 // If -1 is returned it means that server did not respond
+// TODO: rename function since not exponential backoff
 int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off_t ring_idx,
-                        struct shmipc_msg *msg) {  
-  int sleep_time_init = 2;
-  int retry_count = 5;
+                        struct shmipc_msg *msg, pid_t serverPid) {  
+  int sleepTime = 2;
   int ret = -1;
-  int count = 0;
+  int reqSent = 0;
 
-  while (ret == -1 && count < retry_count) {
-    printf("Attempt at req: %d \n", count + 1);
-
-    sleep(sleep_time_init * (count + 1));
-
-    if (count == 0) {
+  // Tries until server is alive
+  while (is_server_up(serverPid)) {
+    if (reqSent == 0) {
       shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg, shmipc_STATUS_READY_FOR_SERVER);
     }
     
-    ret = shmipc_mgr_poll_msg(mgr, ring_idx, msg);
+    sleep(sleepTime);
 
-    count++;
+    ret = shmipc_mgr_poll_msg(mgr, ring_idx, msg); // TODO: Should use better names
+    if (ret == 0) {
+      return ret;
+    }
+    reqSent = 1;
   }
 
-  printf("Exiting retry loop | ret: %d \n", ret);
   return ret;
 }
 
@@ -300,12 +310,12 @@ void shmipc_mgr_put_msg_nowait(struct shmipc_mgr *mgr, off_t ring_idx,
 }
 
 void shmipc_mgr_put_msg_server_nowait(struct shmipc_mgr *mgr, off_t ring_idx,
-                               struct shmipc_msg *msg) {
+                               struct shmipc_msg *msg, uint8_t status) {
   struct shmipc_msg *rmsg;
 
   rmsg = IDX_TO_MSG(mgr, ring_idx);
   memcpy(rmsg, msg, 64);
-  SHMIPC_SET_MSG_STATUS(rmsg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
+  SHMIPC_SET_MSG_STATUS(rmsg, status);
 }
 
 
@@ -327,6 +337,17 @@ int shmipc_mgr_poll_notify_msg(struct shmipc_mgr *mgr, off_t idx,
 
   rmsg = IDX_TO_MSG(mgr, idx);
   if (rmsg->status != shmipc_STATUS_NOTIFY_FOR_CLIENT) return -1;
+
+  memcpy(msg, rmsg, 64);
+  return 0;          
+}
+
+int shmipc_mgr_poll_pid_msg(struct shmipc_mgr *mgr, off_t idx,
+                        struct shmipc_msg *msg) {
+  struct shmipc_msg *rmsg;
+
+  rmsg = IDX_TO_MSG(mgr, idx);
+  if (rmsg->status != shmipc_STATUS_SERVER_PID_FOR_CLIENT) return -1;
 
   memcpy(msg, rmsg, 64);
   return 0;          

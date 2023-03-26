@@ -765,6 +765,8 @@ class FsProcWorker {
   void blockingFlushBufferInternal();
   // =======
 
+  void providerPidToApp(pid_t appPid);
+
  protected:
   FsProc::fsproc_wid_t wid;
   int shmBaseOffset;

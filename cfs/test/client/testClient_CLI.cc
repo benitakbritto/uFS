@@ -439,7 +439,12 @@ void process(std::string const &line) {
       } else {
 #ifndef TEST_VFS_INSTEAD
         auto dentryPtr = fs_opendir(tokens[1].c_str());
-        std::cout << "numEntry:" << dentryPtr->dentryNum << std::endl;
+        if (dentryPtr != nullptr) {
+          std::cout << "numEntry:" << dentryPtr->dentryNum << std::endl;
+        } else {
+          std::cout << "dentryPtr is NULL" << std::endl;
+        }
+        
 #else
         // A conceptual drop in replacement for opendirat
         int dirfd = openat(cur_dir_fd, tokens[1].c_str(),
@@ -450,11 +455,13 @@ void process(std::string const &line) {
           return;
         }
 #endif
-        std::cout << "now do readdir()" << std::endl;
-        struct dirent *dp;
-        while ((dp = fs_readdir(dentryPtr)) != NULL) {
-          std::cout << "readdir result -- ino:" << dp->d_ino
-                    << " name: " << dp->d_name << std::endl;
+        if (dentryPtr != nullptr) {
+          std::cout << "now do readdir()" << std::endl;
+          struct dirent *dp;
+          while ((dp = fs_readdir(dentryPtr)) != NULL) {
+            std::cout << "readdir result -- ino:" << dp->d_ino
+                      << " name: " << dp->d_name << std::endl;
+          }
         }
 #ifdef TEST_VFS_INSTEAD
         closedir(dentryPtr);

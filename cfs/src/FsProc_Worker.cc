@@ -20,6 +20,21 @@
 
 extern FsProc *gFsProcPtr;
 
+void FsProcWorker::providerPidToApp(pid_t appPid) {
+  std::cout << "Inside " << __func__ << std::endl;
+  auto myPid = getpid();
+  auto shmipc_mgr = appMap[appPid]->shmipc_mgr;
+  
+  std::cout << "app pid = " << appPid << std::endl;
+  struct shmipc_msg msg;
+  off_t ring_idx;
+  memset(&msg, 0, sizeof(msg));
+  ring_idx = shmipc_mgr_alloc_slot(shmipc_mgr);
+  msg.retval = myPid;
+  shmipc_mgr_put_msg_server_nowait(shmipc_mgr, ring_idx, &msg, 
+    shmipc_STATUS_SERVER_PID_FOR_CLIENT);
+}
+
 // NOTE: must start acceptHandler after all the initialization finished
 // read the superblock into the beginning of devBufMemPtr
 FsProcWorker::FsProcWorker(int wid, CurBlkDev *d, int shmBaseOffset,
@@ -40,6 +55,7 @@ FsProcWorker::FsProcWorker(int wid, CurBlkDev *d, int shmBaseOffset,
   // TODO (jingliu): init acceptHandler here
   // Ideally, we want to have another thread that listens on some socket
   // to init the FSP access, which is "handling fs_register()"
+  std::cout << "FsProcWorker pid = " << getpid() << std::endl;
   SPDLOG_INFO("FsProc init");
   if (d == nullptr) {
     SPDLOG_WARN("start worker without valid device. FOR TEST USAGE ONLY");
@@ -53,6 +69,9 @@ FsProcWorker::FsProcWorker(int wid, CurBlkDev *d, int shmBaseOffset,
   }
 
   fsReqPool_ = new FsReqPool(wid);
+
+  // TODO: provide client with server id
+
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
@@ -374,6 +393,10 @@ int FsProcWorker::initNewApp(struct AppCredential &cred) {
   }
   app->updateFdIncrByWid(getWid());
   appMap.emplace(app->getPid(), app);
+
+  if (isMasterWorker()) {
+    providerPidToApp(app->getPid());
+  }
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
@@ -2645,7 +2668,7 @@ void FsProcWorker::notifyAllWriteOps() {
         ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
         msg.retval = reqId;
         
-        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
+        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
       }
     }
   } 
@@ -2667,7 +2690,7 @@ void FsProcWorker::notifyAllMetadataOps() {
         memset(&msg, 0, sizeof(msg));
         ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
         msg.retval = reqId;
-        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
+        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
       }
     }
   } 
@@ -2689,7 +2712,7 @@ void FsProcWorker::notifyFileWriteOps(cfs_ino_t inodeNum) {
         memset(&msg, 0, sizeof(msg));
         ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
         msg.retval = reqId;
-        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
+        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
       }
     } else {
       return;
@@ -2713,7 +2736,7 @@ void FsProcWorker::notifyFileMetadataOps(cfs_ino_t inodeNum) {
         memset(&msg, 0, sizeof(msg));
         ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
         msg.retval = reqId;
-        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg);
+        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
       }
     } else {
       return;
@@ -2730,6 +2753,7 @@ FsProcWorkerMaster::FsProcWorkerMaster(int w, CurBlkDev *d, int shmBaseOffset,
                                        std::atomic_bool *workerRunning,
                                        PerWorkerLoadStatsSR *stats)
     : FsProcWorker(w, d, shmBaseOffset, workerRunning, stats) {
+
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_INFO("policy NUMBER:{}", gFsProcPtr->getSplitPolicy());
   switch (gFsProcPtr->getSplitPolicy()) {

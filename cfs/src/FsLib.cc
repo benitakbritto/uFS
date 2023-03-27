@@ -1720,7 +1720,9 @@ void handle_cp_retry(uint64_t reqId) {
   std::cout << "Return: " << ret << std::endl;
 }
 
-int fs_retry_pending_ops(void *buf) {
+// TODO: support fs_stat, fs_fstat, fs_open, fs_close, fs_opendir, fs_rmdir
+// fs_rename, fs_fsync, fs_fdatasync
+int fs_retry_pending_ops(void *buf, struct stat *statbuf) {
   if (gServMngPtr->reqRingMap.size() == 0) {
     std::cout << "[INFO] No ops to retry" << std::endl;
     return 0;
@@ -1865,7 +1867,7 @@ int fs_register(void) {
   return -1;
 }
 
-// TODO: add pendingqueue
+// The last key will be used for the pending queue
 // each key will represent one FSP thread (instance/worker)
 int fs_init_multi(int num_key, const key_t *keys) {
   print_app_zc_mimic();
@@ -1935,10 +1937,12 @@ int fs_stat_internal(FsService *fsServ, const char *pathname,
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
-    ret = fs_retry_pending_ops();
+    ret = fs_retry_pending_ops(nullptr, statbuf);
+    goto end;
   }
 
   ret = statOp->ret;
+end:
   if (ret != 0) goto cleanup;
 
   // copy the stats
@@ -2003,10 +2007,12 @@ int fs_fstat_internal(FsService *fsServ, int fd, struct stat *statbuf) {
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
-    ret = fs_retry_pending_ops();
+    ret = fs_retry_pending_ops(nullptr, statbuf);
+    goto end;
   }
 
   ret = fstatOp->ret;
+end:
   if (ret != 0) goto cleanup;
 
   memcpy(statbuf, &(fstatOp->statbuf), sizeof(struct stat));
@@ -2055,16 +2061,19 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     ret = fs_retry_pending_ops();
+    goto end;
   }
 
+  // TODO make sure this doesn't get optimized out?
+  ret = oop->ret;
+
+end:
   if (!bypassPending && !isOpRetried && msg.type == CFS_OP_CREATE) {
     auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
     gServMngPtr->queueMgr->enqueuePendingXreq<struct openOp>(oop, pendingOpIdx);
     gServMngPtr->reqRingMap[requestId].push_back(pendingOpIdx);
   }
 
-  // TODO make sure this doesn't get optimized out?
-  ret = oop->ret;
   if (size) *size = oop->size;
 
 #ifndef CFS_LIB_LDB
@@ -2110,6 +2119,7 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
 }
 
 // TODO [BENITA] Should set offset correctly
+// TODO: Add non-create to pending
 int fs_open(const char *path, int flags, mode_t mode, uint64_t *requestIdPtr,
   bool bypassPending) {
   int delixArr[32];
@@ -2181,10 +2191,12 @@ int fs_close_internal(FsService *fsServ, int fd) {
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     ret = fs_retry_pending_ops();
+    goto end;
   }
 
   ret = cloOp->ret;
 
+end:
 #ifdef _CFS_LIB_PRINT_REQ_
   fprintf(stdout, "fs_close(fd:%d) ret:%d\n", fd, ret);
 #endif
@@ -2214,6 +2226,7 @@ int fs_close_internal(FsService *fsServ, int fd) {
 }
 
 // TODO [BENITA] Should del inode<->offset mapping
+// TODO: Add to pending
 int fs_close(int fd) {
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_CLOSE);
@@ -2261,10 +2274,12 @@ int fs_unlink_internal(FsService *fsServ, const char *pathname, bool isRetry = f
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     ret = fs_retry_pending_ops();
+    goto end;
   }
 
   ret = unlkop->ret;
 
+end:
   // cleanup
   if (ret != 0) {
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
@@ -2332,9 +2347,11 @@ int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode,
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid)) {
     print_server_unavailable(__func__);
     ret = fs_retry_pending_ops();
+    goto end;
   }
 
   ret = mop->ret;
+end:
   if (ret < 0) {
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
     gServMngPtr->reqRingMap.erase(reqId);
@@ -2365,6 +2382,7 @@ int fs_mkdir(const char *pathname, mode_t mode, bool isRetry, uint64_t retryReqI
   return rt;
 }
 
+// TODO: Not sure how to handle the retried result
 CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name) {
   struct shmipc_msg msg;
   struct opendirOp *odop;
@@ -2506,13 +2524,16 @@ int fs_rmdir_internal(FsService *fsServ, const char *pathname) {
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
       print_server_unavailable(__func__);
       ret = fs_retry_pending_ops();
+      goto end;
     }
 
   ret = rmdOp->ret;
+end:
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
   return ret;
 }
 
+// TODO: Add pending
 int fs_rmdir(const char *pathname) {
   // return fs_rmdir_internal(gServMngPtr->primaryServ, pathname);
   // TODO (jingliu): implement a real rmdir here.
@@ -2541,11 +2562,13 @@ int fs_rename_internal(FsService *fsServ, const char *oldpath,
   rnmOp = (struct renameOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_renameOp(&msg, rnmOp, oldpath, newpath);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
-      print_server_unavailable(__func__);
-      ret = fs_retry_pending_ops();
-    }
+    print_server_unavailable(__func__);
+    ret = fs_retry_pending_ops();
+    goto end;
+  }
 
   ret = rnmOp->ret;
+end:
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
 #ifdef _CFS_LIB_PRINT_REQ_
   fprintf(stdout, "fs_rename(from:%s, to:%s) return %d\n", oldpath, newpath,
@@ -2554,6 +2577,7 @@ int fs_rename_internal(FsService *fsServ, const char *oldpath,
   return ret;
 }
 
+// TODO: Add to pending
 int fs_rename(const char *oldpath, const char *newpath) {
 #ifdef LDB_PRINT_CALL
   print_rename(oldpath, newpath);
@@ -2585,13 +2609,16 @@ int fs_fsync_internal(FsService *fsServ, int fd, bool isDataSync) {
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     ret = fs_retry_pending_ops();
+    goto end;
   }
 
   ret = fsyncOp->ret;
+end:
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
   return ret;
 }
 
+// TODO: Add pending
 int fs_fsync(int fd) {
 #ifdef LDB_PRINT_CALL
   print_fsync(fd);
@@ -2618,6 +2645,7 @@ retry:
   return rc;
 }
 
+// TODO: Add pending
 int fs_fdatasync(int fd) {
 #ifdef LDB_PRINT_CALL
   print_fsync(fd);
@@ -2730,33 +2758,34 @@ ssize_t fs_read_internal(FsService *fsServ, int fd, void *buf, size_t count) {
     prepare_readOp(&msg, rop_p, fd, count);
     if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
       print_server_unavailable(__func__);
-      rc = fs_retry_pending_ops();
+      rc = fs_retry_pending_ops(buf);
+      goto end;
     }
 
+    rc = rop_p->rwOp.ret;
+  end:
     // NOTE: FIXME This doesn't look right. If MIMIC_APP_ZC is defined, then we
     // don't copy into buf? That would mean that it is still in the ring
     // data region but can be overwritten by anyone after we dealloc the
     // slot.
-#ifndef MIMIC_APP_ZC
-    void *curDataPtr = (void *)IDX_TO_DATA(fsServ->shmipc_mgr, ring_idx);
-#endif
-
-    rc = rop_p->rwOp.ret;
+    #ifndef MIMIC_APP_ZC
+        void *curDataPtr = (void *)IDX_TO_DATA(fsServ->shmipc_mgr, ring_idx);
+    #endif
     // copy the data back to user
-#ifndef MIMIC_APP_ZC
-    if (rc > 0) {
-      memcpy(buf, curDataPtr, count);
-    }
+    #ifndef MIMIC_APP_ZC
+        if (rc > 0) {
+          memcpy(buf, curDataPtr, count);
+        }
 
-    shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
-#endif
-  } else {
-    rc = -1;
-  }
-#ifdef _CFS_LIB_PRINT_REQ_
-  fprintf(stdout, "fs_read(fd:%d count:%lu) ret:%ld\n", fd, count, rc);
-#endif
-  return rc;
+        shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
+    #endif
+    } else {
+      rc = -1;
+    }
+    #ifdef _CFS_LIB_PRINT_REQ_
+      fprintf(stdout, "fs_read(fd:%d count:%lu) ret:%ld\n", fd, count, rc);
+    #endif
+    return rc;
 }
 
 static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
@@ -2789,14 +2818,15 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
       
       print_server_unavailable(__func__);
       shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
-      return fs_retry_pending_ops(buf);
+      rc = fs_retry_pending_ops(buf);
+      goto end;
     }
 
+    rc = prop_p->rwOp.ret;
+end:
 #ifndef MIMIC_APP_ZC
     void *curDataPtr = (void *)IDX_TO_DATA(fsServ->shmipc_mgr, ring_idx);
 #endif
-
-    rc = prop_p->rwOp.ret;
     // copy the data back to user
 #ifndef MIMIC_APP_ZC
     if (rc > 0) {
@@ -3011,7 +3041,8 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
     if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
       print_server_unavailable(__func__);
-      total_rc = fs_retry_pending_ops(); // TODO: not sure
+      shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
+      return fs_retry_pending_ops(); 
     }
 
     ssize_t rc = pwop_p->rwOp.ret;

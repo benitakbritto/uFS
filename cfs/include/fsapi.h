@@ -6,7 +6,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <unordered_map>
 
 #include "fs_defs.h"
 
@@ -63,7 +62,7 @@ int fs_dumpinodes(int wid);
 
 int fs_dump_pendingops();
 int fs_poll_notification();
-int fs_retry_pending_ops(void* buf = nullptr);
+int fs_retry_pending_ops(void* buf = nullptr, struct stat *statbuf = nullptr);
 ////////////////////////////////////////////////////////////////////////////////
 // POSIX API
 

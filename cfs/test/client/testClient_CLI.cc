@@ -104,12 +104,11 @@ void printHelp() {
                           " <src_wid> <dst_wid>\n");
   printf(ANSI_COLOR_GREEN "view_pending_ops" ANSI_COLOR_RESET
                           "\n");
-  printf(ANSI_COLOR_GREEN "poll_notification" ANSI_COLOR_RESET
-                          "\n");
-  printf(ANSI_COLOR_GREEN "retry_ops" ANSI_COLOR_RESET
-                          "\n"); 
-  printf(ANSI_COLOR_GREEN "cp -r" ANSI_COLOR_RESET
-                          " <PATH & FILENAME src> <PATH & FILENAME dest>\n");                          
+
+  // printf(ANSI_COLOR_GREEN "retry_ops" ANSI_COLOR_RESET
+  //                         "\n"); 
+  // printf(ANSI_COLOR_GREEN "cp -r" ANSI_COLOR_RESET
+  //                         " <PATH & FILENAME src> <PATH & FILENAME dest>\n");                          
 }
 
 void printReturnValue(std::string const &cmd, ssize_t v) {
@@ -638,32 +637,23 @@ void process(std::string const &line) {
         printReturnValue(tokens[0], ret);
         #endif
       }
-    } else if (tokens[0] == "poll_notification") {
-      if (tokens.size() != 1) {
-        printHelp();
-      } else {
-        #ifndef TEST_VFS_INSTEAD
-        int ret = fs_poll_notification();
-        printReturnValue(tokens[0], ret);
-        #endif
-      }
-    } else if (tokens[0] == "retry_ops") {
-      if (tokens.size() != 1) {
-        printHelp();
-      } else {
-        #ifndef TEST_VFS_INSTEAD
-        fs_retry_pending_ops();
-        #endif
-      }
-    } else if (tokens[0] == "cp") {
-      if (tokens.size() == 4) {
-        #ifndef TEST_VFS_INSTEAD
-        int ret = fs_cp(tokens[2].c_str(), tokens[3].c_str());
-        printReturnValue(tokens[0].c_str(), ret);
-        #endif
-      } else {
-        printHelp();
-      }
+    // } else if (tokens[0] == "retry_ops") {
+    //   if (tokens.size() != 1) {
+    //     printHelp();
+    //   } else {
+    //     #ifndef TEST_VFS_INSTEAD
+    //     fs_retry_pending_ops();
+    //     #endif
+    //   }
+    // } else if (tokens[0] == "cp") {
+    //   if (tokens.size() == 4) {
+    //     #ifndef TEST_VFS_INSTEAD
+    //     int ret = fs_cp(tokens[2].c_str(), tokens[3].c_str());
+    //     printReturnValue(tokens[0].c_str(), ret);
+    //     #endif
+    //   } else {
+      //   printHelp();
+      // }
     } else {
       printHelp();
     }

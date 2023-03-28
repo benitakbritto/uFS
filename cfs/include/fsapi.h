@@ -62,7 +62,7 @@ int fs_dumpinodes(int wid);
 
 int fs_dump_pendingops();
 int fs_poll_notification();
-int fs_retry_pending_ops(void* buf = nullptr, struct stat *statbuf = nullptr);
+// int fs_retry_pending_ops(void* buf = nullptr, struct stat *statbuf = nullptr, CFS_DIR* dir = nullptr);
 ////////////////////////////////////////////////////////////////////////////////
 // POSIX API
 
@@ -78,7 +78,7 @@ int fs_stat(const char *pathname, struct stat *statbuf);
 // ~= fstat()
 int fs_fstat(int fd, struct stat *statbuf);
 // ~= open()
-int fs_open(const char *path, int flags, mode_t mode, uint64_t *requestIdPtr = 0, bool bypassPending = false);
+int fs_open(const char *path, int flags, mode_t mode);
 int fs_open2(const char *path, int flags);
 // ~= close()
 int fs_close(int fd);
@@ -87,9 +87,9 @@ int fs_open_lease(const char *path, int flags, mode_t mode);
 int fs_close_lease(int fd);
 
 // ~= unlink()
-int fs_unlink(const char *pathname, bool isRetry = false, uint64_t retryRequestId = 0);
+int fs_unlink(const char *pathname);
 // ~= mkdir()
-int fs_mkdir(const char *pathname, mode_t mode, bool isRetry = false, uint64_t retryRequestId = 0, uint64_t *requestIdPtr = 0, bool bypassPending = false);
+int fs_mkdir(const char *pathname, mode_t mode);
 // ~= opendir()
 struct CFS_DIR *fs_opendir(const char *name);
 // ~= readdir()
@@ -122,16 +122,13 @@ off_t fs_lseek(int fd, long int offset, int whence);
 
 // data plane operations
 // ~= read()
-ssize_t fs_read(int fd, void *buf, size_t count, bool fromRetry = false, uint64_t retryRequestId = 0, bool bypassPending = false);
+ssize_t fs_read(int fd, void *buf, size_t count);
 // ~= pread()
-ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset, bool fromRetry = false, uint64_t retryRequestId = 0, bool bypassPending = false);
+ssize_t fs_pread(int fd, void *buf, size_t count, off_t offset);
 // ~=write()
-ssize_t fs_write(int fd, const void *buf, size_t count, bool fromRetry = false, uint64_t retryRequestId = 0, uint64_t *requestIdPtr = 0, bool bypassPending = false);
+ssize_t fs_write(int fd, const void *buf, size_t count);
 // ~=pwrite()
-ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset, bool fromRetry = false, uint64_t retryRequestId = 0, uint64_t *requestIdPtr = 0, bool bypassPending = false);
-
-// ~=cp()
-ssize_t fs_cp(const char *sourcePath, const char *destPath, bool fromRetry = false, uint64_t retryRequestId = 0);
+ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Copy reduction APIs

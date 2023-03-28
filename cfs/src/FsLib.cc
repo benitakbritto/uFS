@@ -1667,6 +1667,8 @@ int handle_create_retry(uint64_t reqId) {
 ssize_t handle_pread_retry(uint64_t reqId, void* buf) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct preadOpPacked>(gServMngPtr->reqRingMap[reqId][0]);
   auto ret = fs_pread_retry(op->rwOp.fd, buf, op->rwOp.count, op->offset, reqId);
+  char *readRes = (char *) buf;
+  std::cout << "handle_pread_retry: buf = " << readRes << std::endl;
   if (ret > 0) {
     // clean up
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
@@ -3050,12 +3052,11 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
       
       print_server_unavailable(__func__);
       shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
-      rc = fs_retry_pending_ops(buf);
-      goto end;
+      return fs_retry_pending_ops(buf);
     }
 
     rc = prop_p->rwOp.ret;
-end:
+
 #ifndef MIMIC_APP_ZC
     void *curDataPtr = (void *)IDX_TO_DATA(fsServ->shmipc_mgr, ring_idx);
 #endif
@@ -3064,7 +3065,9 @@ end:
     if (rc > 0) {
       memcpy(buf, curDataPtr, count);
     }
+    std::cout << "pread internal: buf = " << ((char *) buf) << std::endl;
 #endif
+  
     shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
   } else {
     // For now, this only support < RING_DATA_ITEM_SIZE
@@ -3097,6 +3100,7 @@ retry:
       goto retry;
     }
   } else {
+    std::cout << "pread common: buf = " << ((char *) buf) << std::endl;
     service->updateOffset(fd, prevOffset + rc);
   }
 #ifdef CFS_LIB_SAVE_API_TS

@@ -72,7 +72,6 @@ int64_t FileMng::checkAndFlushBufferDirtyItems() {
 }
 
 int FileMng::processReq(FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::OP_OWNERSHIP_UNKNOWN) {
     req->setError(FS_REQ_ERROR_INODE_IN_TRANSFER);
     fsWorker_->submitFsReqCompletion(req);

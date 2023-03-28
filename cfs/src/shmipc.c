@@ -214,6 +214,7 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   off_t ring_idx;
 
   ring_idx = __sync_fetch_and_add(&(mgr->next), 1);
+  printf("ring_idx = %d\n", ring_idx);
   ring_idx = ring_idx & mgr->mask;
   rmsg = IDX_TO_MSG(mgr, ring_idx);
 
@@ -233,6 +234,10 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   // These are purely conflicts that should be resolved at client side.
   rmsg->status = shmipc_STATUS_RESERVED;
   return ring_idx;
+}
+
+void shmipc_increment_ring_index(struct shmipc_mgr *mgr) {
+  __sync_fetch_and_add(&(mgr->next), 1);
 }
 
 void shmipc_mgr_dealloc_slot(struct shmipc_mgr *mgr, off_t ring_idx) {

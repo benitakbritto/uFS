@@ -411,7 +411,8 @@ int get_server_pid() {
     if (ret != -1) {                        
       gServMngPtr->fsServPid = msg.retval;
       std::cout << "Received pid = " << msg.retval << std::endl;
-      shmipc_mgr_dealloc_slot(primaryServer->shmipc_mgr, ringIdx);     
+      // shmipc_mgr_dealloc_slot(primaryServer->shmipc_mgr, ringIdx); 
+      shmipc_increment_ring_index(primaryServer->shmipc_mgr);  
       return 0; // success 
     }
     ringIdx++;
@@ -1312,7 +1313,8 @@ int fs_exit() {
       fprintf(stderr, "fs_exit: failed for wid %d\n", wid);
       return ret;
     }
-    shmipc_mgr_client_reset(service->shmipc_mgr);
+    // Commenting this out so the syscall_intercept has pid across cmd invocations
+    //shmipc_mgr_client_reset(service->shmipc_mgr);
   }
 #ifdef CFS_LIB_SAVE_API_TS
   gLibSharedContext->apiTsMng_.reportAllTs();
@@ -2588,7 +2590,9 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name, uint64_t reque
   }
 
   memset(&msg, 0, sizeof(msg));
+  std::cout << "opendir calling shmipc_mgr_alloc_slot_dbg" << std::endl;
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
+  std::cout << "opendir ring_idx = " << ring_idx << std::endl;
   odop = (struct opendirOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_opendirOp(&msg, odop, name);
   odop->alOp.shmid = shmid;

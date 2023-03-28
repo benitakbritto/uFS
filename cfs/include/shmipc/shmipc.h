@@ -159,6 +159,8 @@ int shmipc_mgr_poll_pid_msg(struct shmipc_mgr *mgr, off_t idx,
 void shmipc_mgr_wait_msg(struct shmipc_mgr *mgr, off_t idx,
                          struct shmipc_msg *msg);
 
+void shmipc_increment_ring_index(struct shmipc_mgr *mgr);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

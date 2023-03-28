@@ -457,8 +457,6 @@ AppProc::AppProc(int appIdx, int shmBaseOffset, AppCredential &credential)
       shmBaseOffset(shmBaseOffset),
       fdIncr(kFdBase),
       fdLock(ATOMIC_FLAG_INIT) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
-  // std::cout << "[BENITA]" << shmBaseOffset << std::endl;
   cred = credential;
   shmKey = FS_SHM_KEY_BASE + shmBaseOffset + appIdx;
   SPDLOG_INFO("AppProc initialized shmKey:{}", shmKey);
@@ -475,7 +473,6 @@ AppProc::AppProc(int appIdx, int shmBaseOffset, AppCredential &credential)
   }
 
   SPDLOG_INFO("AppProc {} control shm accessible at {}", appIdx, shmfile);
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 AppProc::~AppProc() { shmipc_mgr_destroy(shmipc_mgr); }
@@ -605,7 +602,6 @@ std::ostream &operator<<(std::ostream &os, const FsReqType &tp) {
 void FsReq::initReqFromCop(AppProc *curApp, off_t curSlotId,
                            struct clientOp *cop, char *curData,
                            FsProcWorker *worker) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                    
   app = curApp;
   appRingSlotId = curSlotId;
   copPtr = cop;
@@ -1413,7 +1409,6 @@ FsReqPool::~FsReqPool() {
 FsReq *FsReqPool::genNewReq(AppProc *appProc, off_t slotId,
                             struct clientOp *cop, char *data,
                             FsProcWorker *worker) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                          
   if (fsReqQueue_.empty()) {
     return nullptr;
   }
@@ -1876,7 +1871,6 @@ void *AppProc::getDataPtrByShmNameAndDataId(
 
 void *AppProc::getDataPtrByShmIdAndDataId(uint8_t shmId,
                                           fslib_malloc_block_cnt_t dataId) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                                          
   auto it = shmIdArrMap.find(shmId);
   SingleSizeMemBlockArr *memArrPtr = nullptr;
   //    SPDLOG_INFO("number of shmId in server:{} recvedID:{} aid:{}",
@@ -1959,7 +1953,7 @@ std::pair<uint8_t, void *> AppProc::initNewAllocatedShm(
 }
 
 int AppProc::invalidateAppShm() {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_INFO("invalidateAppShmByName size:{}", shmNameMemArrMap.size());
   SPDLOG_INFO("invalidateAppShmById size:{}", shmIdArrMap.size());
   shmNameMemArrMap.clear();

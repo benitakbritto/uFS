@@ -72,7 +72,7 @@ int64_t FileMng::checkAndFlushBufferDirtyItems() {
 }
 
 int FileMng::processReq(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::OP_OWNERSHIP_UNKNOWN) {
     req->setError(FS_REQ_ERROR_INODE_IN_TRANSFER);
     fsWorker_->submitFsReqCompletion(req);
@@ -3574,7 +3574,6 @@ void FileMng::processMkdir(FsReq *req) {
 }
 
 void FileMng::processOpendir(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::OPENDIR_GET_CACHED_INODE) {
     int fullPathDepth = req->getStandardPathDepth();
     InMemInode *inodePtr = nullptr;
@@ -3687,7 +3686,6 @@ void FileMng::processOpendir(FsReq *req) {
 }
 
 void FileMng::processNewShmAllocated(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::NEW_SHM_ALLOC_SEND_MSG) {
     SPDLOG_DEBUG("FsReq::processNewShmAllocated wid:{} reqType:{}",
                  req->getWid(), getFsReqTypeOutputString(req->getType()));

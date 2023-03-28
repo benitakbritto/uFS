@@ -1740,10 +1740,10 @@ int handle_close_retry(uint64_t reqId) {
 // TODO: Error handling pending
 int handle_opendir_retry(uint64_t reqId, CFS_DIR *dir) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct opendirOp>(gServMngPtr->reqRingMap[reqId][0]);
-  dir = fs_opendir_retry(op->name, reqId);
+  *dir = *fs_opendir_retry(op->name, reqId);
+  
   // clean up
   gServMngPtr->queueMgr->dequePendingMsg(reqId);
-  
   return 0;
 }
 
@@ -1781,7 +1781,8 @@ int handle_fdatasync_retry(uint64_t reqId) {
 }
 
 // TODO: fs_rename
-int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, CFS_DIR *dir = nullptr) {
+int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, 
+  CFS_DIR *dir = nullptr) {
   if (gServMngPtr->reqRingMap.size() == 0) {
     std::cout << "[INFO] No ops to retry" << std::endl;
     return 0;
@@ -1793,8 +1794,8 @@ int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, CF
     print_server_unavailable(__func__);
     return -1;
   } else {
-    std::cout << "[INFO] Connection to server successful" << std::endl;
-    for (auto itr = gServMngPtr->reqRingMap.begin(); itr != gServMngPtr->reqRingMap.end(); ) {
+    std::cout << "[INFO] Connection to server successful" << std::endl; 
+    for (auto itr = gServMngPtr->reqRingMap.begin(); itr != gServMngPtr->reqRingMap.end();) {
       std::cout << "[INFO] Retrying request #" << itr->first << std::endl;
       auto reqId = itr->first;
       auto type = gServMngPtr->queueMgr->getMessageType(gServMngPtr->reqRingMap[reqId][0]);
@@ -1857,7 +1858,7 @@ int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, CF
           break;
         case CFS_OP_OPENDIR:
           ret = handle_opendir_retry(reqId, dir);
-          if (ret > 0) {
+          if (ret == 0) {
             gServMngPtr->reqRingMap.erase(itr++);
           } else {
             itr++;
@@ -2592,11 +2593,12 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name, uint64_t reque
   odop->alOp.dataPtrId = dataPtrId;
 
   // send request
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, 
+    ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
-    CFS_DIR* res;
     shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
     fs_free(dataPtr);
+    threadFsTid = 0;
 
     if (gServMngPtr->reqRingMap.count(requestId) == 0) {
       auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
@@ -2604,7 +2606,11 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name, uint64_t reque
       gServMngPtr->reqRingMap[requestId].push_back(off);
     }
     
+    CFS_DIR* res = (CFS_DIR *)malloc(sizeof(*res));
     fs_retry_pending_ops(nullptr, nullptr, res); 
+    if (res != nullptr) {
+      std::cout << "res is not null" << std::endl;
+    }
     return res;
   }
 

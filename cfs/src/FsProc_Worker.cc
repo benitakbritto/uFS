@@ -1782,7 +1782,6 @@ int FsProcWorker::pollReqFromApps() {
 }
 
 void FsProcWorker::processReqOnRecv(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   int reqFlags = req->getReqTypeFlags();
   // every request should have some flags
   assert(reqFlags != FsReqFlags::no_flags);
@@ -2053,7 +2052,6 @@ void FsProcWorker::ownerProcessPathReq(FsReq *req) {
 }
 
 void FsProcWorker::primaryProcessPathReq(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(req->getReqTypeFlags() & FsReqFlags::handled_by_primary);
   assert(req->getReqTypeFlags() & FsReqFlags::uses_paths);
 
@@ -2105,7 +2103,6 @@ end:
 }
 
 void FsProcWorker::processClientControlPlaneReq(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(req->getReqTypeFlags() & FsReqFlags::client_control_plane);
   switch (req->getType()) {
     case FsReqType::NEW_SHM_ALLOCATED:

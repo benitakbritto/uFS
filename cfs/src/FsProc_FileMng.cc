@@ -3685,6 +3685,7 @@ void FileMng::processOpendir(FsReq *req) {
 }
 
 void FileMng::processNewShmAllocated(FsReq *req) {
+  std::cout << "processNewShmAllocated" << std::endl;
   if (req->getState() == FsReqState::NEW_SHM_ALLOC_SEND_MSG) {
     SPDLOG_DEBUG("FsReq::processNewShmAllocated wid:{} reqType:{}",
                  req->getWid(), getFsReqTypeOutputString(req->getType()));

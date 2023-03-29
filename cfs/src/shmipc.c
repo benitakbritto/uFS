@@ -95,7 +95,7 @@ struct shmipc_mgr *shmipc_mgr_init(const char *name, size_t rsize, int create) {
   mgr->data = NULL;
   mgr->capacity = rsize;
   mgr->mask = rsize - 1;
-  mgr->next = 0;
+  mgr->next = 1; // Note: change
 
   // TODO ensure that the shared memory vaddr is cache aligned?
   mem_required = (rsize * 64) + (rsize * shmipc_XREQ_MAX_ELEM_SIZE) +
@@ -214,7 +214,6 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   off_t ring_idx;
 
   ring_idx = __sync_fetch_and_add(&(mgr->next), 1);
-  printf("ring_idx = %d\n", ring_idx);
   ring_idx = ring_idx & mgr->mask;
   rmsg = IDX_TO_MSG(mgr, ring_idx);
 
@@ -273,7 +272,7 @@ int is_server_up(pid_t pid) {
   if (kill(pid, 0) != 0 && errno == ESRCH) {
     return 0;
   }
-
+  
   return 1;
 }
 

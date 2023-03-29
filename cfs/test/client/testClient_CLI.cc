@@ -114,7 +114,7 @@ void printHelp() {
 void printReturnValue(std::string const &cmd, ssize_t v) {
   if (interactive) {
     printf(ANSI_COLOR_MAGENTA "%s Return:" ANSI_COLOR_RESET "\n", cmd.c_str());
-    printf(ANSI_COLOR_BLUE "%ld" ANSI_COLOR_RESET "\n", v);
+    printf(ANSI_COLOR_GREEN "%ld" ANSI_COLOR_RESET "\n", v);
     printf(ANSI_COLOR_MAGENTA "-------" ANSI_COLOR_RESET "\n");
   } else {
     printf("return %ld\n", v);

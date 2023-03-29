@@ -398,25 +398,34 @@ int FsService::submitReq(int slotId) {
 /* #endregion FS Service */
 
 int get_server_pid() {
-  // std::cout << "Inside " << __func__ << std::endl;
   // server pid will be placed in master shm
   auto primaryServer = gServMngPtr->primaryServ;
   shmipc_msg msg;
   off_t ringIdx = 0;
   assert(primaryServer->shmipc_mgr != nullptr);
   // go over entire ring once
-  do {
-    memset(&msg, 0, sizeof(struct shmipc_msg));
-    auto ret = shmipc_mgr_poll_pid_msg(primaryServer->shmipc_mgr, ringIdx, &msg);
-    if (ret != -1) {                        
-      gServMngPtr->fsServPid = msg.retval;
-      std::cout << "Received pid = " << msg.retval << std::endl;
-      // shmipc_mgr_dealloc_slot(primaryServer->shmipc_mgr, ringIdx); 
-      shmipc_increment_ring_index(primaryServer->shmipc_mgr);  
-      return 0; // success 
-    }
-    ringIdx++;
-  } while (ringIdx < RING_SIZE);
+  // do {
+  //   memset(&msg, 0, sizeof(struct shmipc_msg));
+  //   auto ret = shmipc_mgr_poll_pid_msg(primaryServer->shmipc_mgr, ringIdx, &msg);
+  //   if (ret != -1) {                        
+  //     gServMngPtr->fsServPid = msg.retval;
+  //     std::cout << "Received pid = " << msg.retval << std::endl;
+  //     shmipc_mgr_dealloc_slot(primaryServer->shmipc_mgr, ringIdx); 
+  //     // shmipc_increment_ring_index(primaryServer->shmipc_mgr);  
+  //     return 0; // success 
+  //   }
+  //   ringIdx++;
+  // } while (ringIdx < RING_SIZE);
+
+  memset(&msg, 0, sizeof(struct shmipc_msg));
+  auto ret = shmipc_mgr_poll_pid_msg(primaryServer->shmipc_mgr, 0 /*ringIdx*/, &msg);
+  if (ret != -1) {                        
+    gServMngPtr->fsServPid = msg.retval;
+    // std::cout << "Received pid = " << msg.retval << std::endl;
+    // shmipc_mgr_dealloc_slot(primaryServer->shmipc_mgr, ringIdx); // don't dealloc
+    // shmipc_increment_ring_index(primaryServer->shmipc_mgr);  
+    return 0; // success 
+  }
 
   return -1; // failure 
 }
@@ -1314,7 +1323,7 @@ int fs_exit() {
       return ret;
     }
     // Commenting this out so the syscall_intercept has pid across cmd invocations
-    //shmipc_mgr_client_reset(service->shmipc_mgr);
+    // shmipc_mgr_client_reset(service->shmipc_mgr);
   }
 #ifdef CFS_LIB_SAVE_API_TS
   gLibSharedContext->apiTsMng_.reportAllTs();
@@ -1330,9 +1339,11 @@ int fs_ping() {
   int ret = -1;
 
   for (auto iter : gServMngPtr->multiFsServMap) {
+    std::cout << __func__ << "\t" << __LINE__ << std::endl; 
     auto service = iter.second;
     if (!(service->inUse)) continue;
 
+    std::cout << __func__ << "\t" << __LINE__ << std::endl; 
     auto wid = iter.first;
     struct shmipc_msg msg;
     struct pingOp *eop;
@@ -1341,7 +1352,7 @@ int fs_ping() {
     ring_idx = shmipc_mgr_alloc_slot_dbg(service->shmipc_mgr);
     eop = (struct pingOp *)IDX_TO_XREQ(service->shmipc_mgr, ring_idx);
     prepare_pingOp(&msg, eop);
-    // TODO: Not sure if exponential backoff
+    // Note: blocking call
     shmipc_mgr_put_msg(service->shmipc_mgr, ring_idx, &msg);
     ret = eop->ret;
     shmipc_mgr_dealloc_slot(service->shmipc_mgr, ring_idx);
@@ -1615,9 +1626,20 @@ int fs_dumpinodes(int wid) {
   }
 }
 
+// Note: function is duplicated
+int is_server_up(pid_t pid) {
+  // no such process
+  if (kill(pid, 0) != 0 && errno == ESRCH) {
+    return 0;
+  }
+  
+  return 1;
+}
+
 int check_primary_server_availability() {
   int count = 0;
-  while (get_server_pid() != 0) {
+  // Note: get_server_pid is a blocking call
+  while (get_server_pid() != 0 || is_server_up(gServMngPtr->fsServPid) != 1) {
     // std::cout << "#" << count << ": Trying to establish connection with server" << std::endl;
     count++;
   }
@@ -1670,7 +1692,6 @@ ssize_t handle_pread_retry(uint64_t reqId, void* buf) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct preadOpPacked>(gServMngPtr->reqRingMap[reqId][0]);
   auto ret = fs_pread_retry(op->rwOp.fd, buf, op->rwOp.count, op->offset, reqId);
   char *readRes = (char *) buf;
-  std::cout << "handle_pread_retry: buf = " << readRes << std::endl;
   if (ret > 0) {
     // clean up
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
@@ -2007,12 +2028,14 @@ int fs_init_multi(int num_key, const key_t *keys) {
             std::make_pair(curWid, new FsService(curWid, key)));
       }
       gServMngPtr->primaryServ = gServMngPtr->multiFsServMap[gPrimaryServWid];
+      gServMngPtr->primaryServ->inUse = true;
+
       if (get_server_pid() != 0) {
         std::cout << "[ERR] did not receive server pid" << std::endl;
         gMultiFsServLock.clear(std::memory_order_release);
         return -1;
       }
-      gServMngPtr->primaryServ->inUse = true;
+
       // NOTE: 1 key is used for private shm (pending ops)
       gServMngPtr->multiFsServNum = num_key - 1; 
 
@@ -2590,9 +2613,7 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name, uint64_t reque
   }
 
   memset(&msg, 0, sizeof(msg));
-  std::cout << "opendir calling shmipc_mgr_alloc_slot_dbg" << std::endl;
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
-  std::cout << "opendir ring_idx = " << ring_idx << std::endl;
   odop = (struct opendirOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_opendirOp(&msg, odop, name);
   odop->alOp.shmid = shmid;
@@ -2645,6 +2666,7 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name, uint64_t reque
   }
 #ifdef _CFS_LIB_PRINT_REQ_
   fprintf(stdout, "fs_opendir(%s)\n", name);
+  
 #endif
   // TODO measure cost to hold the slot. If it is too much, we might as well
   // copy the data and release the slot.
@@ -3069,7 +3091,6 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
     if (rc > 0) {
       memcpy(buf, curDataPtr, count);
     }
-    std::cout << "pread internal: buf = " << ((char *) buf) << std::endl;
 #endif
   
     shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
@@ -3104,7 +3125,6 @@ retry:
       goto retry;
     }
   } else {
-    std::cout << "pread common: buf = " << ((char *) buf) << std::endl;
     service->updateOffset(fd, prevOffset + rc);
   }
 #ifdef CFS_LIB_SAVE_API_TS

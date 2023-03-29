@@ -21,17 +21,15 @@
 extern FsProc *gFsProcPtr;
 
 void FsProcWorker::providerPidToApp(pid_t appPid) {
-  std::cout << "Inside " << __func__ << std::endl;
   auto myPid = getpid();
   auto shmipc_mgr = appMap[appPid]->shmipc_mgr;
   
-  std::cout << "app pid = " << appPid << std::endl;
   struct shmipc_msg msg;
   off_t ring_idx;
   memset(&msg, 0, sizeof(msg));
-  ring_idx = shmipc_mgr_alloc_slot(shmipc_mgr);
+  // ring_idx = shmipc_mgr_alloc_slot(shmipc_mgr);
   msg.retval = myPid;
-  shmipc_mgr_put_msg_server_nowait(shmipc_mgr, ring_idx, &msg, 
+  shmipc_mgr_put_msg_server_nowait(shmipc_mgr, 0 /*ringIdx*/, &msg, 
     shmipc_STATUS_SERVER_PID_FOR_CLIENT);
 }
 

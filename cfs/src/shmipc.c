@@ -176,7 +176,7 @@ void shmipc_mgr_server_reset(struct shmipc_mgr *mgr) { mgr->next = 0; }
 // server to use that. This will remove the need for "resets".
 void shmipc_mgr_client_reset(struct shmipc_mgr *mgr) {
   mgr->next = 0;
-  memset(mgr->qp->ptr, 0, mgr->qp->size);
+  memset(mgr->qp->ptr, 1, mgr->qp->size);
 }
 
 struct shmipc_msg *shmipc_mgr_get_msg(struct shmipc_mgr *mgr, off_t *idx) {
@@ -301,6 +301,7 @@ int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off
     }
 
     usleep(3000);
+    // sleep(1);
 
     // printf("[DEBUG] polling msg %d\n", count); fflush(stdout);
     ret = shmipc_mgr_poll_msg(mgr, ring_idx, msg); // TODO: Should use better names

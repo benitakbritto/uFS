@@ -149,5 +149,8 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
+  if (fs_exit() != 0) {
+    fprintf(stderr, "exit failed\n");
+  }
   return 0;
 }

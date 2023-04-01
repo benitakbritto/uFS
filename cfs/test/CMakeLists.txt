@@ -91,6 +91,7 @@ endif()
 
 add_subdirectory(fsproc)
 add_subdirectory(client)
+add_subdirectory(client-retry/cp-recursive)
 ## add_subdirectory(urcu_usage)
 option(BUILD_FSCK "Build fsck" OFF)
 if(BUILD_FSCK)

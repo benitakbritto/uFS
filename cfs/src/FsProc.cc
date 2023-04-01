@@ -1953,7 +1953,6 @@ std::pair<uint8_t, void *> AppProc::initNewAllocatedShm(
 }
 
 int AppProc::invalidateAppShm() {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_INFO("invalidateAppShmByName size:{}", shmNameMemArrMap.size());
   SPDLOG_INFO("invalidateAppShmById size:{}", shmIdArrMap.size());
   shmNameMemArrMap.clear();

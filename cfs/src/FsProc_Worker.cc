@@ -29,6 +29,7 @@ void FsProcWorker::providerPidToApp(pid_t appPid) {
   memset(&msg, 0, sizeof(msg));
   // ring_idx = shmipc_mgr_alloc_slot(shmipc_mgr);
   msg.retval = myPid;
+  std::cout << "providerPidToApp: msg.retval = " << msg.retval << std::endl;
   shmipc_mgr_put_msg_server_nowait(shmipc_mgr, 0 /*ringIdx*/, &msg, 
     shmipc_STATUS_SERVER_PID_FOR_CLIENT);
 }

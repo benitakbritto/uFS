@@ -18,6 +18,9 @@
 #include "FsReq_SyncBatchCtx.h"
 #endif
 
+#define CRASH_TEST 1
+#define crash() if (CRASH_TEST) { *((char*)0) = 0; }
+
 extern FsProc *gFsProcPtr;
 
 //
@@ -170,6 +173,7 @@ int FileMng::processReq(FsReq *req) {
       break;
     case FsReqType::MKDIR:
       processMkdir(req);
+      // TODO: del later
       break;
     case FsReqType::OPENDIR:
       processOpendir(req);
@@ -3573,6 +3577,7 @@ void FileMng::processMkdir(FsReq *req) {
 }
 
 void FileMng::processOpendir(FsReq *req) {
+  // std::cout << "[BENITA]" << __func__ << std::endl;
   if (req->getState() == FsReqState::OPENDIR_GET_CACHED_INODE) {
     int fullPathDepth = req->getStandardPathDepth();
     InMemInode *inodePtr = nullptr;
@@ -3685,7 +3690,6 @@ void FileMng::processOpendir(FsReq *req) {
 }
 
 void FileMng::processNewShmAllocated(FsReq *req) {
-  std::cout << "processNewShmAllocated" << std::endl;
   if (req->getState() == FsReqState::NEW_SHM_ALLOC_SEND_MSG) {
     SPDLOG_DEBUG("FsReq::processNewShmAllocated wid:{} reqType:{}",
                  req->getWid(), getFsReqTypeOutputString(req->getType()));

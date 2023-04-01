@@ -214,6 +214,10 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   off_t ring_idx;
 
   ring_idx = __sync_fetch_and_add(&(mgr->next), 1);
+  // ring_idx 0 is reserved for getting server pid
+  if (ring_idx == 0) {
+    ring_idx = __sync_fetch_and_add(&(mgr->next), 1);
+  }
   ring_idx = ring_idx & mgr->mask;
   rmsg = IDX_TO_MSG(mgr, ring_idx);
 
@@ -269,36 +273,51 @@ void shmipc_mgr_put_msg(struct shmipc_mgr *mgr, off_t ring_idx,
 }
 
 int is_server_up(pid_t pid) {
-  if (kill(pid, 0) != 0 && errno == ESRCH) {
-    return 0;
+  if (kill(pid, 0) != 0) {
+    if (errno == ESRCH) {
+      return 0;
+    } else if (errno == EPERM) {
+      //printf("[DEBUG] Do not have permission\n");
+    }
   }
   
   return 1;
 }
 
-// TODO [BENITA] make macros/config
 // If -1 is returned it means that server did not respond
 // TODO: rename function since not exponential backoff
 int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off_t ring_idx,
                         struct shmipc_msg *msg, pid_t serverPid) {  
-  int sleepTime = 2;
   int ret = -1;
   int reqSent = 0;
+  int count = 0;
 
   // Tries until server is alive
   while (is_server_up(serverPid)) {
+    // printf("[DEBUG] at loop begin %d\n", count); fflush(stdout);
     if (reqSent == 0) {
+      // printf("[DEBUG] Sending msg: %d\n", count); fflush(stdout);
       shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg, shmipc_STATUS_READY_FOR_SERVER);
     }
-    
-    sleep(sleepTime);
 
+    usleep(3000);
+
+    // printf("[DEBUG] polling msg %d\n", count); fflush(stdout);
     ret = shmipc_mgr_poll_msg(mgr, ring_idx, msg); // TODO: Should use better names
+    // printf("[DEBUG] polled msg %d\n", count); fflush(stdout);
     if (ret == 0) {
+      // printf("[DEBUG] msg responded by server %d\n", count); fflush(stdout);
       return ret;
     }
+
+    // printf("[DEBUG] at loop end %d\n", count); fflush(stdout);
+    // count++;
     reqSent = 1;
+    
+    // sleep(1); // TODO: Delete
   }
+
+  // printf("[DEBUG] server is not available\n");
 
   return ret;
 }
@@ -328,6 +347,21 @@ int shmipc_mgr_poll_msg(struct shmipc_mgr *mgr, off_t idx,
   struct shmipc_msg *rmsg;
 
   rmsg = IDX_TO_MSG(mgr, idx);
+
+  // // TODO: Del later
+  // if (rmsg->status == shmipc_STATUS_READY_FOR_SERVER) {
+  //   printf("[DEBUG] shmipc_mgr_poll_msg: status = shmipc_STATUS_READY_FOR_SERVER\n");
+  // } else if (rmsg->status == shmipc_STATUS_IN_PROGRESS) {
+  //   printf("[DEBUG]shmipc_mgr_poll_msg: status = shmipc_STATUS_IN_PROGRESS\n");
+  // } else if (rmsg->status == shmipc_STATUS_EMPTY) {
+  //   printf("[DEBUG]shmipc_mgr_poll_msg: status = shmipc_STATUS_EMPTY\n");
+  // } else if (rmsg->status == shmipc_STATUS_READY_FOR_CLIENT) {
+  //   printf("[DEBUG]shmipc_mgr_poll_msg: status = shmipc_STATUS_READY_FOR_CLIENT\n");
+  // } else if (rmsg->status == shmipc_STATUS_RESERVED) {
+  //   printf("[DEBUG] shmipc_mgr_poll_msg: status = shmipc_STATUS_RESERVED\n");
+  // }
+  // fflush(stdout);
+
   if (rmsg->status != shmipc_STATUS_READY_FOR_CLIENT) return -1;
 
   // server finished operation, copy into rmsg.

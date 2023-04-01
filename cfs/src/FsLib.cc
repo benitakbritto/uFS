@@ -59,7 +59,7 @@ int fs_fsync_retry(int fd, uint64_t requestId);
 
 // if enabled, will print each api invocation
 // #define _CFS_LIB_PRINT_REQ_
-#define LDB_PRINT_CALL
+// #define LDB_PRINT_CALL
 
 /* #region requestId */
 // TODO: Lock over gRequestId
@@ -397,33 +397,32 @@ int FsService::submitReq(int slotId) {
 }
 /* #endregion FS Service */
 
+// Note: function is duplicated
+int is_server_up(pid_t pid) {
+  // no such process
+  if (kill(pid, 0) != 0 && errno == ESRCH) {
+    return 0;
+  }
+
+  // if (errno == EPERM) {
+  //   std::cout << "[DEBUG] Do not have permission" << std::endl; 
+  // }
+  
+  return 1;
+}
+
 int get_server_pid() {
   // server pid will be placed in master shm
   auto primaryServer = gServMngPtr->primaryServ;
   shmipc_msg msg;
   off_t ringIdx = 0;
   assert(primaryServer->shmipc_mgr != nullptr);
-  // go over entire ring once
-  // do {
-  //   memset(&msg, 0, sizeof(struct shmipc_msg));
-  //   auto ret = shmipc_mgr_poll_pid_msg(primaryServer->shmipc_mgr, ringIdx, &msg);
-  //   if (ret != -1) {                        
-  //     gServMngPtr->fsServPid = msg.retval;
-  //     std::cout << "Received pid = " << msg.retval << std::endl;
-  //     shmipc_mgr_dealloc_slot(primaryServer->shmipc_mgr, ringIdx); 
-  //     // shmipc_increment_ring_index(primaryServer->shmipc_mgr);  
-  //     return 0; // success 
-  //   }
-  //   ringIdx++;
-  // } while (ringIdx < RING_SIZE);
 
   memset(&msg, 0, sizeof(struct shmipc_msg));
   auto ret = shmipc_mgr_poll_pid_msg(primaryServer->shmipc_mgr, 0 /*ringIdx*/, &msg);
-  if (ret != -1) {                        
+  if (ret != -1 && is_server_up(msg.retval)) {                        
     gServMngPtr->fsServPid = msg.retval;
-    // std::cout << "Received pid = " << msg.retval << std::endl;
     // shmipc_mgr_dealloc_slot(primaryServer->shmipc_mgr, ringIdx); // don't dealloc
-    // shmipc_increment_ring_index(primaryServer->shmipc_mgr);  
     return 0; // success 
   }
 
@@ -840,7 +839,6 @@ static inline void prepare_mkdirOp(struct shmipc_msg *msg, struct mkdirOp *op,
   op->mode = mode;
   op->requestId = reqId;
   op->isRetry = isRetry;
-  std::cout << "isRetry = " << op->isRetry << std::endl;
   EmbedThreadIdToAsOpRet(op->ret);
   adjustPath(path, &(op->pathname[0]));
 }
@@ -1009,7 +1007,8 @@ static int send_noargop(FsService *fsServ, CfsOpCode opcode) {
 
   // send msg
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     // ret = fs_retry_pending_ops();
     goto end;
@@ -1626,22 +1625,12 @@ int fs_dumpinodes(int wid) {
   }
 }
 
-// Note: function is duplicated
-int is_server_up(pid_t pid) {
-  // no such process
-  if (kill(pid, 0) != 0 && errno == ESRCH) {
-    return 0;
-  }
-  
-  return 1;
-}
-
 int check_primary_server_availability() {
   int count = 0;
-  // Note: get_server_pid is a blocking call
-  while (get_server_pid() != 0 || is_server_up(gServMngPtr->fsServPid) != 1) {
-    // std::cout << "#" << count << ": Trying to establish connection with server" << std::endl;
-    count++;
+  while (get_server_pid() != 0) {
+    // std::cout << "#" << count++ << ": Trying to establish connection with server" << std::endl;
+    // fflush(stdout);
+    sleep(1);
   }
 
   return 0;
@@ -1809,19 +1798,19 @@ int handle_fdatasync_retry(uint64_t reqId) {
 int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, 
   CFS_DIR *dir = nullptr) {
   if (gServMngPtr->reqRingMap.size() == 0) {
-    std::cout << "[INFO] No ops to retry" << std::endl;
+    // std::cout << "[INFO] No ops to retry" << std::endl;
     return 0;
   }
  
-  std::cout << "[INFO] Checking connection with server" << std::endl;
+  // std::cout << "[INFO] Checking connection with server" << std::endl;
   auto ret = check_primary_server_availability();
   if (ret == -1) {
     print_server_unavailable(__func__);
     return -1;
   } else {
-    std::cout << "[INFO] Connection to server successful" << std::endl; 
+    // std::cout << "[INFO] Connection to server successful" << std::endl; 
     for (auto itr = gServMngPtr->reqRingMap.begin(); itr != gServMngPtr->reqRingMap.end();) {
-      std::cout << "[INFO] Retrying request #" << itr->first << std::endl;
+      // std::cout << "[INFO] Retrying request #" << itr->first << std::endl;
       auto reqId = itr->first;
       auto type = gServMngPtr->queueMgr->getMessageType(gServMngPtr->reqRingMap[reqId][0]);
       switch(type) {
@@ -2080,7 +2069,8 @@ int fs_stat_internal(FsService *fsServ, const char *pathname,
   statOp = (struct statOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_statOp(&msg, statOp, pathname);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     if (gServMngPtr->reqRingMap.count(requestId) == 0) {
       auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
@@ -2163,7 +2153,8 @@ int fs_fstat_internal(FsService *fsServ, int fd, struct stat *statbuf, uint64_t 
   fstatOp = (struct fstatOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_fstatOp(&msg, fstatOp, fd);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     if (gServMngPtr->reqRingMap.count(requestId) == 0) {
       auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
@@ -2547,7 +2538,7 @@ int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode,
   }
 
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, 
-    ring_idx, &msg, gServMngPtr->fsServPid)) {
+    ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     ret = fs_retry_pending_ops();
     goto end;
@@ -2755,11 +2746,12 @@ int fs_rmdir_internal(FsService *fsServ, const char *pathname) {
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   rmdOp = (struct rmdirOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_rmdirOp(&msg, rmdOp, pathname);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
-      print_server_unavailable(__func__);
-      ret = fs_retry_pending_ops();
-      goto end;
-    }
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
+    print_server_unavailable(__func__);
+    ret = fs_retry_pending_ops();
+    goto end;
+  }
 
   ret = rmdOp->ret;
 end:
@@ -2795,7 +2787,8 @@ int fs_rename_internal(FsService *fsServ, const char *oldpath,
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   rnmOp = (struct renameOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_renameOp(&msg, rnmOp, oldpath, newpath);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     ret = fs_retry_pending_ops();
     goto end;
@@ -3018,7 +3011,8 @@ ssize_t fs_read_internal(FsService *fsServ, int fd, void *buf, size_t count) {
     ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
     rop_p = (struct readOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
     prepare_readOp(&msg, rop_p, fd, count);
-    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+      &msg, gServMngPtr->fsServPid) == -1) {
       print_server_unavailable(__func__);
       rc = fs_retry_pending_ops(buf);
       goto end;
@@ -3125,7 +3119,7 @@ retry:
       goto retry;
     }
   } else {
-    service->updateOffset(fd, prevOffset + rc);
+    service->updateOffset(fd, prevOffset + rc - 1);
   }
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_READ, tsIdx);
@@ -3211,7 +3205,8 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
 #endif
 
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+    if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+      &msg, gServMngPtr->fsServPid) == -1) {
       print_server_unavailable(__func__);
       rc = fs_retry_pending_ops();
     }
@@ -3249,10 +3244,11 @@ static ssize_t fs_write_internal(FsService *fsServ, int fd, const void *buf,
 #endif
 
       // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-      if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
-      print_server_unavailable(__func__);
-      rc = fs_retry_pending_ops();
-    }
+      if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+        &msg, gServMngPtr->fsServPid) == -1) {
+        print_server_unavailable(__func__);
+        rc = fs_retry_pending_ops();
+      }
       
 
       rc += wop_p->rwOp.ret;
@@ -3383,7 +3379,7 @@ retry:
       goto retry;
     }
   } else {
-    service->updateOffset(fd, prevOffset + rc);
+    service->updateOffset(fd, prevOffset + rc - 1);
   }
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_WRITE, tsIdx);
@@ -3586,7 +3582,8 @@ static ssize_t fs_allocated_read_internal(FsService *fsServ, int fd, void *buf,
   arop_p->alOp.dataPtrId = dataPtrId;
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     rc = fs_retry_pending_ops();
   }
@@ -3638,7 +3635,8 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
   aprop_p->rwOp.realCount = 0;
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     rc = fs_retry_pending_ops();
   }
@@ -3672,7 +3670,7 @@ retry:
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
     if (should_retry) goto retry;
   } else {
-    service->updateOffset(fd, offset + rc);
+    service->updateOffset(fd, offset + rc - 1);
   }
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_READ, tsIdx);
@@ -3739,7 +3737,8 @@ static ssize_t fs_allocated_write_internal(FsService *fsServ, int fd, void *buf,
   awop_p->alOp.dataPtrId = dataPtrId;
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     rc = fs_retry_pending_ops();
   }
@@ -3795,7 +3794,8 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
   apwop_p->alOp.dataPtrId = dataPtrId;
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     rc = fs_retry_pending_ops();  
   }
@@ -3851,7 +3851,7 @@ retry:
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
     if (should_retry) goto retry;
   } else {
-    service->updateOffset(fd, offset + rc);
+    service->updateOffset(fd, offset + rc - 1);
   }
 
 #ifdef CFS_LIB_SAVE_API_TS
@@ -4468,7 +4468,8 @@ ssize_t fs_uc_pread_renewonly_internal(FsService *fsServ, int fd,
   prepare_preadOpForUC(&msg, prop_p, fd, 0, 0);
   setLeaseOpRenewOnly(prop_p);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     rc = fs_retry_pending_ops();
   }
@@ -4500,7 +4501,8 @@ ssize_t fs_uc_pread_internal(FsService *fsServ, int fd, void *buf,
   setLeaseOpForReadUC<preadOpPacked>(prop_p);
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     rc = fs_retry_pending_ops();
   }
@@ -4626,7 +4628,8 @@ off_t fs_lseek_internal(FsService *fsServ, int fd, long int offset,
   op = (struct lseekOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_lseekOp(&msg, op, fd, offset, whence, file_offset);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     ret = fs_retry_pending_ops();
   }
@@ -4686,7 +4689,7 @@ retry:
   int rc = fs_lseek_internal(service, fd, offset, whence, file_offset);
 
   if (rc >= 0) {
-    service->updateOffset(fd, rc);
+    service->updateOffset(fd, rc - 1);
     return rc;
   }
   if (handle_inode_in_transfer(rc)) goto retry;
@@ -4888,7 +4891,8 @@ static ssize_t fs_allocated_pread_internal_ldb(FsService *fsServ, int fd,
   aprop_p->rwOp.realCount = mem_offset;
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     rc = fs_retry_pending_ops();
   }
@@ -5033,7 +5037,8 @@ int fs_wsync_internal(FsService *fsServ, int fd, bool isDataSync, off_t offset) 
   }
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
-  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
+  if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
+    &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
     ret = fs_retry_pending_ops();
   }

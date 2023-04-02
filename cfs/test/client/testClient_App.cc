@@ -251,7 +251,7 @@ void processOneCmd(std::string const &line) {
         size_t count = stoiWrapper(tokens[2]);
         char *buf = (char *)fs_malloc(count);
         memset(buf, 0, count);
-        ssize_t ret = fs_allocated_read(fd, buf, count);
+        ssize_t ret = fs_allocated_read(fd, buf, count, (void **)&buf);
         printReturnValue(tokens[0], ret);
         if (ret > 0) {
           fprintf(stdout, "%s", gDataOutputSignalstr);
@@ -272,7 +272,7 @@ void processOneCmd(std::string const &line) {
         off_t offset = stollWrapper(tokens[3]);
         char *buf = (char *)fs_malloc(count);
         memset(buf, 0, count);
-        ssize_t ret = fs_allocated_pread(fd, buf, count, offset);
+        ssize_t ret = fs_allocated_pread(fd, buf, count, offset, (void **)&buf);
         printReturnValue(tokens[0], ret);
         if (ret > 0) {
           fprintf(stdout, "%s", gDataOutputSignalstr);

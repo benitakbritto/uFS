@@ -1,0 +1,328 @@
+time LD_PRELOAD=build/examples/libsyscall_fsp.so cp -r FSPsrc FSPdest
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+[DEBUG] fsTid = 0
+[DEBUG] isRetry = 0
+shm_open(O_CREAT, fsp_8_1_1) fail warning (will go on to attach) error:File exists.
+shm_open(O_CREAT, fsp_48_1_1) fail warning (will go on to attach) error:File exists.
+shm_open(O_CREAT, fsp_2048_1_1) fail warning (will go on to attach) error:File exists.
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- stat(FSPdest) --
+-- stat(FSPsrc) --
+[DEBUG] cur_path: FSPsrc is a dir
+-- Req #2: mkdir(FSPdest, 493d)
+ ---- stat(FSPdest) --
+[DEBUG] cur_path: FSPdest is a dir
+-- open(FSPsrc, 591872, 0) from tid 1 --
+-- opendir(FSPsrc) --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- fstat(13) --
+-- close(13) from tid 1 --
+-- stat(FSPsrc/FSPdirl1_0) --
+[DEBUG] cur_path: FSPsrc/FSPdirl1_0 is a dir
+-- Req #9: mkdir(FSPdest/FSPdirl1_0, 493d)
+ ---- stat(FSPdest/FSPdirl1_0) --
+[DEBUG] cur_path: FSPdest/FSPdirl1_0 is a dir
+-- open(FSPsrc/FSPdirl1_0, 591872, 0) from tid 1 --
+-- opendir(FSPsrc/FSPdirl1_0) --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- fstat(14) --
+-- close(14) from tid 1 --
+-- stat(FSPsrc/FSPdirl1_0/FSPf0) --
+[DEBUG] cur_path: FSPsrc/FSPdirl1_0/FSPf0 is a reg file
+-- open(FSPsrc/FSPdirl1_0/FSPf0, 131072, 0) from tid 1 --
+-- fstat(18) --
+-- open(FSPdest/FSPdirl1_0/FSPf0, 193, 493) from tid 1 --
+-- fstat(24) --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: read(18, 0x7fffde190080, 131072) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] buf = 0x7fffde190080
+[DEBUG] getBufOwnerInfo
+[DEBUG] devu print 1
+[DEBUG] before shmipc_mgr_alloc_slot_dbg
+[DEBUG] after shmipc_mgr_alloc_slot_dbg
+[DEBUG] before prepare_allocatedPreadOp
+[DEBUG] after prepare_allocatedPreadOp
+[DEBUG] devu print 2
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: write(24, 0x7fffe6392540, 32768) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: read(18, 0x7fffde190080, 131072) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] buf = 0x7fffde190080
+[DEBUG] getBufOwnerInfo
+[DEBUG] devu print 1
+[DEBUG] before shmipc_mgr_alloc_slot_dbg
+[DEBUG] after shmipc_mgr_alloc_slot_dbg
+[DEBUG] before prepare_allocatedPreadOp
+[DEBUG] after prepare_allocatedPreadOp
+[DEBUG] devu print 2
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: write(24, 0x7ffff64de000, 1) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: read(18, 0x7fffde190080, 131072) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] buf = 0x7fffde190080
+[DEBUG] getBufOwnerInfo
+[DEBUG] devu print 1
+[DEBUG] before shmipc_mgr_alloc_slot_dbg
+[DEBUG] after shmipc_mgr_alloc_slot_dbg
+[DEBUG] before prepare_allocatedPreadOp
+[DEBUG] after prepare_allocatedPreadOp
+[DEBUG] devu print 2
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+cp: error reading 'FSPsrc/FSPdirl1_0/FSPf0': Operation not permitted
+-- close(24) from tid 1 --
+-- close(18) from tid 1 --
+-- stat(FSPsrc/FSPdirl1_0/FSPf1) --
+[DEBUG] cur_path: FSPsrc/FSPdirl1_0/FSPf1 is a reg file
+-- open(FSPsrc/FSPdirl1_0/FSPf1, 131072, 0) from tid 1 --
+-- fstat(19) --
+-- open(FSPdest/FSPdirl1_0/FSPf1, 193, 493) from tid 1 --
+-- fstat(25) --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: read(19, 0x7fffde190080, 131072) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] buf = 0x7fffde190080
+[DEBUG] getBufOwnerInfo
+[DEBUG] devu print 1
+[DEBUG] before shmipc_mgr_alloc_slot_dbg
+[DEBUG] after shmipc_mgr_alloc_slot_dbg
+[DEBUG] before prepare_allocatedPreadOp
+[DEBUG] after prepare_allocatedPreadOp
+[DEBUG] devu print 2
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: write(25, 0x7fffe6392540, 32768) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: read(19, 0x7fffde190080, 131072) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] buf = 0x7fffde190080
+[DEBUG] getBufOwnerInfo
+[DEBUG] devu print 1
+[DEBUG] before shmipc_mgr_alloc_slot_dbg
+[DEBUG] after shmipc_mgr_alloc_slot_dbg
+[DEBUG] before prepare_allocatedPreadOp
+[DEBUG] after prepare_allocatedPreadOp
+[DEBUG] devu print 2
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: write(25, 0x7ffff64de000, 1) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: read(19, 0x7fffde190080, 131072) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] buf = 0x7fffde190080
+[DEBUG] getBufOwnerInfo
+[DEBUG] devu print 1
+[DEBUG] before shmipc_mgr_alloc_slot_dbg
+[DEBUG] after shmipc_mgr_alloc_slot_dbg
+[DEBUG] before prepare_allocatedPreadOp
+[DEBUG] after prepare_allocatedPreadOp
+[DEBUG] devu print 2
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+cp: error reading 'FSPsrc/FSPdirl1_0/FSPf1': Operation not permitted
+-- close(25) from tid 1 --
+-- close(19) from tid 1 --
+-- stat(FSPsrc/FSPdirl1_1) --
+[DEBUG] cur_path: FSPsrc/FSPdirl1_1 is a dir
+-- Req #40: mkdir(FSPdest/FSPdirl1_1, 493d)
+ ---- stat(FSPdest/FSPdirl1_1) --
+[DEBUG] cur_path: FSPdest/FSPdirl1_1 is a dir
+-- open(FSPsrc/FSPdirl1_1, 591872, 0) from tid 1 --
+-- opendir(FSPsrc/FSPdirl1_1) --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- fstat(15) --
+-- close(15) from tid 1 --
+-- stat(FSPsrc/FSPdirl1_1/FSPdirl2_0) --
+[DEBUG] cur_path: FSPsrc/FSPdirl1_1/FSPdirl2_0 is a dir
+-- Req #47: mkdir(FSPdest/FSPdirl1_1/FSPdirl2_0, 493d)
+ ---- stat(FSPdest/FSPdirl1_1/FSPdirl2_0) --
+[DEBUG] cur_path: FSPdest/FSPdirl1_1/FSPdirl2_0 is a dir
+-- open(FSPsrc/FSPdirl1_1/FSPdirl2_0, 591872, 0) from tid 1 --
+-- opendir(FSPsrc/FSPdirl1_1/FSPdirl2_0) --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- fstat(16) --
+-- close(16) from tid 1 --
+-- stat(FSPsrc/FSPdirl1_1/FSPdirl2_0/FSPf3) --
+[DEBUG] cur_path: FSPsrc/FSPdirl1_1/FSPdirl2_0/FSPf3 is a reg file
+-- open(FSPsrc/FSPdirl1_1/FSPdirl2_0/FSPf3, 131072, 0) from tid 1 --
+-- fstat(21) --
+-- open(FSPdest/FSPdirl1_1/FSPdirl2_0/FSPf3, 193, 493) from tid 1 --
+-- fstat(28) --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: read(21, 0x7fffde190080, 131072) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] buf = 0x7fffde190080
+[DEBUG] getBufOwnerInfo
+[DEBUG] devu print 1
+[DEBUG] before shmipc_mgr_alloc_slot_dbg
+[DEBUG] after shmipc_mgr_alloc_slot_dbg
+[DEBUG] before prepare_allocatedPreadOp
+[DEBUG] after prepare_allocatedPreadOp
+[DEBUG] devu print 2
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: write(28, 0x7fffe6392540, 32768) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: read(21, 0x7fffde190080, 131072) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] buf = 0x7fffde190080
+[DEBUG] getBufOwnerInfo
+[DEBUG] devu print 1
+[DEBUG] before shmipc_mgr_alloc_slot_dbg
+[DEBUG] after shmipc_mgr_alloc_slot_dbg
+[DEBUG] before prepare_allocatedPreadOp
+[DEBUG] after prepare_allocatedPreadOp
+[DEBUG] devu print 2
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: write(28, 0x7ffff64de000, 1) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- Req #0: read(21, 0x7fffde190080, 131072) from tid 1 --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] buf = 0x7fffde190080
+[DEBUG] getBufOwnerInfo
+[DEBUG] devu print 1
+[DEBUG] before shmipc_mgr_alloc_slot_dbg
+[DEBUG] after shmipc_mgr_alloc_slot_dbg
+[DEBUG] before prepare_allocatedPreadOp
+[DEBUG] after prepare_allocatedPreadOp
+[DEBUG] devu print 2
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+cp: error reading 'FSPsrc/FSPdirl1_1/FSPdirl2_0/FSPf3': Operation not permitted
+-- close(28) from tid 1 --
+-- close(21) from tid 1 --
+-- stat(FSPsrc/FSPdirl1_1/FSPdirl2_1) --
+[DEBUG] cur_path: FSPsrc/FSPdirl1_1/FSPdirl2_1 is a dir
+-- Req #66: mkdir(FSPdest/FSPdirl1_1/FSPdirl2_1, 493d)
+ ---- stat(FSPdest/FSPdirl1_1/FSPdirl2_1) --
+[DEBUG] cur_path: FSPdest/FSPdirl1_1/FSPdirl2_1 is a dir
+-- open(FSPsrc/FSPdirl1_1/FSPdirl2_1, 591872, 0) from tid 1 --
+-- opendir(FSPsrc/FSPdirl1_1/FSPdirl2_1) --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- fstat(17) --
+-- close(17) from tid 1 --
+-- stat(FSPsrc/FSPdirl1_1/FSPf2) --
+[DEBUG] cur_path: FSPsrc/FSPdirl1_1/FSPf2 is a dir
+-- Req #73: mkdir(FSPdest/FSPdirl1_1/FSPf2, 493d)
+ ---- stat(FSPdest/FSPdirl1_1/FSPf2) --
+[DEBUG] cur_path: FSPdest/FSPdirl1_1/FSPf2 is a dir
+-- open(FSPsrc/FSPdirl1_1/FSPf2, 591872, 0) from tid 1 --
+-- opendir(FSPsrc/FSPdirl1_1/FSPf2) --
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+[DEBUG] getBufOwnerInfo
+[DEBUG] fsTid = 1
+[DEBUG] isRetry = 0
+-- fstat(20) --
+-- close(20) from tid 1 --
+-- stat(FSPsrc/FSPdirl1_1/FSPf2/efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe) --
+[WARN] Server is unavailable for function fs_stat_internal. Retrying all pending operations.
+^C
+
+real	0m4.098s
+user	0m0.254s
+sys	0m0.033s

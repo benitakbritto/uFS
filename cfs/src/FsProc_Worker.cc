@@ -1035,8 +1035,11 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         cop->op.stat.ret = getReturnValueForFailedReq(fsReq);
         SPDLOG_DEBUG("stat-err set return value to:{}", cop->op.stat.ret);
       } else {
-        if (fsReq->getTargetInode()->inodeData->type == T_FILE)
+        if (fsReq->getTargetInode()->inodeData->type == T_FILE) {
+          std::cout << "[DEBUG] is a file" << std::endl;
+          std::cout << "[DEBUG]" << (cop->op.stat.statbuf.st_mode) << std::endl;
           fsReq->getApp()->AccessIno(fsReq->getTid(), fsReq->getFileInum());
+        }
         opStatsAccountSingleOpDone(FsReqType::STAT, 1);
       }
       cop->opStatus = OP_DONE;

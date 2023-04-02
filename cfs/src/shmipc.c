@@ -213,12 +213,12 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   struct shmipc_msg *rmsg;
   off_t ring_idx;
 
-  ring_idx = __sync_fetch_and_add(&(mgr->next), 1);
+  ring_idx = __sync_fetch_and_add(&(mgr->next), 1); 
+  ring_idx = ring_idx & mgr->mask;
   // ring_idx 0 is reserved for getting server pid
   if (ring_idx == 0) {
-    ring_idx = __sync_fetch_and_add(&(mgr->next), 1);
+    ring_idx = 1;
   }
-  ring_idx = ring_idx & mgr->mask;
   rmsg = IDX_TO_MSG(mgr, ring_idx);
 
   // NOTE: If the buffer is not large enough and we happen to
@@ -230,6 +230,7 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   // when slots are available.
   while (__builtin_expect(rmsg->status != shmipc_STATUS_EMPTY, 0))
     ;
+
   
   // NOTE: This (below) might cause cache invalidations slowing down
   // server poll. Maybe client side should have a bitmap for the
@@ -294,7 +295,6 @@ int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off
 
   // Tries until server is alive
   while (is_server_up(serverPid)) {
-    // printf("[DEBUG] at loop begin %d\n", count); fflush(stdout);
     if (reqSent == 0) {
       // printf("[DEBUG] Sending msg: %d\n", count); fflush(stdout);
       shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg, shmipc_STATUS_READY_FOR_SERVER);
@@ -303,22 +303,17 @@ int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off
     usleep(3000);
     // sleep(1);
 
-    // printf("[DEBUG] polling msg %d\n", count); fflush(stdout);
     ret = shmipc_mgr_poll_msg(mgr, ring_idx, msg); // TODO: Should use better names
-    // printf("[DEBUG] polled msg %d\n", count); fflush(stdout);
     if (ret == 0) {
       // printf("[DEBUG] msg responded by server %d\n", count); fflush(stdout);
       return ret;
     }
 
-    // printf("[DEBUG] at loop end %d\n", count); fflush(stdout);
-    // count++;
+    count++;
     reqSent = 1;
     
     // sleep(1); // TODO: Delete
   }
-
-  // printf("[DEBUG] server is not available\n");
 
   return ret;
 }

@@ -55,11 +55,12 @@ CFS_DIR *fs_opendir_retry(const char *name, uint64_t requestId);
 int fs_fdatasync_retry(int fd, uint64_t requestId);
 int fs_close_retry(int fd, uint64_t requestId);
 int fs_fsync_retry(int fd, uint64_t requestId);
-
+ssize_t fs_allocated_pwrite_retry(int fd, void *buf, ssize_t count, off_t offset, uint64_t requestId);
+ssize_t fs_allocated_pread_retry(int fd, void *buf, size_t count, off_t offset, uint64_t requestId, void **bufPtr);
 
 // if enabled, will print each api invocation
 // #define _CFS_LIB_PRINT_REQ_
-// #define LDB_PRINT_CALL
+#define LDB_PRINT_CALL
 
 /* #region requestId */
 // TODO: Lock over gRequestId
@@ -85,13 +86,13 @@ void print_admin_inode_reassignment(int type, uint32_t inode, int curOwner,
           curOwner, newOwner);                         
 }
 
-void print_open(const char *path, int flags, mode_t mode, bool ldb = false) {
-  fprintf(stderr, "-- open%s(%s, %d, %d) from tid %d --\n", ldb ? "_ldb" : "", path,
+void print_open(const char *path, int flags, mode_t mode, bool ldb = false, uint64_t requestId = 0) {
+  fprintf(stderr, "-- Req #%ld: open%s(%s, %d, %d) from tid %d --\n", requestId, ldb ? "_ldb" : "", path,
           flags, mode, threadFsTid);
 }
 
-void print_close(int fd, bool ldb = false) {
-  fprintf(stderr, "-- close%s(%d) from tid %d --\n", ldb ? "_ldb" : "", fd,
+void print_close(int fd, bool ldb = false, uint64_t requestId = 0) {
+  fprintf(stderr, "-- Req#%ld: close%s(%d) from tid %d --\n", requestId, ldb ? "_ldb" : "", fd,
           threadFsTid);
 }
 
@@ -108,13 +109,13 @@ void print_read(int fd, void *buf, size_t count, uint64_t requestId = 0, bool ld
 
 void print_write(int fd, const void *buf, size_t count, uint64_t requestId = 0, 
   bool ldb = false) {
-  fprintf(stderr, "-- Req #%ld: write%s(%d, %s, %lu) from tid %d --\n", requestId, ldb ? "_ldb" : "", fd,
-          (char *) buf, count, threadFsTid);
+  fprintf(stderr, "-- Req #%ld: write%s(%d, %p, %lu) from tid %d --\n", requestId, ldb ? "_ldb" : "", fd,
+          buf, count, threadFsTid);
 }
 
 void print_pwrite(int fd, const void *buf, size_t count, off_t offset, uint64_t requestId = 0) {
-  fprintf(stderr, "-- Req #%ld: pwrite(%d, %s, %lu, %ld)\n --", requestId,
-          fd, (char *)buf, count, offset);
+  fprintf(stderr, "-- Req #%ld: pwrite(%d, %p, %lu, %ld)\n --", requestId,
+          fd, buf, count, offset);
 }
 
 void print_mkdir(const char *pathname, mode_t mode, uint64_t requestId = 0) {
@@ -136,16 +137,16 @@ void print_rename(const char *oldpath, const char *newpath) {
           threadFsTid);
 }
 
-void print_opendir(const char *path) {
-  fprintf(stderr, "-- opendir(%s) --\n", path);
+void print_opendir(const char *path, uint64_t requestId) {
+  fprintf(stderr, "-- Req #%ld: opendir(%s) --\n", requestId, path);
 }
 
-void print_stat(const char *path) {
-  fprintf(stderr, "-- stat(%s) --\n", path);
+void print_stat(const char *path, uint64_t requestId) {
+  fprintf(stderr, "-- Req #%ld: stat(%s) --\n", requestId, path);
 }
 
-void print_fstat(int fd) {
-  fprintf(stderr, "-- fstat(%d) --\n", fd);
+void print_fstat(int fd, uint64_t requestId) {
+  fprintf(stderr, "-- Req#%ld: fstat(%d) --\n", requestId, fd);
 }
 
 /* #endregion print api end */
@@ -404,10 +405,6 @@ int is_server_up(pid_t pid) {
     return 0;
   }
 
-  // if (errno == EPERM) {
-  //   std::cout << "[DEBUG] Do not have permission" << std::endl; 
-  // }
-  
   return 1;
 }
 
@@ -457,8 +454,8 @@ void PendingQueueMgr::init(key_t shmKey) {
     throw std::runtime_error("PendingQueueMgr::init failed to initialize shared memory");
   }
 
-    std::cout << "INFO PendingQueueMgr connected to contrl shm at " << shmfile
-            << std::endl;
+  std::cout << "INFO PendingQueueMgr connected to contrl shm at " << shmfile
+          << std::endl;
 }
 
 struct shmipc_mgr *PendingQueueMgr::getShmManager() {
@@ -633,10 +630,10 @@ struct allocatedPreadOp *fillAllocedPreadOp(struct clientOp *curCop, int fd,
 static inline void prepare_allocatedPreadOp(struct shmipc_msg *msg,
                                             struct allocatedPreadOpPacked *op,
                                             int fd, size_t count,
-                                            off_t offset) {
+                                            off_t offset, uint64_t requestId = 0) {
   msg->type = CFS_OP_ALLOCED_PREAD;
   op->offset = offset;
-  prepare_rwOpCommon(&(op->rwOp), fd, count);
+  prepare_rwOpCommon(&(op->rwOp), fd, count, requestId);
 }
 
 struct allocatedWriteOp *fillAllocedWriteOp(struct clientOp *curCop, int fd,
@@ -668,10 +665,10 @@ struct allocatedPwriteOp *fillAllocedPwriteOp(struct clientOp *curCop, int fd,
 static inline void prepare_allocatedPwriteOp(struct shmipc_msg *msg,
                                              struct allocatedPwriteOpPacked *op,
                                              int fd, size_t count,
-                                             off_t offset) {
+                                             off_t offset, uint64_t requestId) {
   msg->type = CFS_OP_ALLOCED_PWRITE;
   op->offset = offset;
-  prepare_rwOpCommon(&(op->rwOp), fd, count);
+  prepare_rwOpCommon(&(op->rwOp), fd, count, requestId);
 }
 
 struct readOp *fillReadOp(struct clientOp *curCop, int fd, size_t count) {
@@ -796,9 +793,10 @@ struct closeOp *fillCloseOp(struct clientOp *curCop, int fd) {
 }
 
 static inline void prepare_closeOp(struct shmipc_msg *msg, struct closeOp *op,
-                                   int fd) {
+                                   int fd, uint64_t requestId) {
   msg->type = CFS_OP_CLOSE;
   op->fd = fd;
+  op->requestId = requestId;
   EmbedThreadIdToAsOpRet(op->ret);
 }
 
@@ -816,8 +814,9 @@ struct statOp *fillStatOp(struct clientOp *curCop, const char *path,
 }
 
 static inline void prepare_statOp(struct shmipc_msg *msg, struct statOp *op,
-                                  const char *path) {
+                                  const char *path, uint64_t requestId) {
   msg->type = CFS_OP_STAT;
+  op->requestId = requestId;
   EmbedThreadIdToAsOpRet(op->ret);
   adjustPath(path, &(op->path[0]));
 }
@@ -853,9 +852,10 @@ struct fstatOp *fillFstatOp(struct clientOp *curCop, int fd,
 }
 
 static inline void prepare_fstatOp(struct shmipc_msg *msg, struct fstatOp *op,
-                                   int fd) {
+                                   int fd, uint64_t requestId) {
   msg->type = CFS_OP_FSTAT;
   op->fd = fd;
+  op->requestId = requestId;
   EmbedThreadIdToAsOpRet(op->ret);
 }
 
@@ -925,8 +925,9 @@ static inline void prepare_unlinkOp(struct shmipc_msg *msg, struct unlinkOp *op,
 
 static inline void prepare_opendirOp(struct shmipc_msg *msg,
                                      struct opendirOp *op,
-                                     const char *pathname) {
+                                     const char *pathname, uint64_t requestId) {
   msg->type = CFS_OP_OPENDIR;
+  op->requestId = requestId;
   adjustPath(pathname, &(op->name[0]));
   EmbedThreadIdToAsOpRet(op->numDentry);
 }
@@ -1196,6 +1197,7 @@ void _setup_app_thread_mem_buf() {
   for (int idx = 0; idx < numShmFiles; idx++) {
     curFsLibMemBuf->getShmConfigForIdx(idx, cur_shmFname, cur_block_sz,
                                        cur_block_cnt, cur_shmid);
+    
     cur_shmid =
         fs_notify_server_new_shm(cur_shmFname, cur_block_sz, cur_block_cnt);
     if (cur_shmid < 0) {
@@ -1205,8 +1207,10 @@ void _setup_app_thread_mem_buf() {
     curFsLibMemBuf->setShmIDForIdx(idx, cur_shmid);
   }
 
+ 
   gLibSharedContext->tidMemBufMap.insert(
-      std::make_pair(threadFsTid, curFsLibMemBuf));
+    std::make_pair(threadFsTid, curFsLibMemBuf));
+  
 }
 
 FsLibMemMng *check_app_thread_mem_buf_ready(int fsTid) {
@@ -1671,6 +1675,21 @@ ssize_t handle_pwrite_retry(uint64_t reqId) {
   return ret;
 }
 
+ssize_t handle_allocated_pwrite_retry(uint64_t reqId) {
+  auto op = gServMngPtr->queueMgr->getPendingXreq<struct allocatedPwriteOpPacked>(gServMngPtr->reqRingMap[reqId][0]);
+  char *data = gServMngPtr->reqAllocatedDataMap[reqId];
+  char *buf = (char *)fs_malloc(48 * 1024);
+  strcpy(buf, data);
+  auto ret = fs_allocated_pwrite_retry(op->rwOp.fd, buf, op->rwOp.count, op->offset, reqId);
+
+  if (ret > 0) {
+    // clean up
+    gServMngPtr->queueMgr->dequePendingMsg(reqId);
+  }
+
+  return ret;
+}
+
 int handle_create_retry(uint64_t reqId) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct openOp>(gServMngPtr->reqRingMap[reqId][0]);
   auto ret = fs_open_retry(op->path, op->flags, op->mode, reqId);
@@ -1680,7 +1699,22 @@ int handle_create_retry(uint64_t reqId) {
 ssize_t handle_pread_retry(uint64_t reqId, void* buf) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct preadOpPacked>(gServMngPtr->reqRingMap[reqId][0]);
   auto ret = fs_pread_retry(op->rwOp.fd, buf, op->rwOp.count, op->offset, reqId);
-  char *readRes = (char *) buf;
+
+  if (ret > 0) {
+    // clean up
+    gServMngPtr->queueMgr->dequePendingMsg(reqId);
+  }
+
+  return ret;
+}
+
+ssize_t handle_allocated_pread_retry(uint64_t reqId, void** bufPtr) {
+  auto op = gServMngPtr->queueMgr->getPendingXreq<struct allocatedPreadOpPacked>(gServMngPtr->reqRingMap[reqId][0]);
+  // fs_free(buf);
+  *bufPtr = (void *)fs_malloc(op->rwOp.count + 1);
+  memset(*bufPtr, 0, op->rwOp.count + 1);
+  auto ret = fs_allocated_pread_retry(op->rwOp.fd, *bufPtr, op->rwOp.count, op->offset, reqId, bufPtr);
+  
   if (ret > 0) {
     // clean up
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
@@ -1796,7 +1830,7 @@ int handle_fdatasync_retry(uint64_t reqId) {
 
 // TODO: fs_rename
 int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, 
-  CFS_DIR *dir = nullptr) {
+  CFS_DIR *dir = nullptr, void **bufPtr = nullptr) {
   if (gServMngPtr->reqRingMap.size() == 0) {
     // std::cout << "[INFO] No ops to retry" << std::endl;
     return 0;
@@ -1818,12 +1852,24 @@ int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr,
           ret = handle_pwrite_retry(reqId);
           itr++;
           break;
+        case CFS_OP_ALLOCED_PWRITE:
+          ret = handle_allocated_pwrite_retry(reqId);
+          itr++;
+          break;
         case CFS_OP_CREATE:
           ret = handle_create_retry(reqId);
           itr++;
           break;
         case CFS_OP_PREAD:
           ret = handle_pread_retry(reqId, buf);
+          if (ret > 0) {
+            gServMngPtr->reqRingMap.erase(itr++);
+          } else {
+            itr++;
+          }
+          break;
+        case CFS_OP_ALLOCED_PREAD:
+          ret = handle_allocated_pread_retry(reqId, bufPtr);
           if (ret > 0) {
             gServMngPtr->reqRingMap.erase(itr++);
           } else {
@@ -2067,7 +2113,7 @@ int fs_stat_internal(FsService *fsServ, const char *pathname,
   memset(&msg, 0, sizeof(msg));
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   statOp = (struct statOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
-  prepare_statOp(&msg, statOp, pathname);
+  prepare_statOp(&msg, statOp, pathname, requestId);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
     &msg, gServMngPtr->fsServPid) == -1) {
@@ -2098,7 +2144,7 @@ cleanup:
 
 int fs_stat_internal_common(const char *pathname, struct stat *statbuf, uint64_t requestId) {
 #ifdef LDB_PRINT_CALL
-  print_stat(pathname);
+  print_stat(pathname, requestId);
 #endif
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_STAT);
@@ -2151,7 +2197,7 @@ int fs_fstat_internal(FsService *fsServ, int fd, struct stat *statbuf, uint64_t 
   memset(&msg, 0, sizeof(msg));
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   fstatOp = (struct fstatOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
-  prepare_fstatOp(&msg, fstatOp, fd);
+  prepare_fstatOp(&msg, fstatOp, fd, requestId);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
     &msg, gServMngPtr->fsServPid) == -1) {
@@ -2178,7 +2224,7 @@ cleanup:
 // TODO: Fix, when widIt not know, go with primary
 int fs_fstat_internal_common(int fd, struct stat *statbuf, uint64_t requestId) {
 #ifdef LDB_PRINT_CALL
-  print_fstat(fd);
+  print_fstat(fd, requestId);
 #endif
   auto widIt = gLibSharedContext->fdWidMap.find(fd);
   FsService *fsServ; 
@@ -2295,7 +2341,7 @@ int fs_open_internal_common(const char *path, int flags, mode_t mode, uint64_t r
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_OPEN);
 #endif
 #ifdef LDB_PRINT_CALL
-  print_open(path, flags, mode);
+  print_open(path, flags, mode, false, requestId);
 #endif
   char *standardPath = filepath2TokensStandardized(path, delixArr, dummy);
 
@@ -2356,7 +2402,7 @@ int fs_close_internal(FsService *fsServ, int fd, uint64_t requestId) {
   memset(&msg, 0, sizeof(msg));
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   cloOp = (struct closeOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
-  prepare_closeOp(&msg, cloOp, fd);
+  prepare_closeOp(&msg, cloOp, fd, requestId);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, 
     ring_idx, &msg, gServMngPtr->fsServPid) == -1) {
@@ -2407,7 +2453,7 @@ int fs_close_internal_common(int fd, uint64_t requestId) {
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_CLOSE);
 #endif
 #ifdef LDB_PRINT_CALL
-  print_close(fd);
+  print_close(fd, false, requestId);
 #endif
 retry:
   int wid = -1;
@@ -2606,7 +2652,7 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name, uint64_t reque
   memset(&msg, 0, sizeof(msg));
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   odop = (struct opendirOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
-  prepare_opendirOp(&msg, odop, name);
+  prepare_opendirOp(&msg, odop, name, requestId);
   odop->alOp.shmid = shmid;
   odop->alOp.dataPtrId = dataPtrId;
 
@@ -2668,7 +2714,7 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name, uint64_t reque
 
 CFS_DIR *fs_opendir_internal_common(const char *name, uint64_t requestId) {
 #ifdef LDB_PRINT_CALL
-  print_opendir(name);
+  print_opendir(name, requestId);
 #endif
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_OPENDIR);
@@ -3552,7 +3598,9 @@ int fs_close_lease(int fd) {
 }
 /*#endregion*/
 
+// TODO: Fix allocated retry
 /* #region fs_allocated_xxx */
+// TODO: Note - not being used
 static ssize_t fs_allocated_read_internal(FsService *fsServ, int fd, void *buf,
                                           size_t count) {
   struct shmipc_msg msg;
@@ -3599,7 +3647,7 @@ static ssize_t fs_allocated_read_internal(FsService *fsServ, int fd, void *buf,
 }
 
 static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
-                                           size_t count, off_t offset) {
+  size_t count, off_t offset, uint64_t requestId, void **bufPtr) {
   struct shmipc_msg msg;
   struct allocatedPreadOpPacked *aprop_p;
   off_t ring_idx;
@@ -3626,7 +3674,7 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   aprop_p = (struct allocatedPreadOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr,
                                                          ring_idx);
-  prepare_allocatedPreadOp(&msg, aprop_p, fd, count, offset);
+  prepare_allocatedPreadOp(&msg, aprop_p, fd, count, offset, requestId);
   aprop_p->alOp.shmid = shmid;
   aprop_p->alOp.dataPtrId = dataPtrId;
 
@@ -3637,8 +3685,21 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
     &msg, gServMngPtr->fsServPid) == -1) {
+    if (gServMngPtr->reqRingMap.count(requestId) == 0) {
+      auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+      gServMngPtr->queueMgr->enqueuePendingXreq<struct allocatedPreadOpPacked>(aprop_p, off);
+      gServMngPtr->reqRingMap[requestId].push_back(off);
+    }
+      
     print_server_unavailable(__func__);
-    rc = fs_retry_pending_ops();
+    
+    // cleanup
+    shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
+    // fs_free(buf);
+    threadFsTid = 0;
+
+    auto ret = fs_retry_pending_ops(nullptr, nullptr, nullptr, bufPtr);
+    return ret;
   }
   unpack_allocatedPreadOp(aprop_p, &aprop);
   rc = aprop.rwOp.ret;
@@ -3651,9 +3712,11 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
   return rc;
 }
 
-ssize_t fs_allocated_read(int fd, void *buf, size_t count) {
+ssize_t fs_allocated_read_internal_common(int fd, void *buf, size_t count, 
+  uint64_t requestId, void **bufPtr) {
+  std::cout << "Inside " << __func__ << std::endl; 
 #ifdef LDB_PRINT_CALL
-  print_read(fd, buf, count);
+  print_read(fd, buf, count, requestId);
 #endif
   int wid = -1;
   if (count == 0) return 0;
@@ -3664,7 +3727,7 @@ retry:
   auto service = getFsServiceForFD(fd, wid);
   // ssize_t rc = fs_allocated_read_internal(service, fd, buf, count);
   auto offset = service->getOffset(fd);
-  ssize_t rc = fs_allocated_pread_internal(service, fd, buf, count, offset);
+  ssize_t rc = fs_allocated_pread_internal(service, fd, buf, count, offset, requestId, bufPtr);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
@@ -3678,9 +3741,21 @@ retry:
   return rc;
 }
 
-ssize_t fs_allocated_pread(int fd, void *buf, size_t count, off_t offset) {
+ssize_t fs_allocated_read_retry(int fd, void *buf, size_t count, uint64_t requestId, void **bufPtr) {
+  return fs_allocated_read_internal_common(fd, buf, count, requestId, bufPtr);
+}
+
+ssize_t fs_allocated_read(int fd, void *buf, size_t count, void **bufPtr) {
+  std::cout << "Inside " << __func__ << std::endl; 
+  auto requestId = getNewRequestId();
+  return fs_allocated_read_internal_common(fd, buf, count, requestId, bufPtr);
+}
+
+ssize_t fs_allocated_pread_internal_common(int fd, void *buf, size_t count, 
+  off_t offset, uint64_t requestId, void **bufPtr) {
+  std::cout << "Inside " << __func__ << std::endl; 
 #ifdef LDB_PRINT_CALL
-  print_pread(fd, buf, count, offset);
+  print_pread(fd, buf, count, offset, requestId);
 #endif
   if (OpenLease::IsLocalFd(fd)) {
     int base_fd = OpenLease::FindBaseFd(fd);
@@ -3696,18 +3771,29 @@ ssize_t fs_allocated_pread(int fd, void *buf, size_t count, off_t offset) {
 #endif
 retry:
   auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_allocated_pread_internal(service, fd, buf, count, offset);
+  ssize_t rc = fs_allocated_pread_internal(service, fd, buf, count, offset, requestId, bufPtr);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
     if (should_retry) goto retry;
-  }
+  } 
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_PREAD, tsIdx);
 #endif
   return rc;
 }
 
+ssize_t fs_allocated_pread_retry(int fd, void *buf, size_t count, off_t offset, 
+  uint64_t requestId, void **bufPtr) {
+  return fs_allocated_pread_internal_common(fd, buf, count, offset, requestId, bufPtr);
+}
+
+ssize_t fs_allocated_pread(int fd, void *buf, size_t count, off_t offset, void **bufPtr) {
+  auto requestId = getNewRequestId();
+  return fs_allocated_pread_internal_common(fd, buf, count, offset, requestId, bufPtr);
+}
+
+// Note: not being used
 static ssize_t fs_allocated_write_internal(FsService *fsServ, int fd, void *buf,
                                            size_t count) {
   struct shmipc_msg msg;
@@ -3756,7 +3842,7 @@ static ssize_t fs_allocated_write_internal(FsService *fsServ, int fd, void *buf,
 
 static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
                                             void *buf, size_t count,
-                                            off_t offset) {
+                                            off_t offset, uint64_t requestId) {
   struct shmipc_msg msg;
   struct allocatedPwriteOpPacked *apwop_p;
   off_t ring_idx;
@@ -3789,15 +3875,24 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   apwop_p = (struct allocatedPwriteOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr,
                                                           ring_idx);
-  prepare_allocatedPwriteOp(&msg, apwop_p, fd, count, offset);
+  prepare_allocatedPwriteOp(&msg, apwop_p, fd, count, offset, requestId);
   apwop_p->alOp.shmid = shmid;
   apwop_p->alOp.dataPtrId = dataPtrId;
+
+  if (gServMngPtr->reqRingMap.count(requestId) == 0) {
+    auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+    gServMngPtr->queueMgr->enqueuePendingXreq<struct allocatedPwriteOpPacked>(apwop_p, pendingOpIdx);
+    gServMngPtr->reqRingMap[requestId].push_back(pendingOpIdx);
+    gServMngPtr->reqAllocatedDataMap[requestId] = (char *)buf;
+  }
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
     &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
-    rc = fs_retry_pending_ops();  
+    shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
+    threadFsTid = 0;
+    return fs_retry_pending_ops();  
   }
   rc = apwop_p->rwOp.ret;
 
@@ -3805,9 +3900,10 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
   return rc;
 }
 
-ssize_t fs_allocated_write(int fd, void *buf, size_t count) {
+ssize_t fs_allocated_write_internal_common(int fd, void *buf, size_t count, 
+  uint64_t requestId) {
 #ifdef LDB_PRINT_CALL
-  print_write(fd, buf, count);
+  print_write(fd, buf, count, requestId);
 #endif
   if (OpenLease::IsLocalFd(fd)) {
     int base_fd = OpenLease::FindBaseFd(fd);
@@ -3842,7 +3938,7 @@ retry:
   auto service = getFsServiceForFD(fd, wid);
   auto offset = service->getOffset(fd);
   // ssize_t rc = fs_allocated_write_internal(service, fd, buf, count);
-  ssize_t rc = fs_allocated_pwrite_internal(service, fd, buf, count, offset);
+  ssize_t rc = fs_allocated_pwrite_internal(service, fd, buf, count, offset, requestId);
 #ifdef _CFS_LIB_PRINT_REQ_
   fprintf(stdout, "fs_allocated_write fd:%d count:%ld rc:%ld\n", fd, count, rc);
 #endif
@@ -3860,14 +3956,29 @@ retry:
   return rc;
 }
 
-ssize_t fs_allocated_pwrite(int fd, void *buf, ssize_t count, off_t offset) {
+ssize_t fs_allocated_write_retry(int fd, void *buf, size_t count, 
+  uint64_t requestId) {
+  return fs_allocated_write_internal_common(fd, buf, count, requestId);
+}
+
+ssize_t fs_allocated_write(int fd, void *buf, size_t count) {
+  auto requestId = getNewRequestId();
+  return fs_allocated_write_internal_common(fd, buf, count, requestId);
+}
+
+
+ssize_t fs_allocated_pwrite_internal_common(int fd, void *buf, ssize_t count, 
+  off_t offset, uint64_t requestId) {
   int wid = -1;
+#ifdef LDB_PRINT_CALL
+  print_pwrite(fd, buf, count, offset, requestId);
+#endif
 #ifdef CFS_LIB_SAVE_API_TS
   int tsIdx = tFsApiTs->addApiStart(FsApiType::FS_PWRITE);
 #endif
 retry:
   auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_allocated_pwrite_internal(service, fd, buf, count, offset);
+  ssize_t rc = fs_allocated_pwrite_internal(service, fd, buf, count, offset, requestId);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
@@ -3877,6 +3988,17 @@ retry:
   tFsApiTs->addApiNormalDone(FsApiType::FS_PWRITE, tsIdx);
 #endif
   return rc;
+}
+
+ssize_t fs_allocated_pwrite_retry(int fd, void *buf, ssize_t count, 
+  off_t offset, uint64_t requestId) {
+  return fs_allocated_pwrite_internal_common(fd, buf, count, offset, requestId);
+}
+
+ssize_t fs_allocated_pwrite(int fd, void *buf, ssize_t count, 
+  off_t offset) {
+  auto requestId = getNewRequestId();
+  return fs_allocated_pwrite_internal_common(fd, buf, count, offset, requestId);
 }
 
 #if 0
@@ -4004,7 +4126,7 @@ static ssize_t fs_rw_renew_lease(FsService *fsServ, int fd, void *buf,
                                  FsLeaseCommon::rdtscmp_ts_t &ts,
                                  void (*set_lease_flag_func)(T2 *),
                                  void (*prep_op_fun)(struct shmipc_msg *, T2 *,
-                                                     int, size_t, off_t),
+                                                     int, size_t, off_t, uint64_t),
                                  void (*unpack_func)(T2 *, T1 *)) {
   T2 *top_packed;
 
@@ -4022,7 +4144,7 @@ static ssize_t fs_rw_renew_lease(FsService *fsServ, int fd, void *buf,
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
   top_packed =
       reinterpret_cast<T2 *>(IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx));
-  prep_op_fun(&msg, top_packed, fd, count, offset);
+  prep_op_fun(&msg, top_packed, fd, count, offset, 0);
 
   set_lease_flag_func(top_packed);
 

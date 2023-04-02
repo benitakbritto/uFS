@@ -223,7 +223,9 @@ void process(std::string const &line) {
         size_t count = stoiWrapper(tokens[2]);
         char *buf = (char *)fs_malloc(count + 1);
         memset(buf, 0, count + 1);
-        ssize_t ret = fs_allocated_read(fd, buf, count);
+        std::cout << "Inside " << __func__ << std::endl; 
+        printf("[DEBUG] buf ptr = %p\n", &buf);
+        ssize_t ret = fs_allocated_read(fd, buf, count, (void **) &buf);
         printReturnValue(tokens[0], ret);
         int print_cnt = count > 100 ? 100 : count;
         if ((size_t)ret == count) {
@@ -285,8 +287,10 @@ void process(std::string const &line) {
         size_t count = stoiWrapper(tokens[2]);
         off_t offset = stollWrapper(tokens[3]);
         char *buf = (char *)fs_malloc(count + 1);
+         std::cout << "Inside " << __func__ << std::endl; 
+        printf("[DEBUG] buf ptr = %p\n", &buf);
         memset(buf, 0, count + 1);
-        ssize_t ret = fs_allocated_pread(fd, buf, count, offset);
+        ssize_t ret = fs_allocated_pread(fd, buf, count, offset, (void **) &buf);
         printReturnValue(tokens[0], ret);
         int print_cnt = count > 100 ? 100 : count;
         if ((size_t)ret == count) {

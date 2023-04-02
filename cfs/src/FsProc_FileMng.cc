@@ -1841,6 +1841,7 @@ void FileMng::processStat(FsReq *req) {
           // finish request here
           clientOp *cop = req->getClientOp();
           struct stat *cur_stat_ptr = &(cop->op.stat.statbuf);
+          memset(cur_stat_ptr, 0, sizeof(struct stat)); // TODO: Check if this is correct
           fromInMemInode2Statbuf(inodePtr, cur_stat_ptr);
           req->getClientOp()->op.stat.ret = 0;
           fsWorker_->submitFsReqCompletion(req);
@@ -3755,12 +3756,16 @@ void FileMng::fromInMemInode2Statbuf(InMemInode *inodePtr,
       inodePtr->i_no, inodePtr->inodeData->size,
       inodePtr->inodeData->i_block_count);
   if (inodePtr->inodeData->type == T_DIR) {
+    std::cout << "[DEBUG]" << __func__ << inodePtr->i_no << "is dir" << std::endl;
     cur_stat_ptr->st_size =
         sizeof(struct cfs_dirent) * inodePtr->inodeData->i_dentry_count;
-    cur_stat_ptr->st_mode = cur_stat_ptr->st_mode | S_IFDIR;
+    // cur_stat_ptr->st_mode = cur_stat_ptr->st_mode | S_IFDIR;
+    cur_stat_ptr->st_mode = S_IFDIR;
   } else {
+    std::cout << "[DEBUG]" << __func__ << inodePtr->i_no << "is reg file" << std::endl;
     cur_stat_ptr->st_size = inodePtr->inodeData->size;
-    cur_stat_ptr->st_mode = cur_stat_ptr->st_mode | S_IFREG;
+    // cur_stat_ptr->st_mode = cur_stat_ptr->st_mode | S_IFREG;
+     cur_stat_ptr->st_mode = S_IFREG;
   }
   // TODO(jingliu): fill more field into stbuf
   cur_stat_ptr->st_gid = inodePtr->inodeData->i_gid;

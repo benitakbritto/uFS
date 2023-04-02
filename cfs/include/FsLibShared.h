@@ -306,6 +306,7 @@ struct openOp {
 struct closeOp {
   int fd;
   int ret;
+  uint64_t requestId;
 };
 
 struct mkdirOp {
@@ -319,12 +320,14 @@ struct mkdirOp {
 struct statOp {
   int ret;
   struct stat statbuf;
+  uint64_t requestId;
   char path[MULTI_DIRSIZE];
 };
 
 struct fstatOp {
   int fd;
   int ret;
+  uint64_t requestId;
   struct stat statbuf;
 };
 
@@ -359,6 +362,7 @@ struct renameOp {
 struct opendirOp {
   int numDentry;
   char name[MULTI_DIRSIZE];
+  uint64_t requestId;
   struct allocatedOpCommon alOp;
 };
 

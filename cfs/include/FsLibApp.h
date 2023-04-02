@@ -157,6 +157,7 @@ struct FsLibServiceMng {
   FsService *primaryServ{nullptr};
   // must process in sorted order of id
   std::map<uint64_t, std::vector<off_t>> reqRingMap;
+  std::unordered_map<uint64_t, char *> reqAllocatedDataMap;
   PendingQueueMgr *queueMgr{nullptr};
   std::unordered_map<uint64_t, std::pair<bool, std::unordered_set<uint64_t>>> compositeRequestIdMap;
   std::unordered_map<uint64_t, uint64_t> childToParentCompositeIdMap;

@@ -1,0 +1,140 @@
+crashRequestNum = {0}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+[DEBUG] threadFsTid = 0
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+[DEBUG] threadFsTid = 1
+[DEBUG] rc = -1
+[DEBUG] In handle_stat retry, size = 0
+[DEBUG] ret = -1
+[DEBUG] In fs_stat_internal retry, size = 0
+[DEBUG] rc = -1
+[DEBUG] ret = -1
+Execution time was 4714336765 nanoseconds when crash num was 0.
+crashRequestNum = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+[DEBUG] threadFsTid = 0
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+[DEBUG] threadFsTid = 1
+[DEBUG] rc = -1
+[DEBUG] ret = -1
+[DEBUG] rc = 0
+[DEBUG] In handle_stat retry, size = 128
+[DEBUG] ret = 0
+[DEBUG] In fs_stat_internal retry, size = 128
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] threadFsTid = 0
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] threadFsTid = 1
+Inside fs_allocated_read
+Inside fs_allocated_read_internal_common
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+Inside fs_allocated_read
+Inside fs_allocated_read_internal_common
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+Inside fs_allocated_read
+Inside fs_allocated_read_internal_common
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] threadFsTid = 1
+Inside fs_allocated_read
+Inside fs_allocated_read_internal_common
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+Inside fs_allocated_read
+Inside fs_allocated_read_internal_common
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+Inside fs_allocated_read
+Inside fs_allocated_read_internal_common
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] threadFsTid = 1
+Inside fs_allocated_read
+Inside fs_allocated_read_internal_common
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+Inside fs_allocated_read
+Inside fs_allocated_read_internal_common
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+Inside fs_allocated_read
+Inside fs_allocated_read_internal_common
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] threadFsTid = 1
+[DEBUG] rc = 0
+[DEBUG] ret = 0
+Execution time was 5040700584 nanoseconds when crash num was 1.
+crashRequestNum = {2}

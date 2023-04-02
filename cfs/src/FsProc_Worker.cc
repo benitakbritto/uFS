@@ -18,7 +18,11 @@
 #include "spdlog/spdlog.h"
 #include "stats/stats.h"
 
+#define CRASH_TEST 1
+#define crash() if (CRASH_TEST) { *((char*)0) = 0; }
+
 extern FsProc *gFsProcPtr;
+int gCrashRequestId = -1;
 
 void FsProcWorker::providerPidToApp(pid_t appPid) {
   auto myPid = getpid();
@@ -764,6 +768,12 @@ void FsProcWorker::onSyncallCompletion(FsReq *req, void *ctx) {
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
+void runCrash(uint64_t requestId) {
+  if (gCrashRequestId == requestId) {
+    crash();
+  }
+}
+
 // handle the FINI task of each FsReq
 // NOTE: directly set the cop's status to OP_DONE, which
 // will be checked by client, not sure if there is race here.
@@ -816,6 +826,8 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         SPDLOG_DEBUG("read-err set return value to:{}", cop->op.read.rwOp.ret);
       }
 
+      runCrash(cop->op.read.rwOp.requestId);
+
       cop->opStatus = OP_DONE;
       pack_msg(readOp, read);
     }
@@ -829,6 +841,9 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         SPDLOG_DEBUG("pread-err set return value to:{}",
                      cop->op.pread.rwOp.ret);
       }
+
+
+      runCrash(cop->op.pread.rwOp.requestId);
 
       cop->opStatus = OP_DONE;
       pack_msg(preadOp, pread);
@@ -860,6 +875,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
                      cop->op.write.rwOp.ret);
       }
 
+      runCrash(cop->op.write.rwOp.requestId);
       cop->opStatus = OP_DONE;
       pack_msg(writeOp, write);
     }
@@ -877,6 +893,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
           fsReq->getClientOp()->op.pwrite.rwOp.requestId);
       }
 
+      runCrash(cop->op.pwrite.rwOp.requestId);
       cop->opStatus = OP_DONE;
       pack_msg(pwriteOp, pwrite);
     }
@@ -910,6 +927,8 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         opStatsAccountSingleOpDone(FsReqType::ALLOC_PREAD,
                                    cop->op.allocpread.rwOp.ret);
       }
+      
+      runCrash(cop->op.allocpread.rwOp.requestId);
       cop->opStatus = OP_DONE;
       pack_msg(allocatedPreadOp, allocpread);
     }
@@ -928,6 +947,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
                                    cop->op.allocwrite.rwOp.ret);
       }
 
+      runCrash(cop->op.allocwrite.rwOp.requestId);
       cop->opStatus = OP_DONE;
       pack_msg(allocatedWriteOp, allocwrite);
     }
@@ -945,6 +965,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
                                    cop->op.allocpwrite.rwOp.ret);
       }
 
+      runCrash(cop->op.allocpwrite.rwOp.requestId);
       cop->opStatus = OP_DONE;
       pack_msg(allocatedPwriteOp, allocpwrite);
     }
@@ -1006,6 +1027,8 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
           flushPendingMetadataOpMap[app->getPid()][fsReq->getTargetInode()->i_no].push_back(cop->op.open.requestId);
         }
       }
+      
+      runCrash(cop->op.open.requestId);
       cop->opStatus = OP_DONE;
       copy_msg(open);
     }  // it != appMap.end()
@@ -1023,6 +1046,8 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         // fsReq->getApp()->EraseIno(fsReq->getTid(), fsReq->getFileInum());
       }
       do_check_inode_migration = false;
+      
+      runCrash(cop->op.close.requestId);
       cop->opStatus = OP_DONE;
       copy_msg(close);
     }
@@ -1042,6 +1067,8 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         }
         opStatsAccountSingleOpDone(FsReqType::STAT, 1);
       }
+      
+      runCrash(cop->op.stat.requestId);
       cop->opStatus = OP_DONE;
       copy_msg(stat);
     }
@@ -1054,6 +1081,8 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         cop->op.fstat.ret = getReturnValueForFailedReq(fsReq);
         SPDLOG_DEBUG("fstat-err set return value to:{}", cop->op.fstat.ret);
       }
+      
+      runCrash(cop->op.fstat.requestId);
       cop->opStatus = OP_DONE;
       copy_msg(fstat);
     }
@@ -1068,6 +1097,8 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
       } else {
         flushPendingMetadataOpMap[app->getPid()][fsReq->getTargetInode()->i_no].push_back(cop->op.mkdir.requestId);
       }
+      
+      runCrash(cop->op.mkdir.requestId);
       cop->opStatus = OP_DONE;
       copy_msg(mkdir);
     }
@@ -1119,6 +1150,8 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         // TODO have returncode for opendir as well
         cop->op.opendir.numDentry = getReturnValueForFailedReq(fsReq);
       }
+      
+      runCrash(cop->op.opendir.requestId);
       cop->opStatus = OP_DONE;
       copy_msg(opendir);
     }
@@ -2750,9 +2783,10 @@ void FsProcWorker::notifyFileMetadataOps(cfs_ino_t inodeNum) {
 
 FsProcWorkerMaster::FsProcWorkerMaster(int w, CurBlkDev *d, int shmBaseOffset,
                                        std::atomic_bool *workerRunning,
-                                       PerWorkerLoadStatsSR *stats)
+                                       PerWorkerLoadStatsSR *stats, int crashRequestId)
     : FsProcWorker(w, d, shmBaseOffset, workerRunning, stats) {
-
+  gCrashRequestId = crashRequestId;
+  std::cout << "[DEBUG] gCrashRequestId = " << gCrashRequestId << std::endl;
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_INFO("policy NUMBER:{}", gFsProcPtr->getSplitPolicy());
   switch (gFsProcPtr->getSplitPolicy()) {

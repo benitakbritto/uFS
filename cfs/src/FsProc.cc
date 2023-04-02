@@ -169,7 +169,8 @@ int AppProc::GetDstWid(int tau_id, cfs_ino_t ino) {
 
 void FsProc::startWorkers(std::vector<int> &shmOffsetVec,
                           std::vector<CurBlkDev *> &devVec,
-                          std::vector<int> &workerCoresVec) {
+                          std::vector<int> &workerCoresVec,
+                          int crashRequestNum) {
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #ifdef TWEAK_SPLIT_DO_MOD
   SPDLOG_WARN("!!!!!!!!!! Using TWEAK_SPLIT_DO_MOD");
@@ -227,7 +228,7 @@ void FsProc::startWorkers(std::vector<int> &shmOffsetVec,
 #elif defined SCALE_USE_ATOMIC_DATA
   auto masterWorker =
       new FsProcWorkerMaster(FsProcWorker::kMasterWidConst + 0, devVec[0],
-                             shmOffsetVec[0], &workerRunning[0], nullptr);
+                             shmOffsetVec[0], &workerRunning[0], nullptr, crashRequestNum);
 #else
   ASSERT_STATS_TYPE_NOT_VALID
 #endif
@@ -334,7 +335,7 @@ FsProcWorker *FsProc::startInlineWorker(CurBlkDev *dev, bool loadFs) {
       loadMng->getWorkerStatsPtr(FsProcWorker::kMasterWidConst)));
 #elif defined SCALE_USE_ATOMIC_DATA
   auto *curWorker = reinterpret_cast<FsProcWorker *>(new FsProcWorkerMaster(
-      FsProcWorker::kMasterWidConst, dev, 0, &workerRunning[0], nullptr));
+      FsProcWorker::kMasterWidConst, dev, 0, &workerRunning[0], nullptr, -1));
 #else
   ASSERT_STATS_TYPE_NOT_VALID
 #endif

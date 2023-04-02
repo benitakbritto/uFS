@@ -218,7 +218,8 @@ class FsProc {
   // @param workerCoresVec: cores to pin each worker on.
   void startWorkers(std::vector<int> &shmOffsetVec,
                     std::vector<CurBlkDev *> &devVec,
-                    std::vector<int> &workerCoresVec);
+                    std::vector<int> &workerCoresVec,
+                    int crashRequestNum);
 
   // start inline worker (main thread itself as worker)
   // mostly for testing and data directly R/W
@@ -1093,7 +1094,7 @@ class FsProcWorkerMaster : public FsProcWorker {
  public:
   FsProcWorkerMaster(int w, CurBlkDev *d, int shmBaseOffset,
                      std::atomic_bool *workerRunning,
-                     PerWorkerLoadStatsSR *stats);
+                     PerWorkerLoadStatsSR *stats, int crashRequestNum);
 
   ~FsProcWorkerMaster() {}
 

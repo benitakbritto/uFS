@@ -18,9 +18,6 @@
 #include "FsReq_SyncBatchCtx.h"
 #endif
 
-#define CRASH_TEST 1
-#define crash() if (CRASH_TEST) { *((char*)0) = 0; }
-
 extern FsProc *gFsProcPtr;
 
 //

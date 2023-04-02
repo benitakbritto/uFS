@@ -30,7 +30,7 @@ void handle_sigint(int sig);
 //   parameter will be used as SPDK options
 int fsMain(int numWorkers, int numAppProc, std::vector<int> &shmBaseOffsets,
            const char *exitSignalFileName, const char *configFileName,
-           bool isSpdk, std::vector<int> &workerCores) {
+           bool isSpdk, std::vector<int> &workerCores, int crashRequestNum) {
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 #if CFS_JOURNAL(OFF)
   fprintf(stdout, "Journal is disabled\n");
@@ -92,7 +92,7 @@ int fsMain(int numWorkers, int numAppProc, std::vector<int> &shmBaseOffsets,
 
   signal(SIGINT, handle_sigint);
   // start workers
-  gFsProcPtr->startWorkers(shmBaseOffsets, devVec, workerCores);
+  gFsProcPtr->startWorkers(shmBaseOffsets, devVec, workerCores, crashRequestNum);
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
@@ -199,11 +199,11 @@ int main(int argc, char **argv) {
     // experiments.
     fsMain(std::stoi(std::string(argv[1])), std::stoi(std::string(argv[2])),
            /*shmBaseOffset*/ shmBaseOffsetVec, /*exitSignalFileName*/ nullptr,
-           /*configFileName*/ nullptr, isSpdk, workerCores);
+           /*configFileName*/ nullptr, isSpdk, workerCores, -1/*crashRequestNum*/);
   } else if (argc == 5) {
     shmBaseOffsetVec[0] = std::stoi(std::string(argv[3]));
     fsMain(std::stoi(std::string(argv[1])), std::stoi(std::string(argv[2])),
-           shmBaseOffsetVec, argv[4], nullptr, isSpdk, workerCores);
+           shmBaseOffsetVec, argv[4], nullptr, isSpdk, workerCores, -1/*crashRequestNum*/);
   } else if (argc >= 6) {
     // NOTE: now this argument list is preferable. (2020/07/29)
     auto numWorkers = std::stoi(std::string(argv[1]));
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
       exit(1);
     }
 
-    if (argc == 7 || argc == 8) {
+    if (argc == 7 || argc >= 8) {
       // last argument is a comma separated list of cores to pin workers on
       // TODO convert code to use getopt - will be much cleaner
       // e.g. cfs/test/shmipc/client.c and cfs/test/shmipc/myargs.h
@@ -232,15 +232,16 @@ int main(int argc, char **argv) {
       }
     }
 
-    if (argc == 8 && std::experimental::filesystem::exists(argv[7])) {
+    if (argc >= 8 && std::experimental::filesystem::exists(argv[7])) {
       // optional argument
       // use this to pass in a configuration file to configure FSP behavior
       // mostly specify the policy
       gFspConfigFname = argv[7];
       SPDLOG_INFO("FSP configuration file is set to :{}", gFspConfigFname);
     }
+    
     fsMain(numWorkers, std::stoi(std::string(argv[2])), shmBaseOffsetVec,
-           argv[4], argv[5], isSpdk, workerCores);
+           argv[4], argv[5], isSpdk, workerCores, std::stoi(std::string(argv[8]))/*crashRequestNum*/);
   } else {
     usage(argv);
     return -1;

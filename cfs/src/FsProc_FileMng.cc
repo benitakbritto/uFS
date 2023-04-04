@@ -3753,13 +3753,13 @@ void FileMng::fromInMemInode2Statbuf(InMemInode *inodePtr,
       inodePtr->i_no, inodePtr->inodeData->size,
       inodePtr->inodeData->i_block_count);
   if (inodePtr->inodeData->type == T_DIR) {
-    std::cout << "[DEBUG]" << __func__ << inodePtr->i_no << "is dir" << std::endl;
+    // std::cout << "[DEBUG]" << __func__ << inodePtr->i_no << "is dir" << std::endl;
     cur_stat_ptr->st_size =
         sizeof(struct cfs_dirent) * inodePtr->inodeData->i_dentry_count;
     // cur_stat_ptr->st_mode = cur_stat_ptr->st_mode | S_IFDIR;
     cur_stat_ptr->st_mode = S_IFDIR;
   } else {
-    std::cout << "[DEBUG]" << __func__ << inodePtr->i_no << "is reg file" << std::endl;
+    // std::cout << "[DEBUG]" << __func__ << inodePtr->i_no << "is reg file" << std::endl;
     cur_stat_ptr->st_size = inodePtr->inodeData->size;
     // cur_stat_ptr->st_mode = cur_stat_ptr->st_mode | S_IFREG;
      cur_stat_ptr->st_mode = S_IFREG;

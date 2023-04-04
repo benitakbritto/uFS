@@ -1,5 +1,4 @@
 // Create the FSPsrc dir here
-// TODO: Need to prefix path with FSP
 #include <assert.h>
 #include <fcntl.h>
 #include <sstream>

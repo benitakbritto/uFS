@@ -1061,8 +1061,6 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         SPDLOG_DEBUG("stat-err set return value to:{}", cop->op.stat.ret);
       } else {
         if (fsReq->getTargetInode()->inodeData->type == T_FILE) {
-          std::cout << "[DEBUG] is a file" << std::endl;
-          std::cout << "[DEBUG]" << (cop->op.stat.statbuf.st_mode) << std::endl;
           fsReq->getApp()->AccessIno(fsReq->getTid(), fsReq->getFileInum());
         }
         opStatsAccountSingleOpDone(FsReqType::STAT, 1);
@@ -2786,7 +2784,7 @@ FsProcWorkerMaster::FsProcWorkerMaster(int w, CurBlkDev *d, int shmBaseOffset,
                                        PerWorkerLoadStatsSR *stats, int crashRequestId)
     : FsProcWorker(w, d, shmBaseOffset, workerRunning, stats) {
   gCrashRequestId = crashRequestId;
-  std::cout << "[DEBUG] gCrashRequestId = " << gCrashRequestId << std::endl;
+  // std::cout << "[DEBUG] gCrashRequestId = " << gCrashRequestId << std::endl;
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_INFO("policy NUMBER:{}", gFsProcPtr->getSplitPolicy());
   switch (gFsProcPtr->getSplitPolicy()) {

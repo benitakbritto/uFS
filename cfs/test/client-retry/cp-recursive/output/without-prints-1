@@ -1,0 +1,729 @@
+crashRequestNum = {0}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4650628831 nanoseconds when crash num was 0.
+crashRequestNum = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5026856617 nanoseconds when crash num was 1.
+crashRequestNum = {2}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5016602712 nanoseconds when crash num was 2.
+crashRequestNum = {3}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4990403489 nanoseconds when crash num was 3.
+crashRequestNum = {4}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5045000583 nanoseconds when crash num was 4.
+crashRequestNum = {5}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5033683651 nanoseconds when crash num was 5.
+crashRequestNum = {6}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4742862697 nanoseconds when crash num was 6.
+crashRequestNum = {7}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5040464312 nanoseconds when crash num was 7.
+crashRequestNum = {8}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5034187494 nanoseconds when crash num was 8.
+crashRequestNum = {9}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4906091954 nanoseconds when crash num was 9.
+crashRequestNum = {10}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5036257201 nanoseconds when crash num was 10.
+crashRequestNum = {11}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5003754199 nanoseconds when crash num was 11.
+crashRequestNum = {12}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5028000779 nanoseconds when crash num was 12.
+crashRequestNum = {13}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4995997257 nanoseconds when crash num was 13.
+crashRequestNum = {14}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5039254267 nanoseconds when crash num was 14.
+crashRequestNum = {15}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5054449095 nanoseconds when crash num was 15.
+crashRequestNum = {16}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5042146020 nanoseconds when crash num was 16.
+crashRequestNum = {17}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5036299860 nanoseconds when crash num was 17.
+crashRequestNum = {18}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5053779001 nanoseconds when crash num was 18.
+crashRequestNum = {19}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5045562396 nanoseconds when crash num was 19.
+crashRequestNum = {20}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5062535496 nanoseconds when crash num was 20.
+crashRequestNum = {21}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5050580254 nanoseconds when crash num was 21.
+crashRequestNum = {22}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5069544967 nanoseconds when crash num was 22.
+crashRequestNum = {23}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5067554694 nanoseconds when crash num was 23.
+crashRequestNum = {24}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5040266465 nanoseconds when crash num was 24.
+crashRequestNum = {25}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5035932548 nanoseconds when crash num was 25.
+crashRequestNum = {26}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4995159182 nanoseconds when crash num was 26.
+crashRequestNum = {27}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5051677167 nanoseconds when crash num was 27.
+crashRequestNum = {28}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5064720020 nanoseconds when crash num was 28.
+crashRequestNum = {29}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5036923615 nanoseconds when crash num was 29.
+crashRequestNum = {30}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5013776307 nanoseconds when crash num was 30.
+crashRequestNum = {31}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5057098170 nanoseconds when crash num was 31.
+crashRequestNum = {32}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5072137194 nanoseconds when crash num was 32.
+crashRequestNum = {33}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5087191558 nanoseconds when crash num was 33.
+crashRequestNum = {34}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4927996839 nanoseconds when crash num was 34.
+crashRequestNum = {35}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4970086536 nanoseconds when crash num was 35.
+crashRequestNum = {36}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4893627842 nanoseconds when crash num was 36.
+crashRequestNum = {37}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4937884005 nanoseconds when crash num was 37.
+crashRequestNum = {38}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4961033494 nanoseconds when crash num was 38.
+crashRequestNum = {39}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4963842724 nanoseconds when crash num was 39.
+crashRequestNum = {40}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4954643867 nanoseconds when crash num was 40.
+crashRequestNum = {41}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4953118941 nanoseconds when crash num was 41.
+crashRequestNum = {42}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4964735555 nanoseconds when crash num was 42.
+crashRequestNum = {43}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4964736709 nanoseconds when crash num was 43.
+crashRequestNum = {44}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4963161890 nanoseconds when crash num was 44.
+crashRequestNum = {45}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4989443053 nanoseconds when crash num was 45.
+crashRequestNum = {46}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4998449501 nanoseconds when crash num was 46.
+crashRequestNum = {47}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4988397790 nanoseconds when crash num was 47.
+crashRequestNum = {48}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4995366187 nanoseconds when crash num was 48.
+crashRequestNum = {49}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4993409631 nanoseconds when crash num was 49.
+crashRequestNum = {50}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4976377842 nanoseconds when crash num was 50.
+crashRequestNum = {51}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 4983908617 nanoseconds when crash num was 51.
+crashRequestNum = {52}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5050661552 nanoseconds when crash num was 52.
+crashRequestNum = {53}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5043261146 nanoseconds when crash num was 53.
+crashRequestNum = {54}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5035352012 nanoseconds when crash num was 54.
+crashRequestNum = {55}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5028660196 nanoseconds when crash num was 55.
+crashRequestNum = {56}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5029303676 nanoseconds when crash num was 56.
+crashRequestNum = {57}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5045960482 nanoseconds when crash num was 57.
+crashRequestNum = {58}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5007750943 nanoseconds when crash num was 58.
+crashRequestNum = {59}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5001035884 nanoseconds when crash num was 59.
+crashRequestNum = {60}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5015811193 nanoseconds when crash num was 60.
+crashRequestNum = {61}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5024690501 nanoseconds when crash num was 61.
+crashRequestNum = {62}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5003967275 nanoseconds when crash num was 62.
+crashRequestNum = {63}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5037947769 nanoseconds when crash num was 63.
+crashRequestNum = {64}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5038974819 nanoseconds when crash num was 64.
+crashRequestNum = {65}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5031888022 nanoseconds when crash num was 65.
+crashRequestNum = {66}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5043995368 nanoseconds when crash num was 66.
+crashRequestNum = {67}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5041759706 nanoseconds when crash num was 67.
+crashRequestNum = {68}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5053406827 nanoseconds when crash num was 68.
+crashRequestNum = {69}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5041099889 nanoseconds when crash num was 69.
+crashRequestNum = {70}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5047805772 nanoseconds when crash num was 70.
+crashRequestNum = {71}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5054195882 nanoseconds when crash num was 71.
+crashRequestNum = {72}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5056327410 nanoseconds when crash num was 72.
+crashRequestNum = {73}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5060802340 nanoseconds when crash num was 73.
+crashRequestNum = {74}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5065651795 nanoseconds when crash num was 74.
+crashRequestNum = {75}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 5068333737 nanoseconds when crash num was 75.
+crashRequestNum = {76}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 528970246 nanoseconds when crash num was 76.
+crashRequestNum = {77}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 530776572 nanoseconds when crash num was 77.
+crashRequestNum = {78}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 529527504 nanoseconds when crash num was 78.
+crashRequestNum = {79}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 528031342 nanoseconds when crash num was 79.
+crashRequestNum = {80}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 530440649 nanoseconds when crash num was 80.
+crashRequestNum = {81}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 530729353 nanoseconds when crash num was 81.
+crashRequestNum = {82}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 530084261 nanoseconds when crash num was 82.
+crashRequestNum = {83}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 530361902 nanoseconds when crash num was 83.
+crashRequestNum = {84}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 530168489 nanoseconds when crash num was 84.
+crashRequestNum = {85}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+Execution time was 531003198 nanoseconds when crash num was 85.

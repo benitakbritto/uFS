@@ -60,7 +60,7 @@ ssize_t fs_allocated_pread_retry(int fd, void *buf, size_t count, off_t offset, 
 
 // if enabled, will print each api invocation
 // #define _CFS_LIB_PRINT_REQ_
-#define LDB_PRINT_CALL
+// #define LDB_PRINT_CALL
 
 /* #region requestId */
 // TODO: Lock over gRequestId
@@ -1217,7 +1217,7 @@ void _setup_app_thread_mem_buf() {
 FsLibMemMng *check_app_thread_mem_buf_ready(int fsTid) {
   // auto curLock = &(gLibSharedContext->tidIncrLock);
   FsLibMemMng *rt = nullptr;
-  std::cout << "[DEBUG] threadFsTid = " << threadFsTid << std::endl;
+  // std::cout << "[DEBUG] threadFsTid = " << threadFsTid << std::endl;
   if (fsTid == 0) {
     _setup_app_thread_mem_buf();
     rt = gLibSharedContext->tidMemBufMap[threadFsTid];
@@ -1343,11 +1343,11 @@ int fs_ping() {
   int ret = -1;
 
   for (auto iter : gServMngPtr->multiFsServMap) {
-    std::cout << __func__ << "\t" << __LINE__ << std::endl; 
+    // std::cout << __func__ << "\t" << __LINE__ << std::endl; 
     auto service = iter.second;
     if (!(service->inUse)) continue;
 
-    std::cout << __func__ << "\t" << __LINE__ << std::endl; 
+    // std::cout << __func__ << "\t" << __LINE__ << std::endl; 
     auto wid = iter.first;
     struct shmipc_msg msg;
     struct pingOp *eop;
@@ -1742,7 +1742,7 @@ int handle_mkdir_retry(uint64_t reqId) {
 int handle_stat_retry(uint64_t reqId, struct stat* statbuf) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct statOp>(gServMngPtr->reqRingMap[reqId][0]);
   auto ret = fs_stat_retry(op->path, statbuf, reqId);
-  std::cout << "[DEBUG] In handle_stat retry, size = " << statbuf->st_size << std::endl;
+  // std::cout << "[DEBUG] In handle_stat retry, size = " << statbuf->st_size << std::endl;
   if (ret > 0) {
     // clean up
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
@@ -2127,8 +2127,8 @@ int fs_stat_internal(FsService *fsServ, const char *pathname,
     }
     threadFsTid = 0;
     ret = fs_retry_pending_ops(nullptr, statbuf);
-    std::cout << "[DEBUG] ret = " << ret << std::endl;
-    std::cout << "[DEBUG] In fs_stat_internal retry, size = " << statbuf->st_size << std::endl;
+    // std::cout << "[DEBUG] ret = " << ret << std::endl;
+    // std::cout << "[DEBUG] In fs_stat_internal retry, size = " << statbuf->st_size << std::endl;
     goto cleanup;
   }
 
@@ -2181,7 +2181,7 @@ free_and_return:
     errno = -rc;
     rc = -1;
   }
-  std::cout << "[DEBUG] rc = " << rc << std::endl;
+  // std::cout << "[DEBUG] rc = " << rc << std::endl;
   return rc;
 }
 
@@ -2684,9 +2684,9 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name, uint64_t reque
     CFS_DIR* res = (CFS_DIR *)malloc(sizeof(*res));
     threadFsTid = 0;
     fs_retry_pending_ops(nullptr, nullptr, res); 
-    if (res != nullptr) {
-      std::cout << "res is not null" << std::endl;
-    }
+    // if (res != nullptr) {
+    //   std::cout << "res is not null" << std::endl;
+    // }
     return res;
   }
 
@@ -3735,7 +3735,7 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
 
 ssize_t fs_allocated_read_internal_common(int fd, void *buf, size_t count, 
   uint64_t requestId, void **bufPtr) {
-  std::cout << "Inside " << __func__ << std::endl; 
+  // std::cout << "Inside " << __func__ << std::endl; 
 #ifdef LDB_PRINT_CALL
   print_read(fd, buf, count, requestId);
 #endif
@@ -3767,14 +3767,14 @@ ssize_t fs_allocated_read_retry(int fd, void *buf, size_t count, uint64_t reques
 }
 
 ssize_t fs_allocated_read(int fd, void *buf, size_t count, void **bufPtr) {
-  std::cout << "Inside " << __func__ << std::endl; 
+  // std::cout << "Inside " << __func__ << std::endl; 
   auto requestId = getNewRequestId();
   return fs_allocated_read_internal_common(fd, buf, count, requestId, bufPtr);
 }
 
 ssize_t fs_allocated_pread_internal_common(int fd, void *buf, size_t count, 
   off_t offset, uint64_t requestId, void **bufPtr) {
-  std::cout << "Inside " << __func__ << std::endl; 
+  // std::cout << "Inside " << __func__ << std::endl; 
 #ifdef LDB_PRINT_CALL
   print_pread(fd, buf, count, offset, requestId);
 #endif

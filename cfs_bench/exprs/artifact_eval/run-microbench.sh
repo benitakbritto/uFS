@@ -42,20 +42,20 @@ data_dir="$(mk-data-dir microbench_$1)"
 
 if [ "$1" = "ufs" ]; then
 	cleanup-ufs-config  # fsp_microbench_suite.py will generate its own config
-	sudo -E python3 fsp_microbench_suite.py --fs fsp --numapp=10 "${@:2}"
+	sudo -E python3 fsp_microbench_suite.py --fs fsp --numapp=1 "${@:2}"
 	sudo mv fsp_*_run_0 "$data_dir"
 	cleanup-ufs-config
 elif [ "$1" = "ufs-single" ]; then
 	cleanup-ufs-config
-	sudo -E python3 fsp_microbench_suite.py --fs fsp --numapp=10 --single "${@:2}"
+	sudo -E python3 fsp_microbench_suite.py --fs fsp --numapp=1 --single "${@:2}"
 	sudo mv fsp_*_run_0 "$data_dir"
 	cleanup-ufs-config
 elif [ "$1" = "ext4" ]; then
 	reset-spdk
-	sudo -E python3 fsp_microbench_suite.py --fs ext4 --numapp=10 "${@:2}"
+	sudo -E python3 fsp_microbench_suite.py --fs ext4 --numapp=1 "${@:2}"
 	sudo mv ext4_*_run_0 "$data_dir"
 elif [ "$1" = "ext4nj" ]; then
 	reset-spdk
-	sudo -E python3 fsp_microbench_suite.py --fs ext4nj --numapp=10 "${@:2}"
+	sudo -E python3 fsp_microbench_suite.py --fs ext4nj --numapp=1 "${@:2}"
 	sudo mv ext4_*_run_0 "$data_dir"
 fi

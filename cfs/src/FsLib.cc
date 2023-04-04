@@ -1975,6 +1975,7 @@ int fs_init(key_t key) {
         gServMngPtr->primaryServ = new FsService(gPrimaryServWid, key);
         gServMngPtr->primaryServ->inUse = true;
         // gPrimaryServ = new FsService(gPrimaryServWid, key);
+        gServMngPtr->queueMgr = new PendingQueueMgr(20190304); // NOTE: Hardcoded
       } catch (const char *msg) {
         fprintf(stderr, "Cannot init FsService:%s\n", msg);
         return -1;
@@ -1983,6 +1984,12 @@ int fs_init(key_t key) {
       gServMngPtr->multiFsServMap.insert(
           std::make_pair(gPrimaryServWid, gServMngPtr->primaryServ));
       gServMngPtr->multiFsServNum = 1;
+
+      if (get_server_pid() != 0) {
+        std::cout << "[ERR] did not receive server pid" << std::endl;
+        gMultiFsServLock.clear(std::memory_order_release);
+        return -1;
+      }
 
       if (gLibSharedContext == nullptr) {
         gLibSharedContext = new FsLibSharedContext();

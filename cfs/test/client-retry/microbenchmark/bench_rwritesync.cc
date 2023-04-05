@@ -1,4 +1,9 @@
-// Create the FSPsrc dir here
+/*
+* Writes to a file at random offsets
+* Writes of size 1KB
+* Total data written = 1 MB
+* Calls fsync after every write
+*/
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -9,19 +14,16 @@
 #include "util.h"
 
 // Macros
-#define FILE_NAME "f1"
+#define FILE_NAME "f0"
 #define IO_SIZE 1024
 #define FILE_SIZE ((IO_SIZE) * (IO_SIZE))
-#define ITERATIONS ((64) * (1000))
+#define ITERATIONS 1024
 
 // Function prototypes
 int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize, ssize_t iter);
 
 // Main
 int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize, ssize_t iter) {
-  assert(ioSize < fileSize);
-  assert(ioSize % fileSize == 0);
-
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
   auto ino = fs_open(path, O_RDONLY, 0);
@@ -34,16 +36,19 @@ int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize, ssize_t iter
   int offset = 0;
   for (int i = 0; i < iter; i++) {
     memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
-    
+    int offset = rand() % fileSize;
     if (fs_allocated_pwrite(ino, (void *) buf, ioSize, offset) != ioSize) {
-      fprintf(stderr, "fs_allocated_pwrite() failed\n");
+      fprintf(stderr, "fs_allocated_pwrite() failed at iter: %d, offset: %d\n", i, offset);
       fs_free(buf);
       return -1; // failure
     }
 
-    fs_fsync(ino);
-    offset += ioSize;
-  }
+    if (fs_fsync(ino) != 0) {
+      fprintf(stderr, "fs_fsync() failed at iter: %d, offset: %d\n", i, offset);
+      fs_free(buf);
+      return -1; // failure
+    }
+  } 
 
   fs_free(buf);
 

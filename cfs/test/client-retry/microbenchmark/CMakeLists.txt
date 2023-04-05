@@ -24,7 +24,7 @@ add_executable(rwrite bench_rwrite.cc ../../client/testClient_common.h
                           common.cc common.h)
 target_link_libraries(rwrite PRIVATE cfs rt ${TBB_LIBRARIES})
 
-# random write
+# random write sync
 add_executable(rwritesync bench_rwritesync.cc ../../client/testClient_common.h
                           ../../../src/util.cc ../../../include/util.h
                           common.cc common.h)

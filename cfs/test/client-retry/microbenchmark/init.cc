@@ -1,0 +1,117 @@
+// Create the FSPsrc dir here
+#include <assert.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "common.h"
+#include "fsapi.h"
+#include "util.h"
+
+// Macros
+#define FILE_MB "f0"
+#define ONE_KB 1024
+#define ONE_MB ((ONE_KB) * (ONE_KB))
+#define NEW_FILE "f1"
+#define CREAT_FILE_COUNT 100
+
+
+// Function prototypes
+int createOneMbFile();
+int createFile(const char *fileName);
+int createFiles(int count);
+int runInit();
+
+// Main
+int runInit() {
+  if (createOneMbFile() != 0) {
+    fprintf(stderr, "createOneMbFile() failed\n");
+    return -1; // failure
+  }
+
+  if (createFile(NEW_FILE) != 0) {
+    fprintf(stderr, "createFile() failed\n");
+    return -1; // failure
+  }
+}
+
+int createOneMbFile() {
+  auto ino = fs_open(FILE_MB, O_CREAT, 0644);
+  if (ino <= 0) {
+    fprintf(stderr, "fs_open() failed\n");
+    return -1; // failure
+  }
+
+
+  char *buf = (char *) fs_malloc(ONE_MB + 1);
+  assert(buf != nullptr);
+  memset(buf, 0, ONE_MB + 1);
+  memcpy(buf, generateString("a", ONE_MB).c_str(), ONE_MB);
+  
+  if (fs_allocated_write(ino, (void *) buf, ONE_MB) != ONE_MB) {
+    fprintf(stderr, "fs_allocated_write() failed\n");
+    return -1; // failure
+  }
+
+  return 0; // success
+}
+
+int createFile(const char *fileName) {
+   auto ino = fs_open(fileName, O_CREAT, 0644);
+   if (ino <= 0) {
+    fprintf(stderr, "fs_open() failed\n");
+    return -1; // failure
+  }
+
+  return 0; // success
+}
+
+int createFiles(int count) {
+  std::string path = "";
+  for (int i = 0; i < count; i++) {
+    if (i % 10 == 0) {
+      path += "/";
+    }
+
+    path += std::string(1, 'a' + (i % 10));
+
+    auto ino = fs_open(path.c_str(), O_CREAT, 0);
+    if (ino <= 0) {
+      fprintf(stderr, "fs_open() failed\n");
+      return -1; // failure
+    }
+  }
+
+  return 0;
+}
+
+int main(int argc, char **argv) {
+  if (argc != 3) {
+    fprintf(stderr, "Usage %s <pid1,pid2,..> <1/0>\n", argv[0]);
+    fprintf(stderr, "\t requires only two argument\n");
+    fprintf(stderr,
+            "\t Arg-1 --- pid1,pid2,..: a list of integers separated by , "
+            "(comma). The last pid will be used for the pending queue. "
+            "Arg-2 --- 1 if you want to create files for bench_stat, else 0");
+    exit(1);
+  }
+
+  if (initClient(argv[1]) != 0) {
+    exit(1);
+  }
+
+  if (runInit() != 0) {
+    exit(1);
+  }
+
+  if (argv[2] == "1") {
+    if (createFiles(CREAT_FILE_COUNT) != 0) {
+      exit(1);
+    }
+  }
+  
+  if (fs_exit() != 0) {
+    fprintf(stderr, "exit failed\n");
+  }
+  return 0;
+}

@@ -239,9 +239,11 @@ int main(int argc, char **argv) {
       gFspConfigFname = argv[7];
       SPDLOG_INFO("FSP configuration file is set to :{}", gFspConfigFname);
     }
+
+    int crashRequestNum = argc == 8 ? -1 : std::stoi(std::string(argv[8]));
     
     fsMain(numWorkers, std::stoi(std::string(argv[2])), shmBaseOffsetVec,
-           argv[4], argv[5], isSpdk, workerCores, std::stoi(std::string(argv[8]))/*crashRequestNum*/);
+           argv[4], argv[5], isSpdk, workerCores, crashRequestNum);
   } else {
     usage(argv);
     return -1;

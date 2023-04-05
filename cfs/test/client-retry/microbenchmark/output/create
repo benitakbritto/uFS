@@ -8,7 +8,7 @@ INFO initService connected to contrl shm at /shmipc_mgr_20190302
 fs_init_multi success
 [INFO] client connection successful
 FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
-seqwritesync : 6340494729 ns
+create : 3225265039 ns
 run = {2}
 MIMIC_APP_ZC - OFF
 INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
@@ -18,7 +18,7 @@ INFO initService connected to contrl shm at /shmipc_mgr_20190302
 fs_init_multi success
 [INFO] client connection successful
 FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
-seqwritesync : 6340333915 ns
+create : 3225218194 ns
 run = {3}
 MIMIC_APP_ZC - OFF
 INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
@@ -28,7 +28,7 @@ INFO initService connected to contrl shm at /shmipc_mgr_20190302
 fs_init_multi success
 [INFO] client connection successful
 FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
-seqwritesync : 6340261688 ns
+create : 3225348192 ns
 run = {4}
 MIMIC_APP_ZC - OFF
 INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
@@ -38,7 +38,7 @@ INFO initService connected to contrl shm at /shmipc_mgr_20190302
 fs_init_multi success
 [INFO] client connection successful
 FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
-seqwritesync : 6340426696 ns
+create : 3258211082 ns
 run = {5}
 MIMIC_APP_ZC - OFF
 INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
@@ -48,4 +48,4 @@ INFO initService connected to contrl shm at /shmipc_mgr_20190302
 fs_init_multi success
 [INFO] client connection successful
 FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
-seqwritesync : 6340123876 ns
+create : 3225734224 ns

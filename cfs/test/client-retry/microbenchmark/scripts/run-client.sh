@@ -61,11 +61,22 @@
 # done
 
 # Workload: seq write rand
-echo "Running Workload: seq write rand"
+# echo "Running Workload: seq write rand"
+# for run in $(seq 1 5); do
+#     echo "run = {$run}"
+#     sleep 10
+#     EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/seqwriterand
+#     $EXECUTABLE 1,3
+
+#     # kill server
+#     sudo killall fsMain
+# done
+
+echo "Running Workload: seq write rand sync"
 for run in $(seq 1 5); do
     echo "run = {$run}"
     sleep 10
-    EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/seqwriterand
+    EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/seqwriterandsync
     $EXECUTABLE 1,3
 
     # kill server

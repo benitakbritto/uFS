@@ -65,6 +65,8 @@ int runWorkload(const char *path) {
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   auto elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count();
   printElapsedTime("seqwriterandsync", elapsedTime);
+
+  fprintf(stdout, "[INFO] total iterations = %d\n", iteration);
   
   return 0; // success
 }

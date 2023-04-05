@@ -37,7 +37,7 @@ int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize) {
   int offset = 0;
   for (int i = 0; i < iterations; i++) {
     if (fs_allocated_pread(ino, (void *) buf, ioSize, offset, (void **) &buf) != ioSize) {
-      fprintf(stderr, "fs_allocated_pread() failed\n");
+      fprintf(stderr, "fs_allocated_pread() failed at iteration: %d\n", i);
       fs_free(buf);
       return -1; // failure
     }

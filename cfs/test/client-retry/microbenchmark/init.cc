@@ -51,7 +51,7 @@ int createOneMbFile() {
   memcpy(buf, generateString("a", ONE_KB).c_str(), ONE_KB);
   
   int offset = 0;
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < ONE_KB; i++) {
     if (fs_allocated_pwrite(ino, (void *) buf, ONE_KB, offset) != ONE_KB) {
       fprintf(stderr, "fs_allocated_write() failed\n");
       return -1; // failure

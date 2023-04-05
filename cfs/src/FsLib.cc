@@ -2365,7 +2365,6 @@ int fs_open_internal_common(const char *path, int flags, mode_t mode, uint64_t r
   //(void) check_app_thread_mem_buf_ready();
   assert(threadFsTid != 0);
   
-  // TODO: how to know if new file was created Only for create
 retry:
   int wid = -1;
   auto service = getFsServiceForPath(standardPath, wid);

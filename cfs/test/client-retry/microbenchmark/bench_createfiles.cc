@@ -1,5 +1,5 @@
 /*
-* Creates 100 files, 10 files per dir
+* Creates 50 files, 10 files per dir
 * Writes 1MB at once to each file
 */
 #include <assert.h>
@@ -13,7 +13,7 @@
 
 // Macros
 #define IO_SIZE (1024 * 1024)
-#define ITERATIONS 100
+#define ITERATIONS 50
 
 // Function prototypes
 int runWorkload(ssize_t ioSize, ssize_t iter);
@@ -21,18 +21,23 @@ int runWorkload(ssize_t ioSize, ssize_t iter);
 // Main
 int runWorkload(ssize_t ioSize, ssize_t iter) {
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-  std::string path = "";
+  std::string parentPath = "";
+  std::string currentPath = "";
   for (int i = 0; i < iter; i++) {
     if (i % 10 == 0) {
-      path += "/";
+      parentPath += "d" + std::to_string(i / 10) + "/";
+      if (fs_mkdir(parentPath.c_str(), 0755) < 0) {
+        fprintf(stderr, "fs_mkdir() failed\n");
+        return -1; // failure
+      }
     }
 
-    path += std::string(1, 'a' + (i % 10));
+    currentPath = parentPath + "f" + std::to_string(i % 10);
 
-    auto ino = fs_open(path.c_str(), O_CREAT, 0);
+    auto ino = fs_open(currentPath.c_str(), O_CREAT, 0);
     if (ino <= 0) {
-        fprintf(stderr, "fs_open() failed\n");
-        return -1; // failure
+      fprintf(stderr, "fs_open() failed\n");
+      return -1; // failure
     }
 
     char *buf = (char *) fs_malloc(ioSize + 1);

@@ -97,25 +97,25 @@
 # done
 
 # # Workload: create
-echo "Running Workload: create"
-for run in $(seq 1 5); do
-    echo "run = {$run}"
-    sleep 10
-    EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/create
-    $EXECUTABLE 1,3
-
-    # kill server
-    sudo killall fsMain
-done
-
-# Workload: create files
-# echo "Running Workload: create files"
+# echo "Running Workload: create"
 # for run in $(seq 1 5); do
 #     echo "run = {$run}"
 #     sleep 10
-#     EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/createfiles
+#     EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/create
 #     $EXECUTABLE 1,3
 
 #     # kill server
 #     sudo killall fsMain
 # done
+
+# Workload: create files
+echo "Running Workload: create files"
+for run in $(seq 1 5); do
+    echo "run = {$run}"
+    sleep 10
+    EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/createfiles
+    $EXECUTABLE 1,3
+
+    # kill server
+    sudo killall fsMain
+done

@@ -1,7 +1,7 @@
 /*
 * Writes to a file at random offsets
-* Writes of size 1024
-* Total data written = 128 MB
+* Writes of size 1KB
+* Total data written = 1 MB
 */
 #include <assert.h>
 #include <fcntl.h>
@@ -15,11 +15,11 @@
 // Macros
 #define FILE_NAME "f0"
 #define IO_SIZE 1024
-#define ITERATIONS ((64) * (1000))
+#define ITERATIONS 1024
 #define FILE_SIZE ((IO_SIZE) * (IO_SIZE))
 
 // Function prototypes
-int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize, ssize_t iter);
+int runWorkload(const char *path, ssize_t ioSize, ssize_t iter);
 
 // Main
 int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize, ssize_t iter) {
@@ -35,9 +35,9 @@ int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize, ssize_t iter
   int offset = 0;
   for (int i = 0; i < iter; i++) {
     memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
-    int offset = rand() % (fileSize - ioSize);
+    int offset = rand() % fileSize;
     if (fs_allocated_pwrite(ino, (void *) buf, ioSize, offset) != ioSize) {
-      fprintf(stderr, "fs_allocated_pwrite() failed\n");
+      fprintf(stderr, "fs_allocated_pwrite() failed at iter: %d, offset: %d\n", i, offset);
       fs_free(buf);
       return -1; // failure
     }

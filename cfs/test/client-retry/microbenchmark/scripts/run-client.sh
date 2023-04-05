@@ -13,11 +13,23 @@
 # done
 
 # Workload: random read
-echo "Running Workload: random read"
-for run in $(seq 0 5); do
+# echo "Running Workload: random read"
+# for run in $(seq 0 5); do
+#     echo "run = {$run}"
+#     sleep 10
+#     EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/rread
+#     $EXECUTABLE 1,3
+
+#     # kill server
+#     sudo killall fsMain
+# done
+
+# Workload: seq write
+echo "Running Workload: seq write"
+for run in $(seq 1 5); do
     echo "run = {$run}"
     sleep 10
-    EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/rread
+    EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/seqwrite
     $EXECUTABLE 1,3
 
     # kill server

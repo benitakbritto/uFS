@@ -1,0 +1,61 @@
+Running Workload: seq write
+run = {0}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+seqwrite : 3212664342 ns
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+seqwrite : 3212825489 ns
+run = {2}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+seqwrite : 3212632731 ns
+run = {3}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+seqwrite : 3212621434 ns
+run = {4}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+seqwrite : 3234390471 ns
+run = {5}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+FsLibMemMng:init() will create FsLibLinearListsAllocator threadFsTid: 1
+seqwrite : 3222774860 ns

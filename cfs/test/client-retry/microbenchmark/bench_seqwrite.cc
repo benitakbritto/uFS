@@ -1,4 +1,8 @@
-// Create the FSPsrc dir here
+/*
+* Appends to an empty file
+* I/O size = 1KB
+* Total write size = 1MB
+*/
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -18,9 +22,6 @@ int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize);
 
 // Main
 int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize) {
-  assert(ioSize < fileSize);
-  assert(ioSize % fileSize == 0);
-
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
   auto ino = fs_open(path, O_RDWR, 0);
@@ -30,16 +31,18 @@ int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize) {
   }
 
   char *buf = (char *) fs_malloc(ioSize + 1);
+  memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
   int iterations = fileSize / ioSize;
+  int offset = 0;
+  
   for (int i = 0; i < iterations; i++) {
-    memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
-    
-    if (fs_allocated_write(ino, (void *) buf, ioSize) != ioSize) {
-      fprintf(stderr, "fs_allocated_write() failed\n");
+    if (fs_allocated_pwrite(ino, (void *) buf, ioSize, offset) != ioSize) {
+      fprintf(stderr, "fs_allocated_pwrite() failed at iter: %d\n", i);
       fs_free(buf);
       return -1; // failure
     }
 
+    offset += ioSize;
   }
 
   fs_free(buf);

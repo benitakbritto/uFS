@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Run server 
-for run in $(seq 0 5); do
+for run in $(seq 1 5); do
     EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/fsMain
     EXIT_PATH=/tmp/cfs_exit
     SPDK_CONF=/users/bbritto/workspace/uFS/cfs/build/spdk_dev.conf

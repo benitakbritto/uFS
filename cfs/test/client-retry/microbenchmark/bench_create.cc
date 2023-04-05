@@ -1,6 +1,6 @@
 /*
 * Creates a file 
-* and writes 1024 B at a time until
+* and writes 1KB at a time until
 * it finishes writing 1MB 
 */
 #include <assert.h>
@@ -14,7 +14,7 @@
 
 // Macros
 #define FILE_NAME "f2"
-#define IO_SIZE (1024 * 1024)
+#define IO_SIZE 1024
 #define ITERATIONS 1024
 
 // Function prototypes
@@ -31,15 +31,17 @@ int runWorkload(const char *path, ssize_t ioSize, ssize_t iter) {
   }
 
   char *buf = (char *) fs_malloc(ioSize + 1);
+  int offset = 0;
   for (int i = 0; i < iter; i++) {
     memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
     
-    if (fs_allocated_write(ino, (void *) buf, ioSize) != ioSize) {
+    if (fs_allocated_pwrite(ino, (void *) buf, ioSize, offset) != ioSize) {
       fprintf(stderr, "fs_allocated_write() failed\n");
       fs_free(buf);
       return -1; // failure
     }
 
+    offset += ioSize;
   }
 
   fs_free(buf);

@@ -36,6 +36,18 @@
 #     sudo killall fsMain
 # done
 
+# Workload: seq write sync
+# echo "Running Workload: seq write sync"
+# for run in $(seq 1 5); do
+#     echo "run = {$run}"
+#     sleep 10
+#     EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/seqwritesync
+#     $EXECUTABLE 1,3
+
+#     # kill server
+#     sudo killall fsMain
+# done
+
 # # Workload: random write
 # echo "Running Workload: random write"
 # for run in $(seq 1 5); do
@@ -48,14 +60,26 @@
 #     sudo killall fsMain
 # done
 
-# Workload: random write sync
-echo "Running Workload: random write"
+# Workload: seq write rand
+echo "Running Workload: seq write rand"
 for run in $(seq 1 5); do
     echo "run = {$run}"
     sleep 10
-    EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/rwritesync
+    EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/seqwriterand
     $EXECUTABLE 1,3
 
     # kill server
     sudo killall fsMain
 done
+
+# Workload: seq write sync
+# echo "Running Workload: seq write sync"
+# for run in $(seq 1 5); do
+#     echo "run = {$run}"
+#     sleep 10
+#     EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/microbenchmark/seqwritesync
+#     $EXECUTABLE 1,3
+
+#     # kill server
+#     sudo killall fsMain
+# done

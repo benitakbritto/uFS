@@ -12,6 +12,12 @@ add_executable(seqwrite bench_seqwrite.cc ../../client/testClient_common.h
                           common.cc common.h)
 target_link_libraries(seqwrite PRIVATE cfs rt ${TBB_LIBRARIES})
 
+# seqwritesync
+add_executable(seqwritesync bench_seqwritesync.cc ../../client/testClient_common.h
+                          ../../../src/util.cc ../../../include/util.h
+                          common.cc common.h)
+target_link_libraries(seqwritesync PRIVATE cfs rt ${TBB_LIBRARIES})
+
 # random read
 add_executable(rread bench_rread.cc ../../client/testClient_common.h
                           ../../../src/util.cc ../../../include/util.h
@@ -35,6 +41,12 @@ add_executable(seqwriterand bench_seqwriterand.cc ../../client/testClient_common
                           ../../../src/util.cc ../../../include/util.h
                           common.cc common.h)
 target_link_libraries(seqwriterand PRIVATE cfs rt ${TBB_LIBRARIES})
+
+# seq write random size sync
+add_executable(seqwriterandsync bench_seqwriterandsync.cc ../../client/testClient_common.h
+                          ../../../src/util.cc ../../../include/util.h
+                          common.cc common.h)
+target_link_libraries(seqwriterandsync PRIVATE cfs rt ${TBB_LIBRARIES})
 
 # create
 add_executable(create bench_create.cc ../../client/testClient_common.h

@@ -2,6 +2,7 @@
 * Appends to an empty file
 * I/O size = [1B-8KB]
 * Total write size = 1 MB
+* fsync every 100 writes
 */
 #include <assert.h>
 #include <fcntl.h>
@@ -32,6 +33,7 @@ int runWorkload(const char *path) {
   }
 
   int countWritten = 0;
+  int iteration = 0;
   while (countWritten < DATA_WRITE) {
     int ioSize = std::max(1, (rand() % IO_SIZE_END_RANGE));
     ioSize = (DATA_WRITE - countWritten) < ioSize ? (DATA_WRITE - countWritten) : ioSize;
@@ -45,14 +47,24 @@ int runWorkload(const char *path) {
       fs_free(buf);
       return -1; // failure
     }
-    
+
     fs_free(buf);
+
+    if (iteration != 0 && iteration % 100 == 0) {
+      if (fs_fsync(ino) != 0) {
+        fprintf(stderr, "fs_fsync() failed at ioSize = %d, countWritten = %d\n", ioSize, countWritten);
+        fs_free(buf);
+        return -1; // failure
+      }
+    }
+
     countWritten += ioSize;
+    iteration++;
   }
 
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   auto elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count();
-  printElapsedTime("seqwriterand", elapsedTime);
+  printElapsedTime("seqwriterandsync", elapsedTime);
   
   return 0; // success
 }

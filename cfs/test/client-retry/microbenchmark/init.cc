@@ -13,7 +13,7 @@
 #define ONE_KB 1024
 #define ONE_MB (1024 * 1024)
 #define NEW_FILE "f1"
-#define CREAT_FILE_COUNT 100
+#define CREAT_FILE_COUNT 50
 
 
 // Function prototypes
@@ -31,6 +31,11 @@ int runInit() {
 
   if (createFile(NEW_FILE) != 0) {
     fprintf(stderr, "createFile() failed\n");
+    return -1; // failure
+  }
+
+  if (createFiles(CREAT_FILE_COUNT) != 0) {
+    fprintf(stderr, "createFiles() failed\n");
     return -1; // failure
   }
 
@@ -75,15 +80,21 @@ int createFile(const char *fileName) {
 }
 
 int createFiles(int count) {
-  std::string path = "";
+  std::cout << "[INFO] Creating files" << std::endl;
+  std::string parentPath = "";
+  std::string currentPath = "";
   for (int i = 0; i < count; i++) {
     if (i % 10 == 0) {
-      path += "/";
+      parentPath += "dir" + std::to_string(i / 10) + "/";
+      if (fs_mkdir(parentPath.c_str(), 0755) < 0) {
+        fprintf(stderr, "fs_mkdir() failed\n");
+        return -1; // failure
+      }
     }
 
-    path += std::string(1, 'a' + (i % 10));
+    currentPath = parentPath + "f" + std::to_string(i % 10);
 
-    auto ino = fs_open(path.c_str(), O_CREAT, 0);
+    auto ino = fs_open(currentPath.c_str(), O_CREAT, 0);
     if (ino <= 0) {
       fprintf(stderr, "fs_open() failed\n");
       return -1; // failure
@@ -94,13 +105,12 @@ int createFiles(int count) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 3) {
-    fprintf(stderr, "Usage %s <pid1,pid2,..> <1/0>\n", argv[0]);
+  if (argc != 2) {
+    fprintf(stderr, "Usage %s <pid1,pid2,..>\n", argv[0]);
     fprintf(stderr, "\t requires only two argument\n");
     fprintf(stderr,
             "\t Arg-1 --- pid1,pid2,..: a list of integers separated by , "
-            "(comma). The last pid will be used for the pending queue. "
-            "Arg-2 --- 1 if you want to create files for bench_stat, else 0");
+            "(comma). The last pid will be used for the pending queue.\n");
     exit(1);
   }
 
@@ -110,12 +120,6 @@ int main(int argc, char **argv) {
 
   if (runInit() != 0) {
     exit(1);
-  }
-
-  if (argv[2] == "1") {
-    if (createFiles(CREAT_FILE_COUNT) != 0) {
-      exit(1);
-    }
   }
 
   fs_syncall();

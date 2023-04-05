@@ -9,7 +9,7 @@
 #include "util.h"
 
 // Macros
-#define ITERATIONS 100
+#define ITERATIONS 50
 
 // Function prototypes
 int runWorkload(ssize_t iter);
@@ -18,18 +18,19 @@ int runWorkload(ssize_t iter);
 int runWorkload(ssize_t iter) {
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   
-  std::string path = "";
+  std::string parentPath = "";
+  std::string currentPath = "";
   for (int i = 0; i < iter; i++) {
     if (i % 10 == 0) {
-      path += "/";
+      parentPath += "dir" + std::to_string(i / 10) + "/";
     }
 
-    path += std::string(1, 'a' + (i % 10));
+    currentPath = parentPath + "f" + std::to_string(i % 10);
 
     struct stat statbuf;
-    auto ret = fs_stat(path.c_str(), &statbuf);
+    auto ret = fs_stat(currentPath.c_str(), &statbuf);
     if (ret != 0) {
-        fprintf(stderr, "fs_open() failed\n");
+        fprintf(stderr, "fs_stat() failed\n");
         return -1; // failure
     }
   }

@@ -1,7 +1,7 @@
 /*
 * Reads from a file at random offset
 * Reads data of size 1024
-* Reads until 128 MB
+* Reads until 1 MB
 */
 #include <assert.h>
 #include <fcntl.h>
@@ -16,7 +16,7 @@
 #define FILE_NAME "f0"
 #define IO_SIZE 1024
 #define FILE_SIZE ((IO_SIZE) * (IO_SIZE))
-#define ITERATIONS ((64) * (1000))
+#define ITERATIONS 1024
 
 // Function prototypes
 int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize, ssize_t iter);
@@ -35,7 +35,7 @@ int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize, ssize_t iter
   for (int i = 0; i < iter; i++) {
     int offset = rand() % (fileSize - ioSize);
     if (fs_allocated_pread(ino, (void *) buf, ioSize, offset, (void **) &buf) != ioSize) {
-      fprintf(stderr, "fs_allocated_pread() failed\n");
+      fprintf(stderr, "fs_allocated_pread() failed at iter: %ld, offset: %d\n", iter, offset);
       fs_free(buf);
       return -1; // failure
     }

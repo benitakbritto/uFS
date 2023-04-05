@@ -11,7 +11,7 @@
 // Macros
 #define FILE_MB "f0"
 #define ONE_KB 1024
-#define ONE_MB ((ONE_KB) * (ONE_KB))
+#define ONE_MB (1024 * 1024)
 #define NEW_FILE "f1"
 #define CREAT_FILE_COUNT 100
 
@@ -33,6 +33,8 @@ int runInit() {
     fprintf(stderr, "createFile() failed\n");
     return -1; // failure
   }
+
+  return 0;
 }
 
 int createOneMbFile() {
@@ -43,16 +45,22 @@ int createOneMbFile() {
   }
 
 
-  char *buf = (char *) fs_malloc(ONE_MB + 1);
+  char *buf = (char *) fs_malloc(ONE_KB + 1);
   assert(buf != nullptr);
-  memset(buf, 0, ONE_MB + 1);
-  memcpy(buf, generateString("a", ONE_MB).c_str(), ONE_MB);
+  memset(buf, 0, ONE_KB + 1);
+  memcpy(buf, generateString("a", ONE_KB).c_str(), ONE_KB);
   
-  if (fs_allocated_write(ino, (void *) buf, ONE_MB) != ONE_MB) {
-    fprintf(stderr, "fs_allocated_write() failed\n");
-    return -1; // failure
-  }
+  int offset = 0;
+  for (int i = 0; i < 10; i++) {
+    if (fs_allocated_pwrite(ino, (void *) buf, ONE_KB, offset) != ONE_KB) {
+      fprintf(stderr, "fs_allocated_write() failed\n");
+      return -1; // failure
+    }
 
+    fs_syncall();
+    offset += ONE_KB;
+  }
+  
   return 0; // success
 }
 
@@ -109,6 +117,8 @@ int main(int argc, char **argv) {
       exit(1);
     }
   }
+
+  fs_syncall();
   
   if (fs_exit() != 0) {
     fprintf(stderr, "exit failed\n");

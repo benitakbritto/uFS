@@ -11,6 +11,28 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+int gServerIsDown = 0;
+pid_t gServerPid = -1;
+
+int is_server_up(pid_t pid) {
+  if (kill(gServerPid, 0) != 0 && errno == ESRCH) {
+    return 0;
+  }
+  
+  return 1;
+}
+
+void sig_handler(int signum) {
+  printf("Inside handler function\n");
+  // server is up, reset alarm
+  if (is_server_up(gServerPid) == 1) {
+    alarm(1); 
+  } 
+  // server is down
+  else {
+    gServerIsDown = 1;
+  }
+}
 
 static_assert(sizeof(struct shmipc_msg) <= 64,
               "struct shmipc_msg must fit cacheline");
@@ -41,8 +63,6 @@ struct shmipc_qp *shmipc_qp_get(const char *name, size_t size, int create) {
     qp->fd = shm_open(name, O_RDWR | O_CREAT, 0666);
   else
     qp->fd = shm_open(name, O_RDWR, 0666);
-
-  // qp->fd = shm_open(name, O_RDWR | O_CREAT, 0666);
 
   tmp_mask = umask(old_mask);  // reset umask
 
@@ -82,6 +102,7 @@ void shmipc_qp_destroy(struct shmipc_qp *qp) {
 struct shmipc_mgr *shmipc_mgr_init(const char *name, size_t rsize, int create) {
   struct shmipc_mgr *mgr = NULL;
   size_t mem_required;
+  signal(SIGALRM, sig_handler);
 
   // rsize must be a power of 2
   if ((rsize < 4) || ((rsize & (rsize - 1)) != 0)) return NULL;
@@ -273,47 +294,28 @@ void shmipc_mgr_put_msg(struct shmipc_mgr *mgr, off_t ring_idx,
   memcpy(msg, rmsg, 64);  // 40 cycles
 }
 
-int is_server_up(pid_t pid) {
-  if (kill(pid, 0) != 0) {
-    if (errno == ESRCH) {
-      return 0;
-    } else if (errno == EPERM) {
-      //printf("[DEBUG] Do not have permission\n");
-    }
-  }
-  
-  return 1;
-}
-
 // If -1 is returned it means that server did not respond
 // TODO: rename function since not exponential backoff
 int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off_t ring_idx,
                         struct shmipc_msg *msg, pid_t serverPid) {  
   int ret = -1;
-  int reqSent = 0;
   int count = 0;
 
+  shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg, shmipc_STATUS_READY_FOR_SERVER);
+  
+  // To detect server failure
+  gServerPid = serverPid;
+  alarm(1);
+
   // Tries until server is alive
-  while (is_server_up(serverPid)) {
-    if (reqSent == 0) {
-      // printf("[DEBUG] Sending msg: %d\n", count); fflush(stdout);
-      shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg, shmipc_STATUS_READY_FOR_SERVER);
+  while ((ret = shmipc_mgr_poll_msg(mgr, ring_idx, msg)) != 0) {
+    if (gServerIsDown == 1) {
+      break;
     }
-
-    usleep(3000);
-    // sleep(1);
-
-    ret = shmipc_mgr_poll_msg(mgr, ring_idx, msg); // TODO: Should use better names
-    if (ret == 0) {
-      // printf("[DEBUG] msg responded by server %d\n", count); fflush(stdout);
-      return ret;
-    }
-
-    count++;
-    reqSent = 1;
-    
-    // sleep(1); // TODO: Delete
   }
+
+  // cancel alarm
+  alarm(0);
 
   return ret;
 }

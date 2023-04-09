@@ -168,6 +168,9 @@ std::once_flag g_register_flag;
 static FsLibServiceMng *gServMngPtr = nullptr;
 std::atomic_bool gCleanedUpDone;
 std::atomic_flag gMultiFsServLock = ATOMIC_FLAG_INIT;
+std::atomic_flag gRetryOpLock = ATOMIC_FLAG_INIT;
+std::atomic_flag gReqRingMapLock = ATOMIC_FLAG_INIT;
+std::atomic_flag gReqAllocatedDataMapLock = ATOMIC_FLAG_INIT;
 
 // Thread local variables
 // if threadFsTid is 0, it means fsLib has not setup its FsLibMemMng
@@ -230,8 +233,6 @@ void fs_dump_ring_status() {
   }
 }
 
-
-// TODO: Need to test
 // With this, we do not need a dedicated thread to listen to fsync notifys
 // Instead, on allocatation if we see a notify msg, then we clear it from the state
 // This enables lazy handling
@@ -242,7 +243,17 @@ off_t shmipc_mgr_alloc_slot_wrapper(struct shmipc_mgr *mgr) {
   if (isNotify) {
     auto reqId = IDX_TO_MSG(mgr, ring_idx)->retval;
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
+    while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+      // spin
+    }
     gServMngPtr->reqRingMap.erase(reqId);
+    gReqRingMapLock.clear(std::memory_order_release);
+
+    while (gReqAllocatedDataMapLock.test_and_set(std::memory_order_acquire)) {
+      // spin
+    }
+    gServMngPtr->reqAllocatedDataMap.erase(reqId);
+
     shmipc_mgr_dealloc_slot(mgr, ring_idx);
   }
 
@@ -506,12 +517,11 @@ uint8_t PendingQueueMgr::getMessageStatus(uint64_t requestId) {
   assert(shmMgr != nullptr);
 
   if (gServMngPtr->reqRingMap.count(requestId) == 0 || 
-   gServMngPtr->reqRingMap[requestId].size() == 0) {
+    gServMngPtr->reqRingMap[requestId].size() == 0) {
     throw std::runtime_error("Invalid request id");
   }
 
   off_t ringIdx = gServMngPtr->reqRingMap[requestId][0];
-
   return (IDX_TO_MSG(shmMgr, ringIdx))->status;
 }
 
@@ -1601,7 +1611,6 @@ int fs_dump_pendingops() {
       }
     }
   }
-
   return 0;
 }
 
@@ -1817,18 +1826,30 @@ int handle_fdatasync_retry(uint64_t reqId) {
 // TODO: fs_rename
 int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, 
   CFS_DIR *dir = nullptr, void **bufPtr = nullptr) {
+  std::cout << "[DEBUG] Inside fs_retry_pending_ops" << std::endl; fflush(stdout);
+  
+  while (gRetryOpLock.test_and_set(std::memory_order_acquire)) {
+    // spin
+  }
+
   if (gServMngPtr->reqRingMap.size() == 0) {
-    // std::cout << "[INFO] No ops to retry" << std::endl;
+    gRetryOpLock.clear(std::memory_order_release);
     return 0;
   }
- 
+
   // std::cout << "[INFO] Checking connection with server" << std::endl;
   auto ret = check_primary_server_availability();
   if (ret == -1) {
     print_server_unavailable(__func__);
+    gRetryOpLock.clear(std::memory_order_release);
     return -1;
   } else {
     // std::cout << "[INFO] Connection to server successful" << std::endl; 
+   
+    while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+      // spin
+    }
+
     for (auto itr = gServMngPtr->reqRingMap.begin(); itr != gServMngPtr->reqRingMap.end();) {
       // std::cout << "[INFO] Retrying request #" << itr->first << std::endl;
       auto reqId = itr->first;
@@ -1933,8 +1954,10 @@ int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr,
           itr++;
           break;
       }
+      gReqRingMapLock.clear(std::memory_order_release);
     }
 
+    gRetryOpLock.clear(std::memory_order_release);
     return ret;
   }
 }
@@ -2034,6 +2057,22 @@ int fs_register(void) {
   return -1;
 }
 
+// TODO: test
+void detectServerUnavailLoop() {
+  std::cout << "[DEBUG] Inside " << __func__ << std::endl; fflush(stdout);
+  while(true) {
+    std::cout << "[DEBUG] Checking .. " << __func__ << std::endl; fflush(stdout);
+    // server is unavailable
+    if (is_server_up(gServMngPtr->fsServPid) != 1) {
+      print_server_unavailable(__func__);
+      fs_retry_pending_ops();
+    }
+
+    sleep(4); 
+  };
+}
+
+
 // each key will represent one FSP thread (instance/worker)
 int fs_init_multi(int num_key, const key_t *keys) {
   print_app_zc_mimic();
@@ -2073,6 +2112,8 @@ int fs_init_multi(int num_key, const key_t *keys) {
     }
   }
 
+  std::cout << "[DEBUG] Going to create thread " << __func__ << std::endl; fflush(stdout);
+  gServMngPtr->detectServerAliveThread = std::thread(detectServerUnavailLoop); // TODO: Add to fs_init() and cleanup
   return 0;
 }
 
@@ -2110,6 +2151,12 @@ int fs_stat_internal(FsService *fsServ, const char *pathname,
       auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
       gServMngPtr->queueMgr->enqueuePendingXreq<struct statOp>(statOp, off);
       gServMngPtr->reqRingMap[requestId].push_back(off);
+      
+      while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+        // spin
+      }
+      gServMngPtr->reqRingMap[requestId].push_back(off);
+      gReqRingMapLock.clear(std::memory_order_release);
     }
     threadFsTid = 0;
     ret = fs_retry_pending_ops(nullptr, statbuf);
@@ -2197,7 +2244,12 @@ int fs_fstat_internal(FsService *fsServ, int fd, struct stat *statbuf, uint64_t 
     if (gServMngPtr->reqRingMap.count(requestId) == 0) {
       auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
       gServMngPtr->queueMgr->enqueuePendingXreq<struct fstatOp>(fstatOp, off);
+      
+      while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+        // spin
+      }
       gServMngPtr->reqRingMap[requestId].push_back(off);
+      gReqRingMapLock.clear(std::memory_order_release);
     }
     threadFsTid = 0;
     ret = fs_retry_pending_ops(nullptr, statbuf);
@@ -2264,7 +2316,12 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
     if (gServMngPtr->reqRingMap.count(requestId) == 0) {
       auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
       gServMngPtr->queueMgr->enqueuePendingXreq<struct openOp>(oop, off);
+      
+      while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+        // spin
+      }
       gServMngPtr->reqRingMap[requestId].push_back(off);
+      gReqRingMapLock.clear(std::memory_order_release);
     }
     threadFsTid = 0;
     ret = fs_retry_pending_ops();
@@ -2281,7 +2338,12 @@ end:
   if (msg.type == CFS_OP_CREATE && gServMngPtr->reqRingMap.count(requestId) == 0) {
     auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
     gServMngPtr->queueMgr->enqueuePendingXreq<struct openOp>(oop, pendingOpIdx);
+    
+    while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+      // spin
+    }
     gServMngPtr->reqRingMap[requestId].push_back(pendingOpIdx);
+    gReqRingMapLock.clear(std::memory_order_release);
   }
 
 #ifndef CFS_LIB_LDB
@@ -2402,7 +2464,12 @@ int fs_close_internal(FsService *fsServ, int fd, uint64_t requestId) {
     if (gServMngPtr->reqRingMap.count(requestId) == 0) {
       auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
       gServMngPtr->queueMgr->enqueuePendingXreq<struct closeOp>(cloOp, off);
+      
+      while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+        // spin
+      }
       gServMngPtr->reqRingMap[requestId].push_back(off);
+      gReqRingMapLock.clear(std::memory_order_release);
     }
     threadFsTid = 0;
     ret = fs_retry_pending_ops();
@@ -2490,7 +2557,12 @@ int fs_unlink_internal(FsService *fsServ, const char *pathname, uint64_t reqId) 
   if (gServMngPtr->reqRingMap.count(reqId) == 0) {
     auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
     gServMngPtr->queueMgr->enqueuePendingXreq<struct unlinkOp>(unlkop, off);
+    
+    while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+      // spin
+    }
     gServMngPtr->reqRingMap[reqId].push_back(off);
+    gReqRingMapLock.clear(std::memory_order_release);
   }
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
@@ -2508,7 +2580,11 @@ end:
   // cleanup
   if (ret != 0) {
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
+    while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+      // spin
+    }
     gServMngPtr->reqRingMap.erase(reqId);
+    gReqRingMapLock.clear(std::memory_order_release);
   }
 #ifdef _CFS_LIB_PRINT_REQ_
   fprintf(stdout, "fs_unlink(pathname:%s) return:%d\n", pathname, ret);
@@ -2574,7 +2650,12 @@ int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode,
   if (gServMngPtr->reqRingMap.count(reqId) == 0) {
     auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
     gServMngPtr->queueMgr->enqueuePendingXreq<struct mkdirOp>(mop, off);
+    
+    while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+      // spin
+    }
     gServMngPtr->reqRingMap[reqId].push_back(off);
+    gReqRingMapLock.clear(std::memory_order_release);
   }
 
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, 
@@ -2589,7 +2670,12 @@ int fs_mkdir_internal(FsService *fsServ, const char *pathname, mode_t mode,
 end:
   if (ret < 0) {
     gServMngPtr->queueMgr->dequePendingMsg(reqId);
+    
+    while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+      // spin
+    }
     gServMngPtr->reqRingMap.erase(reqId);
+    gReqRingMapLock.clear(std::memory_order_release);
   }
 #ifdef _CFS_LIB_PRINT_REQ_
   fprintf(stdout, "fs_mkdir(%s) ret:%d\n", pathname, ret);
@@ -2662,7 +2748,12 @@ CFS_DIR *fs_opendir_internal(FsService *fsServ, const char *name, uint64_t reque
     if (gServMngPtr->reqRingMap.count(requestId) == 0) {
       auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
       gServMngPtr->queueMgr->enqueuePendingXreq<struct opendirOp>(odop, off);
+      
+      while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+        // spin
+      }
       gServMngPtr->reqRingMap[requestId].push_back(off);
+      gReqRingMapLock.clear(std::memory_order_release);
     }
     
     CFS_DIR* res = (CFS_DIR *)malloc(sizeof(*res));
@@ -2883,7 +2974,11 @@ int fs_fsync_internal(FsService *fsServ, int fd, bool isDataSync, uint64_t reque
     if (gServMngPtr->reqRingMap.count(requestId) == 0) {
       auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
       gServMngPtr->queueMgr->enqueuePendingXreq<struct fsyncOp>(fsyncOp, off);
+      while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+        // spin
+      }
       gServMngPtr->reqRingMap[requestId].push_back(off);
+      gReqRingMapLock.clear(std::memory_order_release);
     }
     threadFsTid = 0;
     ret = fs_retry_pending_ops();
@@ -3113,7 +3208,11 @@ static ssize_t fs_pread_internal(FsService *fsServ, int fd, void *buf,
       if (gServMngPtr->reqRingMap.count(requestId) == 0) {
         auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
         gServMngPtr->queueMgr->enqueuePendingXreq<struct preadOpPacked>(prop_p, off);
+        while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+          // spin 
+        }
         gServMngPtr->reqRingMap[requestId].push_back(off);
+        gReqRingMapLock.clear(std::memory_order_release);
       }
       
       print_server_unavailable(__func__);
@@ -3349,7 +3448,12 @@ static ssize_t fs_pwrite_internal(FsService *fsServ, int fd, const void *buf,
       auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
       gServMngPtr->queueMgr->enqueuePendingXreq<struct pwriteOpPacked>(pwop_p, pendingOpIdx);
       gServMngPtr->queueMgr->enqueuePendingData(curDataPtr, pendingOpIdx, tmpBytes);
+      
+      while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+        // spin
+      }
       gServMngPtr->reqRingMap[requestId].push_back(pendingOpIdx);
+      gReqRingMapLock.clear(std::memory_order_release);
     }
     
     // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
@@ -3693,7 +3797,12 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
     if (gServMngPtr->reqRingMap.count(requestId) == 0) {
       auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
       gServMngPtr->queueMgr->enqueuePendingXreq<struct allocatedPreadOpPacked>(aprop_p, off);
+      
+      while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+        // spin
+      }
       gServMngPtr->reqRingMap[requestId].push_back(off);
+      gReqRingMapLock.clear(std::memory_order_release);
     }
       
     print_server_unavailable(__func__);
@@ -3888,8 +3997,18 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
   if (gServMngPtr->reqRingMap.count(requestId) == 0) {
     auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
     gServMngPtr->queueMgr->enqueuePendingXreq<struct allocatedPwriteOpPacked>(apwop_p, pendingOpIdx);
+    
+    while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
+      // spin
+    }
     gServMngPtr->reqRingMap[requestId].push_back(pendingOpIdx);
+    gReqRingMapLock.clear(std::memory_order_release);
+
+    while (gReqAllocatedDataMapLock.test_and_set(std::memory_order_acquire)) {
+      // spin
+    }
     gServMngPtr->reqAllocatedDataMap[requestId] = (char *)buf;
+    gReqAllocatedDataMapLock.clear(std::memory_order_release);
   }
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);

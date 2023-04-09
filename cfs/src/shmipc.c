@@ -15,10 +15,12 @@ int gServerIsDown = 0;
 pid_t gServerPid = -1;
 
 int is_server_up(pid_t pid) {
-  if (kill(gServerPid, 0) != 0 && errno == ESRCH) {
+  if (kill(pid, 0) != 0 && errno == ESRCH) {
+    printf("[DEBUG] server is dead\n");
     return 0;
   }
   
+  printf("[DEBUG] server is alive\n");
   return 1;
 }
 

@@ -159,6 +159,7 @@ struct FsLibServiceMng {
   std::map<uint64_t, std::vector<off_t>> reqRingMap;
   std::unordered_map<uint64_t, char *> reqAllocatedDataMap;
   PendingQueueMgr *queueMgr{nullptr};
+  std::thread detectServerAliveThread;
 };
 
 // NOTE: enable this flag will record the entry and exit timestamp
@@ -389,5 +390,6 @@ struct unlinkOp *fillUnlinkOp(struct clientOp *curCop, const char *pathname);
 // Check if the thread has already setup its mem buffer, if not set it up.
 FsLibMemMng *check_app_thread_mem_buf_ready(int fsTid = threadFsTid);
 // =======
+
 
 #endif  // CFS_FSLIBAPP_H

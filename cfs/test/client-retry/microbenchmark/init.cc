@@ -43,6 +43,7 @@ int runInit() {
 }
 
 int createOneMbFile() {
+  std::cout << "[DEBUG] Inside " << __func__ << std::endl;
   auto ino = fs_open(FILE_MB, O_CREAT, 0644);
   if (ino <= 0) {
     fprintf(stderr, "fs_open() failed\n");
@@ -70,6 +71,7 @@ int createOneMbFile() {
 }
 
 int createFile(const char *fileName) {
+  std::cout << "[DEBUG] Inside " << __func__ << std::endl;
    auto ino = fs_open(fileName, O_CREAT, 0644);
    if (ino <= 0) {
     fprintf(stderr, "fs_open() failed\n");
@@ -80,6 +82,7 @@ int createFile(const char *fileName) {
 }
 
 int createFiles(int count) {
+  std::cout << "[DEBUG] Inside " << __func__ << std::endl;
   std::cout << "[INFO] Creating files" << std::endl;
   std::string parentPath = "";
   std::string currentPath = "";

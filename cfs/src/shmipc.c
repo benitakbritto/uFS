@@ -16,16 +16,16 @@ pid_t gServerPid = -1;
 
 int is_server_up(pid_t pid) {
   if (kill(pid, 0) != 0 && errno == ESRCH) {
-    printf("[DEBUG] server is dead\n");
+    // printf("[DEBUG] server is dead\n");
     return 0;
   }
   
-  printf("[DEBUG] server is alive\n");
+  // printf("[DEBUG] server is alive\n");
   return 1;
 }
 
 void sig_handler(int signum) {
-  printf("Inside handler function\n");
+  printf("Inside handler function\n"); fflush(stdout);
   // server is up, reset alarm
   if (is_server_up(gServerPid) == 1) {
     alarm(1); 
@@ -337,6 +337,7 @@ void shmipc_mgr_put_msg(struct shmipc_mgr *mgr, off_t ring_idx,
 // TODO: rename function since not exponential backoff
 int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off_t ring_idx,
                         struct shmipc_msg *msg, pid_t serverPid) {  
+  // printf("[DEBUG] Inside put msg\n"); fflush(stdout);
   int ret = -1;
   int count = 0;
 
@@ -351,6 +352,7 @@ int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off
     if (gServerIsDown == 1) {
       break;
     }
+    // printf("[DEBUG] trying again %d\n", count++); fflush(stdout);
   }
 
   // cancel alarm

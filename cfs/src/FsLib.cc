@@ -88,65 +88,65 @@ void print_admin_inode_reassignment(int type, uint32_t inode, int curOwner,
 
 void print_open(const char *path, int flags, mode_t mode, bool ldb = false, uint64_t requestId = 0) {
   fprintf(stderr, "-- Req #%ld: open%s(%s, %d, %d) from tid %d --\n", requestId, ldb ? "_ldb" : "", path,
-          flags, mode, threadFsTid);
+          flags, mode, threadFsTid); fflush(stderr);
 }
 
 void print_close(int fd, bool ldb = false, uint64_t requestId = 0) {
   fprintf(stderr, "-- Req#%ld: close%s(%d) from tid %d --\n", requestId, ldb ? "_ldb" : "", fd,
-          threadFsTid);
+          threadFsTid); fflush(stderr);
 }
 
 void print_pread(int fd, void *buf, size_t count, off_t offset, uint64_t requestId = 0,
                  bool ldb = false) {
   fprintf(stderr, "-- Req #%ld: pread%s(%d, %p, %lu, %ld) from tid %d --\n", requestId,
-        ldb ? "_ldb" : "", fd, buf, count, offset, threadFsTid);
+        ldb ? "_ldb" : "", fd, buf, count, offset, threadFsTid); fflush(stderr);
 }
 
 void print_read(int fd, void *buf, size_t count, uint64_t requestId = 0, bool ldb = false) {
   fprintf(stderr, "-- Req #%ld: read%s(%d, %p, %lu) from tid %d --\n", requestId,
-        ldb ? "_ldb" : "", fd, buf, count, threadFsTid);
+        ldb ? "_ldb" : "", fd, buf, count, threadFsTid); fflush(stderr);
 }
 
 void print_write(int fd, const void *buf, size_t count, uint64_t requestId = 0, 
   bool ldb = false) {
   fprintf(stderr, "-- Req #%ld: write%s(%d, %p, %lu) from tid %d --\n", requestId, ldb ? "_ldb" : "", fd,
-          buf, count, threadFsTid);
+          buf, count, threadFsTid); fflush(stderr);
 }
 
 void print_pwrite(int fd, const void *buf, size_t count, off_t offset, uint64_t requestId = 0) {
   fprintf(stderr, "-- Req #%ld: pwrite(%d, %p, %lu, %ld)\n --", requestId,
-          fd, buf, count, offset);
+          fd, buf, count, offset); fflush(stderr);
 }
 
 void print_mkdir(const char *pathname, mode_t mode, uint64_t requestId = 0) {
   fprintf(stderr, "-- Req #%ld: mkdir(%s, %dd)\n --", requestId,
-          pathname, mode);
+          pathname, mode); fflush(stderr);
 }
 
 void print_fsync(int fd, bool ldb = false) {
   fprintf(stderr, "-- fsync%s(%d) from tid %d --\n", ldb ? "_ldb" : "", fd,
-          threadFsTid);
+          threadFsTid); fflush(stderr);
 }
 
 void print_unlink(const char *path) {
-  fprintf(stderr, "-- unlink(%s) from tid %d --\n", path, threadFsTid);
+  fprintf(stderr, "-- unlink(%s) from tid %d --\n", path, threadFsTid); fflush(stderr);
 }
 
 void print_rename(const char *oldpath, const char *newpath) {
   fprintf(stderr, "-- rename(%s, %s) from tid %d --\n", oldpath, newpath,
-          threadFsTid);
+          threadFsTid); fflush(stderr);
 }
 
 void print_opendir(const char *path, uint64_t requestId) {
-  fprintf(stderr, "-- Req #%ld: opendir(%s) --\n", requestId, path);
+  fprintf(stderr, "-- Req #%ld: opendir(%s) --\n", requestId, path); fflush(stderr);
 }
 
 void print_stat(const char *path, uint64_t requestId) {
-  fprintf(stderr, "-- Req #%ld: stat(%s) --\n", requestId, path);
+  fprintf(stderr, "-- Req #%ld: stat(%s) --\n", requestId, path); fflush(stderr);
 }
 
 void print_fstat(int fd, uint64_t requestId) {
-  fprintf(stderr, "-- Req#%ld: fstat(%d) --\n", requestId, fd);
+  fprintf(stderr, "-- Req#%ld: fstat(%d) --\n", requestId, fd); fflush(stderr);
 }
 
 /* #endregion print api end */
@@ -253,11 +253,12 @@ off_t shmipc_mgr_alloc_slot_wrapper(struct shmipc_mgr *mgr) {
       // spin
     }
     gServMngPtr->reqAllocatedDataMap.erase(reqId);
+    gReqAllocatedDataMapLock.clear(std::memory_order_release);
 
     shmipc_mgr_dealloc_slot(mgr, ring_idx);
   }
 
-  printf("[DEBUG] ring_idx = %ld\n", ring_idx);
+  // printf("[DEBUG] ring_idx = %ld\n", ring_idx);
   return ring_idx;
 }
 
@@ -1826,7 +1827,7 @@ int handle_fdatasync_retry(uint64_t reqId) {
 // TODO: fs_rename
 int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, 
   CFS_DIR *dir = nullptr, void **bufPtr = nullptr) {
-  std::cout << "[DEBUG] Inside fs_retry_pending_ops" << std::endl; fflush(stdout);
+  // std::cout << "[DEBUG] Inside fs_retry_pending_ops" << std::endl; fflush(stdout);
   
   while (gRetryOpLock.test_and_set(std::memory_order_acquire)) {
     // spin
@@ -2059,9 +2060,9 @@ int fs_register(void) {
 
 // TODO: test
 void detectServerUnavailLoop() {
-  std::cout << "[DEBUG] Inside " << __func__ << std::endl; fflush(stdout);
+  // std::cout << "[DEBUG] Inside " << __func__ << std::endl; fflush(stdout);
   while(true) {
-    std::cout << "[DEBUG] Checking .. " << __func__ << std::endl; fflush(stdout);
+    // std::cout << "[DEBUG] Checking .. " << __func__ << std::endl; fflush(stdout);
     // server is unavailable
     if (is_server_up(gServMngPtr->fsServPid) != 1) {
       print_server_unavailable(__func__);
@@ -2112,7 +2113,8 @@ int fs_init_multi(int num_key, const key_t *keys) {
     }
   }
 
-  std::cout << "[DEBUG] Going to create thread " << __func__ << std::endl; fflush(stdout);
+  // std::cout << "[DEBUG] Going to create thread " << __func__ << std::endl; fflush(stdout);
+  
   gServMngPtr->detectServerAliveThread = std::thread(detectServerUnavailLoop); // TODO: Add to fs_init() and cleanup
   return 0;
 }
@@ -3791,6 +3793,7 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
   aprop_p->alOp.perAppSeqNo = 0;
   aprop_p->rwOp.realCount = 0;
 
+  // std::cout << "[DEBUG] Going to put msg" << std::endl; fflush(stdout);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
     &msg, gServMngPtr->fsServPid) == -1) {
@@ -3988,13 +3991,16 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
 
   memset(&msg, 0, sizeof(struct shmipc_msg));
   ring_idx = shmipc_mgr_alloc_slot_dbg(fsServ->shmipc_mgr);
+  // std::cout << "[DEBUG] the ring idx over here is = " << ring_idx << std::endl; fflush(stdout);
   apwop_p = (struct allocatedPwriteOpPacked *)IDX_TO_XREQ(fsServ->shmipc_mgr,
                                                           ring_idx);
   prepare_allocatedPwriteOp(&msg, apwop_p, fd, count, offset, requestId);
   apwop_p->alOp.shmid = shmid;
   apwop_p->alOp.dataPtrId = dataPtrId;
 
+  // std::cout << "[DEBUG] Accessing reqRingMap" << std::endl; fflush(stdout);
   if (gServMngPtr->reqRingMap.count(requestId) == 0) {
+    // std::cout << "[DEBUG] Adding to pending" << std::endl; fflush(stdout);
     auto pendingOpIdx = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
     gServMngPtr->queueMgr->enqueuePendingXreq<struct allocatedPwriteOpPacked>(apwop_p, pendingOpIdx);
     
@@ -4011,6 +4017,7 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
     gReqAllocatedDataMapLock.clear(std::memory_order_release);
   }
 
+  // std::cout << "[DEBUG] going to put msg" << std::endl; fflush(stdout);
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
     &msg, gServMngPtr->fsServPid) == -1) {

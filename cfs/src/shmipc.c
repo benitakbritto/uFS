@@ -261,6 +261,43 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   return ring_idx;
 }
 
+off_t shmipc_mgr_alloc_slot_client(struct shmipc_mgr *mgr, int *isNotify) {
+  struct shmipc_msg *rmsg;
+  off_t ring_idx;
+
+  ring_idx = __sync_fetch_and_add(&(mgr->next), 1); 
+  ring_idx = ring_idx & mgr->mask;
+  // ring_idx 0 is reserved for getting server pid
+  if (ring_idx == 0) {
+    ring_idx = 1;
+  }
+  rmsg = IDX_TO_MSG(mgr, ring_idx);
+
+  if (__builtin_expect(rmsg->status == shmipc_STATUS_NOTIFY_FOR_CLIENT, 1)) {
+    *isNotify = 1;
+    return ring_idx;
+  }
+
+  // NOTE: If the buffer is not large enough and we happen to
+  // circle back onto a slot that is still in use, we will have to wait
+  // till it is free. Further, if some task ahead in the ring gets done
+  // quickly, we won't be able to take it's slot as we already have one.
+  // Sort of like hol blocking but only when the buffer is small.
+  // We might have to change to a mechanism where we get a slot only
+  // when slots are available.
+  while (__builtin_expect(rmsg->status != shmipc_STATUS_EMPTY, 0))
+    ;
+
+  
+  // NOTE: This (below) might cause cache invalidations slowing down
+  // server poll. Maybe client side should have a bitmap for the
+  // ring slots to ensure that it is free?
+  // These are purely conflicts that should be resolved at client side.
+  rmsg->status = shmipc_STATUS_RESERVED;
+  return ring_idx;
+}
+
+
 void shmipc_increment_ring_index(struct shmipc_mgr *mgr) {
   __sync_fetch_and_add(&(mgr->next), 1);
 }
@@ -345,20 +382,6 @@ int shmipc_mgr_poll_msg(struct shmipc_mgr *mgr, off_t idx,
   struct shmipc_msg *rmsg;
 
   rmsg = IDX_TO_MSG(mgr, idx);
-
-  // // TODO: Del later
-  // if (rmsg->status == shmipc_STATUS_READY_FOR_SERVER) {
-  //   printf("[DEBUG] shmipc_mgr_poll_msg: status = shmipc_STATUS_READY_FOR_SERVER\n");
-  // } else if (rmsg->status == shmipc_STATUS_IN_PROGRESS) {
-  //   printf("[DEBUG]shmipc_mgr_poll_msg: status = shmipc_STATUS_IN_PROGRESS\n");
-  // } else if (rmsg->status == shmipc_STATUS_EMPTY) {
-  //   printf("[DEBUG]shmipc_mgr_poll_msg: status = shmipc_STATUS_EMPTY\n");
-  // } else if (rmsg->status == shmipc_STATUS_READY_FOR_CLIENT) {
-  //   printf("[DEBUG]shmipc_mgr_poll_msg: status = shmipc_STATUS_READY_FOR_CLIENT\n");
-  // } else if (rmsg->status == shmipc_STATUS_RESERVED) {
-  //   printf("[DEBUG] shmipc_mgr_poll_msg: status = shmipc_STATUS_RESERVED\n");
-  // }
-  // fflush(stdout);
 
   if (rmsg->status != shmipc_STATUS_READY_FOR_CLIENT) return -1;
 

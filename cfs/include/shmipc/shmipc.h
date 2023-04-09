@@ -96,6 +96,8 @@ struct shmipc_mgr {
   off_t next;
 };
 
+int is_server_up(pid_t pid);
+
 struct shmipc_mgr *shmipc_mgr_init(const char *name, size_t rsize, int create);
 // Init shmipc manager with shared memory so that forked processes
 // can access it. Not used for now.
@@ -119,6 +121,9 @@ struct shmipc_msg *shmipc_mgr_get_msg_nowait(struct shmipc_mgr *mgr,
 
 // All *put* functions first need to alloc a slot and later dealloc.
 off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr);
+
+off_t shmipc_mgr_alloc_slot_client(struct shmipc_mgr *mgr, int *isNotify);
+
 // TODO in debug mode, measure how much time slots are held...
 void shmipc_mgr_dealloc_slot(struct shmipc_mgr *mgr, off_t ring_idx);
 

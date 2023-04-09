@@ -61,7 +61,7 @@ int fs_stop_dump_load_stats();
 int fs_dumpinodes(int wid);
 
 int fs_dump_pendingops();
-int fs_poll_notification();
+void fs_dump_ring_status();
 // int fs_retry_pending_ops(void* buf = nullptr, struct stat *statbuf = nullptr, CFS_DIR* dir = nullptr);
 ////////////////////////////////////////////////////////////////////////////////
 // POSIX API

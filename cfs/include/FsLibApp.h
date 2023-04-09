@@ -110,11 +110,11 @@ class FsService {
     return inodeOffsetMap.count(inode) == 0 ? 0 : inodeOffsetMap[inode];
   }
 
-  void notificationListenerLoop();
+  // void notificationListenerLoop();
 
-  void cleanupNotificationListener();
+  // void cleanupNotificationListener();
 
-  void handleServerNotification(int64_t requestId);
+  // void handleServerNotification(int64_t requestId);
  private:
   std::list<int> unusedRingSlots;
   std::atomic_flag unusedSlotsLock;
@@ -122,7 +122,7 @@ class FsService {
   int wid;
   CommuChannelAppSide *channelPtr;
   std::unordered_map<ino_t, off_t> inodeOffsetMap;
-  std::thread *notificationListener_;
+  // std::thread *notificationListener_;
 };
 
 class PendingQueueMgr {
@@ -159,8 +159,6 @@ struct FsLibServiceMng {
   std::map<uint64_t, std::vector<off_t>> reqRingMap;
   std::unordered_map<uint64_t, char *> reqAllocatedDataMap;
   PendingQueueMgr *queueMgr{nullptr};
-  std::unordered_map<uint64_t, std::pair<bool, std::unordered_set<uint64_t>>> compositeRequestIdMap;
-  std::unordered_map<uint64_t, uint64_t> childToParentCompositeIdMap;
 };
 
 // NOTE: enable this flag will record the entry and exit timestamp

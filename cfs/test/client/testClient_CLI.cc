@@ -654,7 +654,16 @@ void process(std::string const &line) {
     //   } else {
       //   printHelp();
       // }
-    } else {
+    } else if (tokens[0] == "dump_ring") {
+      if (tokens.size() != 1) {
+        printHelp();
+      } else {
+        #ifndef TEST_VFS_INSTEAD
+        fs_dump_ring_status();
+        #endif
+      }
+    }
+    else {
       printHelp();
     }
   }

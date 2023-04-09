@@ -195,6 +195,61 @@ thread_local std::unique_ptr<FsLibPinnedMemMng> tlPinnedMemPtr;
 
 /* #endregion */
 
+// TODO: Del later
+void fs_dump_ring_status() {
+  auto mgr = gServMngPtr->primaryServ->shmipc_mgr;
+
+  for (int i = 0; i < RING_SIZE; i++) {
+    auto msg = IDX_TO_MSG(mgr, i);
+    switch(msg->status) {
+      case shmipc_STATUS_EMPTY:
+        printf("[INFO]: idx = %d, status = EMPTY\n", i);
+        break;
+      case shmipc_STATUS_RESERVED:
+        printf("[INFO]: idx = %d, status = RESERVED\n", i);
+        break;
+      case shmipc_STATUS_READY_FOR_SERVER:
+        printf("[INFO]: idx = %d, status = READY_FOR_SERVER\n", i);
+        break;
+      case shmipc_STATUS_IN_PROGRESS:
+        printf("[INFO]: idx = %d, status = IN_PROGRESS\n", i);
+        break;
+      case shmipc_STATUS_READY_FOR_CLIENT:
+        printf("[INFO]: idx = %d, status = READY_FOR_CLIENT\n", i);
+        break;
+      case shmipc_STATUS_NOTIFY_FOR_CLIENT:
+        printf("[INFO]: idx = %d, status = NOTIFY_FOR_CLIENT\n", i);
+        break;
+      case shmipc_STATUS_SERVER_PID_FOR_CLIENT:
+        printf("[INFO]: idx = %d, status = SERVER_PID_FOR_CLIENT\n", i);
+        break;
+      default:
+        printf("[INFO]: idx = %d, status = UNKNOWN\n", i);
+        break;
+    }
+  }
+}
+
+
+// TODO: Need to test
+// With this, we do not need a dedicated thread to listen to fsync notifys
+// Instead, on allocatation if we see a notify msg, then we clear it from the state
+// This enables lazy handling
+off_t shmipc_mgr_alloc_slot_wrapper(struct shmipc_mgr *mgr) {
+  int isNotify = 0;
+  auto ring_idx = shmipc_mgr_alloc_slot_client(mgr, &isNotify);
+
+  if (isNotify) {
+    auto reqId = IDX_TO_MSG(mgr, ring_idx)->retval;
+    gServMngPtr->queueMgr->dequePendingMsg(reqId);
+    gServMngPtr->reqRingMap.erase(reqId);
+    shmipc_mgr_dealloc_slot(mgr, ring_idx);
+  }
+
+  printf("[DEBUG] ring_idx = %ld\n", ring_idx);
+  return ring_idx;
+}
+
 //
 // helper functions to dump rbtree to stdout
 //
@@ -244,64 +299,6 @@ static void dumpAllocatedOpCommon(allocatedOpCommonPacked *alOp) {
           alOp->shmid, alOp->dataPtrId, alOp->perAppSeqNo);
 }
 
-/* #region Notification handling start */
-void inline handleSingleOpNotification(uint64_t reqId) {
-  gServMngPtr->queueMgr->dequePendingMsg(reqId);
-  gServMngPtr->reqRingMap.erase(reqId);
-}
-
-void handleCompositeOpNotification(uint64_t individualId) {
-  // std::cout << "Inside " << __func__ << std::endl;
-  assert(gServMngPtr->childToParentCompositeIdMap.count(individualId) != 0);
-  uint64_t compositeId = gServMngPtr->childToParentCompositeIdMap[individualId];
-
-  gServMngPtr->compositeRequestIdMap[compositeId].second.erase(individualId);
-  gServMngPtr->childToParentCompositeIdMap.erase(individualId);
-
-  if (gServMngPtr->compositeRequestIdMap[compositeId].first == true &&
-    gServMngPtr->compositeRequestIdMap[compositeId].second.size() == 0) {
-      gServMngPtr->compositeRequestIdMap.erase(compositeId);
-      handleSingleOpNotification(compositeId);
-   }
-
-  // std::cout << "Exiting " << __func__ << std::endl;
-}
-
-void FsService::notificationListenerLoop() {
-  while(true) {
-    uint8_t count = 0;
-    shmipc_msg msg;
-    off_t ringIdx = 0;
-    assert(shmipc_mgr != nullptr);
-    // go over entire ring once
-    do {
-      memset(&msg, 0, sizeof(struct shmipc_msg));
-      auto ret = shmipc_mgr_poll_notify_msg(shmipc_mgr, ringIdx, &msg);
-      if (ret != -1) {                        
-        handleServerNotification(msg.retval);
-        shmipc_mgr_dealloc_slot(shmipc_mgr, ringIdx);        
-      }
-      ringIdx++;
-    } while (ringIdx < RING_SIZE);
-
-    sleep(5); // TODO: configure this
- };
-}
-
-void FsService::handleServerNotification(int64_t requestId) {
-  if (gServMngPtr->childToParentCompositeIdMap.count(requestId) != 0) {
-    handleCompositeOpNotification(requestId);
-  } else {
-    handleSingleOpNotification(requestId);
-  }
-}
-
-void FsService::cleanupNotificationListener() {
-  notificationListener_->join();
-}
-
-/* #endregion Notification handling */
-
 /* #region FS Service */
 FsService::FsService(int wid, key_t key)
     : unusedSlotsLock(ATOMIC_FLAG_INIT),
@@ -340,8 +337,6 @@ void FsService::initService() {
 
     std::cout << "INFO initService connected to contrl shm at " << shmfile
             << std::endl;
-
-    notificationListener_ = new std::thread(&FsService::notificationListenerLoop, this);
 }
 
 int FsService::allocRingSlot() {
@@ -397,16 +392,6 @@ int FsService::submitReq(int slotId) {
   return ret;
 }
 /* #endregion FS Service */
-
-// Note: function is duplicated
-int is_server_up(pid_t pid) {
-  // no such process
-  if (kill(pid, 0) != 0 && errno == ESRCH) {
-    return 0;
-  }
-
-  return 1;
-}
 
 int get_server_pid() {
   // server pid will be placed in master shm
@@ -1024,11 +1009,11 @@ end:
 
 static inline off_t shmipc_mgr_alloc_slot_dbg(struct shmipc_mgr *mgr) {
 #ifdef _SHMIPC_DBG_
-  off_t ring_idx = shmipc_mgr_alloc_slot(mgr);
+  off_t ring_idx = shmipc_mgr_alloc_slot_wrapper(mgr);
   fprintf(stdout, "tid:%d ring_idx:%zu\n", threadFsTid, ring_idx);
   return ring_idx;
 #else
-  return shmipc_mgr_alloc_slot(mgr);
+  return shmipc_mgr_alloc_slot_wrapper(mgr);
 #endif
 }
 
@@ -1387,7 +1372,6 @@ int fs_cleanup() {
       for (auto ele : gServMngPtr->multiFsServMap) {
         // fprintf(stderr, "fs_cleanup: key:%d\n", ele.first);
         auto server = ele.second;
-        server->cleanupNotificationListener();
         delete server;
         server = nullptr;
       }
@@ -1958,8 +1942,6 @@ int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr,
 /* #endregion fs util */
 
 /* #region fs functions */
-// TODO: Deprecate this, as we need atleast 2 keys to work
-// with client retries (1 for server and 1 for private pending ops tracking)
 // If app know's its key, allow init with the key
 int fs_init(key_t key) {
   print_app_zc_mimic();
@@ -1974,8 +1956,6 @@ int fs_init(key_t key) {
         gServMngPtr = new FsLibServiceMng();
         gServMngPtr->primaryServ = new FsService(gPrimaryServWid, key);
         gServMngPtr->primaryServ->inUse = true;
-        // gPrimaryServ = new FsService(gPrimaryServWid, key);
-        gServMngPtr->queueMgr = new PendingQueueMgr(20190304); // NOTE: Hardcoded
       } catch (const char *msg) {
         fprintf(stderr, "Cannot init FsService:%s\n", msg);
         return -1;
@@ -2054,7 +2034,6 @@ int fs_register(void) {
   return -1;
 }
 
-// The last key will be used for the pending queue
 // each key will represent one FSP thread (instance/worker)
 int fs_init_multi(int num_key, const key_t *keys) {
   print_app_zc_mimic();
@@ -2279,7 +2258,6 @@ static int fs_open_internal(FsService *fsServ, const char *path, int flags,
   oop = (struct openOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_openOp(&msg, oop, path, flags, mode, size, requestId);
 
-  // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
     &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);

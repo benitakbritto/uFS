@@ -1382,7 +1382,7 @@ void FileMng::processAllocWrite(FsReq *req) {
 }
 
 void FileMng::processAllocPwrite(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  std::cout << "[DEBUG]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::ALLOCPWRITE_TOCACHE_MODIFY) {
     // TO be implemented
     throw std::runtime_error("allocpwrite not supported");
@@ -1445,6 +1445,7 @@ void FileMng::processAllocPwrite(FsReq *req) {
   }
 
   if (req->getState() == FsReqState::ALLOCPWRITE_RET_ERR) {
+    std::cout << "[DEBUG]" << __func__ << "\t" << "error" << std::endl;
     req->setError();
     fsWorker_->submitFsReqCompletion(req);
   }
@@ -3688,6 +3689,7 @@ void FileMng::processOpendir(FsReq *req) {
 }
 
 void FileMng::processNewShmAllocated(FsReq *req) {
+  std::cout << "[DEBUG] Inside " << __func__ << std::endl;
   if (req->getState() == FsReqState::NEW_SHM_ALLOC_SEND_MSG) {
     SPDLOG_DEBUG("FsReq::processNewShmAllocated wid:{} reqType:{}",
                  req->getWid(), getFsReqTypeOutputString(req->getType()));

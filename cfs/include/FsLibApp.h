@@ -157,7 +157,7 @@ struct FsLibServiceMng {
   FsService *primaryServ{nullptr};
   // must process in sorted order of id
   std::map<uint64_t, std::vector<off_t>> reqRingMap;
-  std::unordered_map<uint64_t, char *> reqAllocatedDataMap;
+  std::unordered_map<uint64_t, void *> reqAllocatedDataMap;
   PendingQueueMgr *queueMgr{nullptr};
   std::thread detectServerAliveThread;
 };
@@ -388,7 +388,7 @@ struct unlinkOp *fillUnlinkOp(struct clientOp *curCop, const char *pathname);
 
 // Setup per thread mem buffer
 // Check if the thread has already setup its mem buffer, if not set it up.
-FsLibMemMng *check_app_thread_mem_buf_ready(int fsTid = threadFsTid);
+FsLibMemMng *check_app_thread_mem_buf_ready(bool isRetry, int fsTid = threadFsTid);
 // =======
 
 

@@ -62,7 +62,7 @@ int fs_dumpinodes(int wid);
 
 int fs_dump_pendingops();
 void fs_dump_ring_status();
-// int fs_retry_pending_ops(void* buf = nullptr, struct stat *statbuf = nullptr, CFS_DIR* dir = nullptr);
+
 ////////////////////////////////////////////////////////////////////////////////
 // POSIX API
 
@@ -202,6 +202,9 @@ int fs_close_ldb(int fd);
 int fs_wsync(int fd);
 
 ////////////////////////////////////////////////////////////////////////////////
+
+int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, 
+  CFS_DIR *dir = nullptr, void **bufPtr = nullptr); // TODO: Remove this from header
 
 #ifdef __cplusplus
 }

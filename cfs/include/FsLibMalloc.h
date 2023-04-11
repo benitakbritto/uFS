@@ -18,7 +18,7 @@
 
 constexpr static uint32_t gFsLibMallocPageSize = 4096;
 // On/off of debug prints
-//// #define FS_LIB_MALLOC_DEBUG
+#define FS_LIB_MALLOC_DEBUG
 
 //
 // helper functions for mmap based shared memory, if ok err set to 0.

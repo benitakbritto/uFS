@@ -1900,7 +1900,8 @@ void *AppProc::getDataPtrByShmIdAndDataId(uint8_t shmId,
 std::pair<uint8_t, void *> AppProc::initNewAllocatedShm(
     std::string &shmName, fslib_malloc_block_sz_t shmBlockSize,
     fslib_malloc_block_cnt_t shmNumBlocks) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  std::cout << "[DEBUG]" << __func__ << "\t" << __LINE__ << std::endl;
+  std::cout << "[DEBUG] shmName = " << shmName << std::endl;
   // fprintf(stderr, "===AppProc: initNewAllocatedShm shmName:%s\n",
   // shmName.c_str());
   // FIXME (jingliu), not sure if this is strictly necessary, but I see

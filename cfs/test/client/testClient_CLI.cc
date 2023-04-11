@@ -104,11 +104,8 @@ void printHelp() {
                           " <src_wid> <dst_wid>\n");
   printf(ANSI_COLOR_GREEN "view_pending_ops" ANSI_COLOR_RESET
                           "\n");
-
-  // printf(ANSI_COLOR_GREEN "retry_ops" ANSI_COLOR_RESET
-  //                         "\n"); 
-  // printf(ANSI_COLOR_GREEN "cp -r" ANSI_COLOR_RESET
-  //                         " <PATH & FILENAME src> <PATH & FILENAME dest>\n");                          
+  printf(ANSI_COLOR_GREEN "retry_ops" ANSI_COLOR_RESET
+                          "\n");                    
 }
 
 void printReturnValue(std::string const &cmd, ssize_t v) {
@@ -232,7 +229,7 @@ void process(std::string const &line) {
           }
           std::cout << std::endl;
         }
-        fs_free(buf);
+        // fs_free(buf);
       }
     } else if (tokens[0] == "cacheread") {
       if (tokens.size() != 3) {
@@ -295,7 +292,7 @@ void process(std::string const &line) {
           }
           std::cout << std::endl;
         }
-        fs_free(buf);
+        // fs_free(buf);
       }
 #endif
     } else if (tokens[0] == "write") {
@@ -317,13 +314,12 @@ void process(std::string const &line) {
       } else {
         int fd = stoiWrapper(tokens[1]);
         size_t count = strlen(tokens[2].c_str());
-        char *buf0 = (char *)fs_malloc(count + 1);
         char *buf = (char *)fs_malloc(count + 1);
         strcpy(buf, tokens[2].c_str());
         ssize_t ret = fs_allocated_write(fd, buf, count);
+        std::cout << "[DEBUG] Inside testClient, returned !!" << std::endl;
         printReturnValue(tokens[0], ret);
-        fs_free(buf);
-        fs_free(buf0);
+        // fs_free(buf);
       }
     } else if (tokens[0] == "allocpwrite") {
       if (tokens.size() != 4) {
@@ -332,12 +328,11 @@ void process(std::string const &line) {
         int fd = stoiWrapper(tokens[1]);
         size_t count = strlen(tokens[2].c_str());
         off_t offset = stollWrapper(tokens[3]);
-        // char *buf = (char *)fs_malloc(count + 1);
-        char *buf = (char *)fs_malloc(48 * 1024);
+        char *buf = (char *)fs_malloc(count + 1);
         strcpy(buf, tokens[2].c_str());
         ssize_t ret = fs_allocated_pwrite(fd, buf, count, offset);
         printReturnValue(tokens[0], ret);
-        fs_free(buf);
+        // fs_free(buf);
       }
 #endif
     } else if (tokens[0] == "writen") {
@@ -660,6 +655,14 @@ void process(std::string const &line) {
       } else {
         #ifndef TEST_VFS_INSTEAD
         fs_dump_ring_status();
+        #endif
+      }
+    } else if (tokens[0] == "retry") {
+      if (tokens.size() != 1) {
+        printHelp();
+      } else {
+        #ifndef TEST_VFS_INSTEAD
+        fs_retry_pending_ops();
         #endif
       }
     }

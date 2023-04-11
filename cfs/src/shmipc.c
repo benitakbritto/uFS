@@ -11,8 +11,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-int gServerIsDown = 0;
 pid_t gServerPid = -1;
+int gServerIsDown = 0;
 
 int is_server_up(pid_t pid) {
   if (kill(pid, 0) != 0 && errno == ESRCH) {

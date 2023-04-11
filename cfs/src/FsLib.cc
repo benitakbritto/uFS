@@ -65,12 +65,12 @@ ssize_t fs_allocated_pread_retry(int fd, void *buf, size_t count, off_t offset, 
 int gRetryNotifyShm = false;
 
 /* #region requestId */
-// TODO: Lock over gRequestId
-uint64_t gRequestId = 0;
+thread_local uint64_t gRequestId = 0;
+// Assumes that get thread won't make more than these # of requests
+#define REQUEST_ID_BASE 10000 
 
-// TODO: Lock
 uint64_t inline getNewRequestId() {
-  return gRequestId++;
+  return (REQUEST_ID_BASE) * threadFsTid + gRequestId++;
 }
 
 /* #endregion requestId end */

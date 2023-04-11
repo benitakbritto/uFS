@@ -62,6 +62,8 @@ ssize_t fs_allocated_pread_retry(int fd, void *buf, size_t count, off_t offset, 
 // #define _CFS_LIB_PRINT_REQ_
 #define LDB_PRINT_CALL
 
+int gRetryNotifyShm = false;
+
 /* #region requestId */
 // TODO: Lock over gRequestId
 uint64_t gRequestId = 0;
@@ -1008,7 +1010,6 @@ static int send_noargop(FsService *fsServ, CfsOpCode opcode) {
   if (shmipc_mgr_put_msg_retry_exponential_backoff(fsServ->shmipc_mgr, ring_idx, 
     &msg, gServMngPtr->fsServPid) == -1) {
     print_server_unavailable(__func__);
-    // ret = fs_retry_pending_ops();
     goto end;
   }
 
@@ -1887,15 +1888,16 @@ int fs_retry_pending_ops(void *buf, struct stat *statbuf,
   std::cout << "[DEBUG] Inside " << __func__ << std::endl;
   // Func is locked
   if (gRetryOpLock) { 
-    std::cout << "[DEBUG] " << __func__ << " lock held, leaving ... " << std::this_thread::get_id()  << std::endl;
+    std::cout << "[DEBUG] " << __func__ << ": lock held, leaving ... " << 
+      std::this_thread::get_id()  << std::endl;
     return 0; // TODO: Make sure this is the right thing to do
   }
 
-
   if (!gRetryOpLock.exchange(true)) {
-    std::cout << "[DEBUG] " << __func__ << "I have the lock ..." << std::this_thread::get_id() << std::endl;
+    std::cout << "[DEBUG] " << __func__ << ": I have the lock ..." 
+      << std::this_thread::get_id() << std::endl;
     if (gServMngPtr->reqRingMap.size() == 0) {
-      std::cout << "[DEBUG] " << __func__ << " No ops to retry " << std::endl;
+      std::cout << "[DEBUG] " << __func__ << ": No ops to retry " << std::endl;
       gRetryOpLock.exchange(false);
       return 0;
     }
@@ -1908,7 +1910,7 @@ int fs_retry_pending_ops(void *buf, struct stat *statbuf,
       return -1;
     } else {
       std::cout << "[DEBUG] Connection to server successful" << std::endl; 
-    
+      bool foundFirstNotifyShm = false;
       for (auto itr = gServMngPtr->reqRingMap.begin(); itr != gServMngPtr->reqRingMap.end();) {
         std::cout << "[DEBUG] Retrying request #" << itr->first << std::endl;
         auto reqId = itr->first;
@@ -1919,7 +1921,12 @@ int fs_retry_pending_ops(void *buf, struct stat *statbuf,
             itr++;
             break;
           case CFS_OP_ALLOCED_PWRITE:
+            if (foundFirstNotifyShm == false) {
+              gRetryNotifyShm = true;
+              foundFirstNotifyShm = true;
+            }
             ret = handle_allocated_pwrite_retry(reqId);
+            gRetryNotifyShm = false;
             itr++;
             break;
           case CFS_OP_CREATE:
@@ -1935,7 +1942,12 @@ int fs_retry_pending_ops(void *buf, struct stat *statbuf,
             }
             break;
           case CFS_OP_ALLOCED_PREAD:
+            if (foundFirstNotifyShm == false) {
+              gRetryNotifyShm = true;
+              foundFirstNotifyShm = true;
+            }
             ret = handle_allocated_pread_retry(reqId, bufPtr);
+            gRetryNotifyShm = false;
             if (ret > 0) {
               gServMngPtr->reqRingMap.erase(itr++);
             } else {
@@ -1983,7 +1995,12 @@ int fs_retry_pending_ops(void *buf, struct stat *statbuf,
             }
             break;
           case CFS_OP_OPENDIR:
+            if (foundFirstNotifyShm == false) {
+              gRetryNotifyShm = true;
+              foundFirstNotifyShm = true;
+            }
             ret = handle_opendir_retry(reqId, dir);
+            gRetryNotifyShm = false;
             if (ret == 0) {
               gServMngPtr->reqRingMap.erase(itr++);
             } else {
@@ -2876,7 +2893,7 @@ CFS_DIR *fs_opendir(const char *name) {
 }
 
 CFS_DIR *fs_opendir_retry(const char *name, uint64_t requestId) {
-  return fs_opendir_internal_common(name, requestId, true /* isRetry */);
+  return fs_opendir_internal_common(name, requestId, gRetryNotifyShm /* isRetry */);
 }
 
 struct dirent *fs_readdir(CFS_DIR *dirp) {
@@ -3897,7 +3914,10 @@ retry:
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
-    if (should_retry) goto retry;
+    if (should_retry) {
+      isRetry = false;
+      goto retry;
+    }
   } else {
     service->updateOffset(fd, offset + rc - 1);
   }
@@ -3905,10 +3925,6 @@ retry:
   tFsApiTs->addApiNormalDone(FsApiType::FS_READ, tsIdx);
 #endif
   return rc;
-}
-
-ssize_t fs_allocated_read_retry(int fd, void *buf, size_t count, uint64_t requestId, void **bufPtr) {
-  return fs_allocated_read_internal_common(fd, buf, count, requestId, bufPtr, true /* isRetry */);
 }
 
 ssize_t fs_allocated_read(int fd, void *buf, size_t count, void **bufPtr) {
@@ -3941,7 +3957,10 @@ retry:
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
-    if (should_retry) goto retry;
+    if (should_retry) {
+      isRetry = false;
+      goto retry;
+    }
   } 
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_PREAD, tsIdx);
@@ -3951,7 +3970,7 @@ retry:
 
 ssize_t fs_allocated_pread_retry(int fd, void *buf, size_t count, off_t offset, 
   uint64_t requestId, void **bufPtr) {
-  return fs_allocated_pread_internal_common(fd, buf, count, offset, requestId, bufPtr, true /* isRetry */);
+  return fs_allocated_pread_internal_common(fd, buf, count, offset, requestId, bufPtr, gRetryNotifyShm /* isRetry */);
 }
 
 ssize_t fs_allocated_pread(int fd, void *buf, size_t count, off_t offset, void **bufPtr) {
@@ -4128,7 +4147,10 @@ retry:
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
-    if (should_retry) goto retry;
+    if (should_retry) {
+      isRetry = false;
+      goto retry;
+    }
   } else {
     service->updateOffset(fd, offset + rc - 1);
   }
@@ -4140,16 +4162,10 @@ retry:
   return rc;
 }
 
-ssize_t fs_allocated_write_retry(int fd, void *buf, size_t count, 
-  uint64_t requestId) {
-  return fs_allocated_write_internal_common(fd, buf, count, requestId, true /* isRetry */);
-}
-
 ssize_t fs_allocated_write(int fd, void *buf, size_t count) {
   auto requestId = getNewRequestId();
   return fs_allocated_write_internal_common(fd, buf, count, requestId, false /* isRetry */);
 }
-
 
 ssize_t fs_allocated_pwrite_internal_common(int fd, void *buf, ssize_t count, 
   off_t offset, uint64_t requestId, bool isRetry) {
@@ -4182,7 +4198,7 @@ retry:
 
 ssize_t fs_allocated_pwrite_retry(int fd, void *buf, ssize_t count, 
   off_t offset, uint64_t requestId) {
-  return fs_allocated_pwrite_internal_common(fd, buf, count, offset, requestId, true /* isRetry */);
+  return fs_allocated_pwrite_internal_common(fd, buf, count, offset, requestId, gRetryNotifyShm /* isRetry */);
 }
 
 ssize_t fs_allocated_pwrite(int fd, void *buf, ssize_t count, 

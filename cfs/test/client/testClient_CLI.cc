@@ -657,16 +657,7 @@ void process(std::string const &line) {
         fs_dump_ring_status();
         #endif
       }
-    } else if (tokens[0] == "retry") {
-      if (tokens.size() != 1) {
-        printHelp();
-      } else {
-        #ifndef TEST_VFS_INSTEAD
-        fs_retry_pending_ops();
-        #endif
-      }
-    }
-    else {
+    } else {
       printHelp();
     }
   }

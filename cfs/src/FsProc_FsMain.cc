@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
     }
 
     int crashRequestNum = argc == 8 ? -1 : std::stoi(std::string(argv[8]));
-    
+    std::cout << "[DEBUG] crashRequestNum = " << crashRequestNum << std::endl;
     fsMain(numWorkers, std::stoi(std::string(argv[2])), shmBaseOffsetVec,
            argv[4], argv[5], isSpdk, workerCores, crashRequestNum);
   } else {

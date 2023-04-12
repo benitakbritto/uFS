@@ -110,11 +110,6 @@ class FsService {
     return inodeOffsetMap.count(inode) == 0 ? 0 : inodeOffsetMap[inode];
   }
 
-  // void notificationListenerLoop();
-
-  // void cleanupNotificationListener();
-
-  // void handleServerNotification(int64_t requestId);
  private:
   std::list<int> unusedRingSlots;
   std::atomic_flag unusedSlotsLock;
@@ -122,7 +117,116 @@ class FsService {
   int wid;
   CommuChannelAppSide *channelPtr;
   std::unordered_map<ino_t, off_t> inodeOffsetMap;
-  // std::thread *notificationListener_;
+};
+
+class RetryMgr {
+public:
+  RetryMgr() {
+    this->detectServerAliveThread = std::thread(&RetryMgr::detectServerUnavailLoop, this);
+  }
+
+  // fs retries
+  ssize_t fs_pwrite_retry(int fd, const void *buf, size_t count, off_t offset, uint64_t requestId);
+  int fs_open_retry(const char *path, int flags, mode_t mode, uint64_t requestId);
+  ssize_t fs_pread_retry(int fd, void *buf, size_t count, off_t offset, uint64_t requestId);
+  int fs_unlink_retry(const char *pathname, uint64_t requestId);
+  int fs_mkdir_retry(const char *pathname, mode_t mode, uint64_t requestId);
+  int fs_stat_retry(const char *pathname, struct stat *statbuf, uint64_t requestId);
+  int fs_fstat_retry(int fd, struct stat *statbuf, uint64_t requestId);
+  CFS_DIR *fs_opendir_retry(const char *name, uint64_t requestId);
+  int fs_fdatasync_retry(int fd, uint64_t requestId);
+  int fs_close_retry(int fd, uint64_t requestId);
+  int fs_fsync_retry(int fd, uint64_t requestId);
+  ssize_t fs_allocated_pwrite_retry(int fd, void *buf, ssize_t count, off_t offset, uint64_t requestId);
+  ssize_t fs_allocated_pread_retry(int fd, void *buf, size_t count, off_t offset, uint64_t requestId, void **bufPtr);
+
+  // retry handler
+  ssize_t handle_pwrite_retry(uint64_t reqId);
+  ssize_t handle_allocated_pwrite_retry(uint64_t reqId);
+  int handle_create_retry(uint64_t reqId);
+  ssize_t handle_pread_retry(uint64_t reqId, void* buf);
+  ssize_t handle_allocated_pread_retry(uint64_t reqId, void** bufPtr);
+  int handle_unlink_retry(uint64_t reqId);
+  int handle_mkdir_retry(uint64_t reqId);
+  int handle_stat_retry(uint64_t reqId, struct stat* statbuf);
+  int handle_fstat_retry(uint64_t reqId, struct stat* statbuf);
+  int handle_open_retry(uint64_t reqId);
+  int handle_close_retry(uint64_t reqId);
+  int handle_opendir_retry(uint64_t reqId, CFS_DIR *dir);
+  int handle_fsync_retry(uint64_t reqId);
+  int handle_fdatasync_retry(uint64_t reqId);
+
+  // main retry function
+  int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, 
+    CFS_DIR *dir = nullptr, void **bufPtr = nullptr);
+  int fs_retry_pending_ops_for_thread(void *buf = nullptr, struct stat *statbuf = nullptr, 
+    CFS_DIR *dir = nullptr, void **bufPtr = nullptr, bool isBackground = false);
+
+  void initNotifyShmForThread(int numThreads) {
+    this->_notifyShmForThread = std::vector<bool>(numThreads, false);
+  }
+
+  int check_primary_server_availability();
+  int get_server_pid();
+
+  // Ring Map
+  std::vector<off_t> getRingIdxsForRequest(uint64_t requestId) {
+    return this->_reqRingMap[threadFsTid][requestId];
+  }
+
+  bool doesRequestIdExistInRingMap(uint64_t requestId) {
+    return this->_reqRingMap[threadFsTid].count(requestId) != 0 &&
+      this->_reqRingMap[threadFsTid][requestId].size() != 0;
+  }
+
+  // Assumes requestId exists
+  off_t getFirstRingIdxForRequest(uint64_t requestId) {
+    return this->_reqRingMap[threadFsTid][requestId][0];
+  }
+
+  void removeRequestFromRingMap(uint64_t requestId) {
+    this->_reqRingMap[threadFsTid].erase(requestId);
+  }
+
+  std::map<uint64_t, std::vector<off_t>> getReqRingMap() {
+    return this->_reqRingMap[threadFsTid];
+  }
+
+  void addOffsetToRingMapForRequest(uint64_t requestId, off_t off) {
+    this->_reqRingMap[threadFsTid][requestId].push_back(off);
+  }
+
+  int getRingMapSize() {
+    return this->_reqRingMap[threadFsTid].size();
+  }
+
+  // Data Map
+  void removeRequestFromDataMap(uint64_t requestId) {
+    this->_reqAllocatedDataMap.erase(requestId);
+  }
+
+  void *getRequestBufPtrFromDataMap(uint64_t requestId) {
+    return this->_reqAllocatedDataMap[requestId];
+  }
+
+  void addBufPtrToDataMapForRequest(uint64_t requestId, void *buf) {
+    this->_reqAllocatedDataMap[requestId] = buf;
+  }
+
+  bool isRequestAnAllocatedType(uint64_t requestId) {
+    return this->_reqAllocatedDataMap.count(requestId) != 0;
+  }
+
+  // periodic
+  void detectServerUnavailLoop();
+  std::thread detectServerAliveThread;
+
+private:
+  std::vector<bool> _notifyShmForThread;
+  // threadid, requestId, [ring idx offset]
+  std::unordered_map<int, std::map<uint64_t, std::vector<off_t>>> _reqRingMap;
+  std::unordered_map<uint64_t, void *> _reqAllocatedDataMap;
+  int _backgroundThreadId = 10000;
 };
 
 class PendingQueueMgr {
@@ -156,10 +260,9 @@ struct FsLibServiceMng {
   std::atomic_int multiFsServNum{0};
   FsService *primaryServ{nullptr};
   // must process in sorted order of id
-  std::map<uint64_t, std::vector<off_t>> reqRingMap;
-  std::unordered_map<uint64_t, void *> reqAllocatedDataMap;
+  
   PendingQueueMgr *queueMgr{nullptr};
-  std::thread detectServerAliveThread;
+  RetryMgr *retryMgr{nullptr};
 };
 
 // NOTE: enable this flag will record the entry and exit timestamp
@@ -391,5 +494,29 @@ struct unlinkOp *fillUnlinkOp(struct clientOp *curCop, const char *pathname);
 FsLibMemMng *check_app_thread_mem_buf_ready(bool isRetry, int fsTid = threadFsTid);
 // =======
 
+int fs_stat_internal_common(const char *pathname, struct stat *statbuf, uint64_t requestId);
+int fs_fstat_internal_common(int fd, struct stat *statbuf, uint64_t requestId);
+int fs_open_internal_common(const char *path, int flags, mode_t mode, uint64_t requestId);
+int fs_close_internal_common(int fd, uint64_t requestId);
+int fs_unlink_internal_common(const char *pathname, uint64_t requestId);
+int fs_mkdir_internal_common(const char *pathname, mode_t mode, uint64_t requestId, bool isRetry);
+CFS_DIR *fs_opendir_internal_common(const char *name, uint64_t requestId, bool isRetry);
+int fs_fsync_internal_common(int fd, uint64_t requestId);
+int fs_fdatasync_internal_common(int fd, uint64_t requestId);
+ssize_t fs_read_internal_common(int fd, void *buf, size_t count, uint64_t requestId);
+ssize_t fs_pread_internal_common(int fd, void *buf, size_t count, off_t offset, uint64_t requestId);
+ssize_t fs_pwrite_internal_common(int fd, const void *buf, size_t count, off_t offset, uint64_t requestId);
+ssize_t fs_write_internal_common(int fd, const void *buf, size_t count,  uint64_t requestId);
+ssize_t fs_allocated_read_internal_common(int fd, void *buf, size_t count, 
+  uint64_t requestId, void **bufPtr, bool isRetry);
+  ssize_t fs_allocated_pread_internal_common(int fd, void *buf, size_t count, 
+  off_t offset, uint64_t requestId, void **bufPtr, bool isRetry);
+  ssize_t fs_allocated_write_internal_common(int fd, void *buf, size_t count, 
+  uint64_t requestId, bool isRetry);
+  ssize_t fs_allocated_pwrite_internal_common(int fd, void *buf, ssize_t count, 
+  off_t offset, uint64_t requestId, bool isRetry);
+// =======
+
+void clean_up_notify_msg_from_server();
 
 #endif  // CFS_FSLIBAPP_H

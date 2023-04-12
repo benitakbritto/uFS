@@ -11,8 +11,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-pid_t gServerPid = -1;
-int gServerIsDown = 0;
+// thread local variables
+__thread pid_t gServerPid = -1;
+__thread int gServerIsDown = 0;
 
 int is_server_up(pid_t pid) {
   if (kill(pid, 0) != 0 && errno == ESRCH) {
@@ -355,6 +356,8 @@ int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off
     // printf("[DEBUG] trying again %d\n", count++); fflush(stdout);
   }
 
+  gServerIsDown = 0; // reset
+  
   // cancel alarm
   alarm(0);
 

@@ -203,9 +203,6 @@ int fs_wsync(int fd);
 
 ////////////////////////////////////////////////////////////////////////////////
 
-int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, 
-  CFS_DIR *dir = nullptr, void **bufPtr = nullptr); // TODO: Remove this from header
-
 #ifdef __cplusplus
 }
 #endif

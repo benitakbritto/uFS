@@ -41,8 +41,6 @@ extern "C" {
 #define shmipc_STATUS_NOTIFY_FOR_CLIENT 5
 #define shmipc_STATUS_SERVER_PID_FOR_CLIENT 6
 
-extern int gServerIsDown;
-
 // queuepair for shared memory
 struct shmipc_qp {
   int fd;       // shm file descriptor

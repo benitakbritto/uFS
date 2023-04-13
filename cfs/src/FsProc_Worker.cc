@@ -2687,63 +2687,79 @@ void FsProcWorker::opStatsAccountSingleOpDone(FsReqType reqType, size_t bytes) {
 }
 
 void FsProcWorker::notifyAllWriteOps() {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (auto &[appPid, inodeReqMap]: flushPendingDataOpMap) {
+    // put msg in ring buff
+    struct shmipc_msg msg;
+    off_t ring_idx;
+    memset(&msg, 0, sizeof(msg));
+    ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
+
+    // fill xreq
+    struct NotifyMsg* xreq = (struct NotifyMsg *) IDX_TO_XREQ(appMap[appPid]->shmipc_mgr, ring_idx);
+    memset(xreq, 0, sizeof(*xreq));
+    int index = 0;
     for (auto &[inodeNum, reqIdList]: inodeReqMap) {
-      for (auto reqId: reqIdList) {
-        // put msg in ring buff
-        struct shmipc_msg msg;
-        off_t ring_idx;
-        memset(&msg, 0, sizeof(msg));
-        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
-        msg.retval = reqId;
-        
-        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
+      xreq->count += reqIdList.size();
+      for (int i = 0; i < reqIdList.size(); i++) {
+        xreq->requestIdList[index++] = reqIdList[i];
       }
     }
+
+    shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, 
+        ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
   } 
 
   // cleanup
-  flushPendingDataOpMap.clear();
-    
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  flushPendingDataOpMap.clear();    
 }
 
 void FsProcWorker::notifyAllMetadataOps() {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (auto &[appPid, inodeReqMap]: flushPendingMetadataOpMap) {
+    // put msg in ring buff
+    struct shmipc_msg msg;
+    off_t ring_idx;
+    memset(&msg, 0, sizeof(msg));
+    ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
+
+    // fill xreq
+    struct NotifyMsg* xreq = (struct NotifyMsg *) IDX_TO_XREQ(appMap[appPid]->shmipc_mgr, ring_idx);
+    memset(xreq, 0, sizeof(*xreq));
+    int index = 0;
     for (auto &[inodeNum, reqIdList]: inodeReqMap) {
-      for (auto reqId: reqIdList) {
-        // put msg in ring buff
-        struct shmipc_msg msg;
-        off_t ring_idx;
-        memset(&msg, 0, sizeof(msg));
-        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
-        msg.retval = reqId;
-        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
+      xreq->count += reqIdList.size();
+      for (int i = 0; i < reqIdList.size(); i++) {
+        xreq->requestIdList[index++] = reqIdList[i];
       }
     }
+
+    shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, 
+        ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
   } 
 
   // cleanup
-  flushPendingMetadataOpMap.clear();
-  
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+  flushPendingMetadataOpMap.clear();  
 }
 
 void FsProcWorker::notifyFileWriteOps(cfs_ino_t inodeNum) {
   for (auto &[appPid, inodeReqMap]: flushPendingDataOpMap) {
     auto itr = inodeReqMap.find(inodeNum);
     if (itr != inodeReqMap.end()) {
-      for (auto reqId: itr->second) {
-        // put msg in ring buff
-        struct shmipc_msg msg;
-        off_t ring_idx;
-        memset(&msg, 0, sizeof(msg));
-        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
-        msg.retval = reqId;
-        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
+      // put msg in ring buff
+      struct shmipc_msg msg;
+      off_t ring_idx;
+      memset(&msg, 0, sizeof(msg));
+      ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
+      
+      // fill xreq
+      struct NotifyMsg* xreq = (struct NotifyMsg *) IDX_TO_XREQ(appMap[appPid]->shmipc_mgr, ring_idx);
+      xreq->count = (itr->second).size();
+      int i = 0;
+      for (auto listItr = itr->second.begin(); listItr != itr->second.end(); listItr++) {
+        xreq->requestIdList[i++] = *listItr;
       }
+
+      shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, 
+        ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
     } else {
       return;
     }
@@ -2755,6 +2771,7 @@ void FsProcWorker::notifyFileWriteOps(cfs_ino_t inodeNum) {
   }  
 }
 
+// TODO: Add all requests in one msg in the xreq section
 void FsProcWorker::notifyFileMetadataOps(cfs_ino_t inodeNum) {
   for (auto &[appPid, inodeReqMap]: flushPendingMetadataOpMap) {
     auto itr = inodeReqMap.find(inodeNum);
@@ -2765,8 +2782,17 @@ void FsProcWorker::notifyFileMetadataOps(cfs_ino_t inodeNum) {
         off_t ring_idx;
         memset(&msg, 0, sizeof(msg));
         ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
-        msg.retval = reqId;
-        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
+        
+        // fill xreq
+        struct NotifyMsg* xreq = (struct NotifyMsg *) IDX_TO_XREQ(appMap[appPid]->shmipc_mgr, ring_idx);
+        xreq->count = (itr->second).size();
+        int i = 0;
+        for (auto listItr = itr->second.begin(); listItr != itr->second.end(); listItr++) {
+          xreq->requestIdList[i++] = *listItr;
+        }
+
+        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, 
+          ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
       }
     } else {
       return;
@@ -4185,6 +4211,7 @@ void FsProcWorker::blockingFlushBufferOnExit() {
   blockingFlushBufferInternal();
 
   // notify
+  std::cout << "[DEBUG] Sending out notify" << std::endl;
   notifyAllMetadataOps();
   notifyAllWriteOps();
 

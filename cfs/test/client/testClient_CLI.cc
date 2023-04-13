@@ -628,7 +628,7 @@ void process(std::string const &line) {
         printHelp();
       } else {
         #ifndef TEST_VFS_INSTEAD
-        int ret = fs_dump_pendingops();
+        int ret = fs_dump_pendingops().size();
         printReturnValue(tokens[0], ret);
         #endif
       }

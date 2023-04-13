@@ -51,9 +51,10 @@
 #define FS_REQ_ERROR_UNKNOWN_TYPE_FOR_WORKER (-101)
 
 
+// TODO: move to shmipc.h
 ///
-#define FS_PENDING_STATUS (0)
-#define FS_COMPLETED_STATUS (1)
+#define FS_PENDING_STATUS (7)
+#define FS_COMPLETED_STATUS (8)
 ///
 
 // NOTE: Do not place any more constants below these two. Among all the FS_REQ_*
@@ -599,6 +600,11 @@ union ControlMsg {
   struct cmsghdr cmh;
   char control[CMSG_SPACE(sizeof(struct ucred))];
   // Space large enough to hold a ucred structure
+};
+
+struct NotifyMsg {
+  int count;
+  uint64_t requestIdList[RING_SIZE];
 };
 
 #endif  // CFS_FSLIBSHARED_H

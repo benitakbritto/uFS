@@ -10,6 +10,7 @@
 #include "fs_defs.h"
 
 #ifdef __cplusplus
+#include <vector>
 void fs_free(void *ptr, int fsTid);
 void fs_free_pad(void *ptr, int fsTid);
 extern "C" {
@@ -43,25 +44,6 @@ int fs_exit();
 // cleanup FsLib's context
 int fs_cleanup();
 int fs_ping();
-
-int fs_checkpoint();
-int fs_migrate(int fd, int *dstWid);
-int fs_admin_inode_reassignment(int type, uint32_t inode, int curOwner,
-                                int newOwner);
-
-// testing and experimenting
-// change the handling work of the entity: pid+tid from src_wid to dst_wid
-int fs_admin_thread_reassign(int src_wid, int dst_wid, int flag);
-
-// send msg to the server such that it starts/stops dump the stats
-int fs_start_dump_load_stats();
-int fs_stop_dump_load_stats();
-
-// dump all inodes to /tmp
-int fs_dumpinodes(int wid);
-
-int fs_dump_pendingops();
-void fs_dump_ring_status();
 
 ////////////////////////////////////////////////////////////////////////////////
 // POSIX API
@@ -202,6 +184,26 @@ int fs_close_ldb(int fd);
 int fs_wsync(int fd);
 
 ////////////////////////////////////////////////////////////////////////////////
+// util
+
+int fs_checkpoint();
+int fs_migrate(int fd, int *dstWid);
+int fs_admin_inode_reassignment(int type, uint32_t inode, int curOwner,
+                                int newOwner);
+
+// testing and experimenting
+// change the handling work of the entity: pid+tid from src_wid to dst_wid
+int fs_admin_thread_reassign(int src_wid, int dst_wid, int flag);
+
+// send msg to the server such that it starts/stops dump the stats
+int fs_start_dump_load_stats();
+int fs_stop_dump_load_stats();
+
+// dump all inodes to /tmp
+int fs_dumpinodes(int wid);
+
+std::vector<int> fs_dump_pendingops();
+std::vector<int> fs_dump_ring_status();
 
 #ifdef __cplusplus
 }

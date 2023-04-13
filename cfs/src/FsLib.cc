@@ -10,6 +10,8 @@
 #include <atomic>
 #include <iostream>
 
+
+
 #ifdef _CFS_LIB_PRINT_REQ_
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -48,6 +50,8 @@
 // #define _CFS_LIB_PRINT_REQ_
 #define LDB_PRINT_CALL
 #define COULDNT_ACQUIRE_LOCK -100000
+// TODO: Remove this later
+#define _SHMIPC_DBG_
 /* #endregion macros */
 
 /* #region FS global variables */
@@ -206,8 +210,16 @@ void print_fstat(int fd, uint64_t requestId) {
 // Instead, on allocatation if we see a notify msg, then we clear it from the state
 // This enables lazy handling
 off_t shmipc_mgr_alloc_slot_wrapper(struct shmipc_mgr *mgr) {
+retry:
   int isNotify = 0;
   auto ring_idx = shmipc_mgr_alloc_slot_client(mgr, &isNotify);
+
+  // ring buffer is full
+  if (ring_idx == -1) {
+    fs_syncall();
+    clean_up_notify_msg_from_server();
+    goto retry;
+  }
 
   if (isNotify) {
     auto requestId = IDX_TO_MSG(mgr, ring_idx)->retval;
@@ -282,38 +294,52 @@ static void dumpAllocatedOpCommon(allocatedOpCommonPacked *alOp) {
 }
 
 // TODO: Del later
-void fs_dump_ring_status() {
+std::vector<int> fs_dump_ring_status() {
   auto mgr = gServMngPtr->primaryServ->shmipc_mgr;
-
+  std::vector<int> res;
   for (int i = 0; i < RING_SIZE; i++) {
     auto msg = IDX_TO_MSG(mgr, i);
+    /*
     switch(msg->status) {
-      case shmipc_STATUS_EMPTY:
+      
+      case shmipc_STATUS_EMPTY: {
         printf("[INFO]: idx = %d, status = EMPTY\n", i);
         break;
-      case shmipc_STATUS_RESERVED:
+      }
+      case shmipc_STATUS_RESERVED: {
         printf("[INFO]: idx = %d, status = RESERVED\n", i);
         break;
-      case shmipc_STATUS_READY_FOR_SERVER:
+      }
+      case shmipc_STATUS_READY_FOR_SERVER: {
         printf("[INFO]: idx = %d, status = READY_FOR_SERVER\n", i);
         break;
-      case shmipc_STATUS_IN_PROGRESS:
+      }
+      case shmipc_STATUS_IN_PROGRESS: {
         printf("[INFO]: idx = %d, status = IN_PROGRESS\n", i);
         break;
-      case shmipc_STATUS_READY_FOR_CLIENT:
+      }
+      case shmipc_STATUS_READY_FOR_CLIENT: {
         printf("[INFO]: idx = %d, status = READY_FOR_CLIENT\n", i);
         break;
-      case shmipc_STATUS_NOTIFY_FOR_CLIENT:
+      }
+      case shmipc_STATUS_NOTIFY_FOR_CLIENT: {
         printf("[INFO]: idx = %d, status = NOTIFY_FOR_CLIENT\n", i);
         break;
-      case shmipc_STATUS_SERVER_PID_FOR_CLIENT:
+      }
+      case shmipc_STATUS_SERVER_PID_FOR_CLIENT: {
         printf("[INFO]: idx = %d, status = SERVER_PID_FOR_CLIENT\n", i);
         break;
-      default:
+      }
+      default: {
         printf("[INFO]: idx = %d, status = UNKNOWN\n", i);
         break;
-    }
+      }
+      
+    }*/
+    res.push_back(msg->status);
   }
+
+  return res;
 }
 
 static inline void adjustPath(const char *path, char *opPath) {
@@ -1111,7 +1137,14 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
   clean_up_notify_msg_from_server();
 
   bool foundFirstNotifyShm = false;
-  uint64_t lastRequestId = (this->_reqRingMap[threadFsTid].rbegin()->first);
+  uint64_t lastRequestId = (this->_reqRingMap.count(threadFsTid) == 0 
+    || this->_reqRingMap[threadFsTid].size() == 0) ? -1 
+      : (this->_reqRingMap[threadFsTid].rbegin()->first);
+
+  if (lastRequestId == -1) {
+    return 0;
+  }  
+  
   std::cout << "[DEBUG] " << __func__ << ": lastRequestId = " << lastRequestId << std::endl;
   int ret = -1;
   for (auto itr = this->_reqRingMap[threadFsTid].begin(); itr != this->_reqRingMap[threadFsTid].end();) {
@@ -1150,9 +1183,10 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_PREAD: {
         ret = handle_pread_retry(requestId, buf);
         if (ret > 0) {
-          removeRequestFromRingMap(requestId);
-        } 
-        itr++;
+          this->_reqRingMap[threadFsTid].erase(itr++);
+        } else {
+          itr++;
+        }
         break;
       }
       case CFS_OP_ALLOCED_PREAD: {
@@ -1163,9 +1197,10 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
         ret = handle_allocated_pread_retry(requestId, bufPtr);
         _notifyShmForThread[threadFsTid] = false; // restore
         if (ret > 0) {
-          removeRequestFromRingMap(requestId);
-        } 
-        itr++;
+          this->_reqRingMap[threadFsTid].erase(itr++);
+        } else {
+          itr++;
+        }
         break;
       }
       case CFS_OP_UNLINK: {
@@ -1181,33 +1216,37 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_STAT: {
         ret = handle_stat_retry(requestId, statbuf);
         if (ret == 0) {
-          removeRequestFromRingMap(requestId);
-        } 
-        itr++;
+          this->_reqRingMap[threadFsTid].erase(itr++);
+        } else {
+          itr++;
+        }
         break;
       }
       case CFS_OP_FSTAT: {
         ret = handle_fstat_retry(requestId, statbuf);
         if (ret == 0) {
-          removeRequestFromRingMap(requestId);
-        } 
-        itr++;
+          this->_reqRingMap[threadFsTid].erase(itr++);
+        } else {
+          itr++;
+        }
         break;
       }
       case CFS_OP_OPEN: {
         ret = handle_open_retry(requestId);
         if (ret > 0) {
-          removeRequestFromRingMap(requestId);
-        } 
-        itr++;
+          this->_reqRingMap[threadFsTid].erase(itr++);
+        } else {
+          itr++;
+        }
         break;
       }
       case CFS_OP_CLOSE: {
         ret = handle_close_retry(requestId);
         if (ret > 0) {
-          removeRequestFromRingMap(requestId);
-        } 
-        itr++;
+          this->_reqRingMap[threadFsTid].erase(itr++);
+        } else {
+          itr++;
+        }
         break;
       }
       case CFS_OP_OPENDIR: {
@@ -1224,17 +1263,15 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
           itr++;
         }
 
-        if (itr == this->_reqRingMap[threadFsTid].end()) {
-          std::cout << "[DEBUG] itr at end" << std::endl;
-        }
         break;
       }
       case CFS_OP_FSYNC: {
         ret = handle_fsync_retry(requestId);
         if (ret > 0) {
-          removeRequestFromRingMap(requestId);
-        } 
-        itr++;
+          this->_reqRingMap[threadFsTid].erase(itr++);
+        } else {
+          itr++;
+        }
         break;
       }
       default: {
@@ -2028,14 +2065,16 @@ int fs_dumpinodes_internal(FsService *fsServ) {
 }
 
 // NOTE: For testing purposes only
-int fs_dump_pendingops() {
+std::vector<int> fs_dump_pendingops() {
+  std::vector<int> res;
   for (auto &[key, ringList]: gServMngPtr->retryMgr->getReqRingMap()) {
     for (auto ringIdx: ringList) {
-      std::cout << "Req: " << key << "\t"
-      << "ringIdx: " << ringIdx << "\t" 
-      << "request type: ";
+      // std::cout << "Req: " << key << "\t"
+      // << "ringIdx: " << ringIdx << "\t" 
+      // << "request type: ";
 
       auto type = unsigned(gServMngPtr->queueMgr->getMessageType(ringIdx));
+      /*
       switch(type) {
         case CFS_OP_PWRITE:
           std::cout << "pwrite" << std::endl;
@@ -2059,9 +2098,11 @@ int fs_dump_pendingops() {
           std::cout << type << " unknown" << std::endl;
           break;
       }
+      */
+      res.push_back(key);
     }
   }
-  return 0;
+  return res;
 }
 
 int fs_dumpinodes(int wid) {
@@ -2415,21 +2456,38 @@ cleanup:
   return ret;
 }
 
-// TODO: Fix, when widIt not know, go with primary
 int fs_fstat_internal_common(int fd, struct stat *statbuf, uint64_t requestId) {
 #ifdef LDB_PRINT_CALL
   print_fstat(fd, requestId);
 #endif
-  auto widIt = gLibSharedContext->fdWidMap.find(fd);
-  FsService *fsServ; 
-  if (widIt == gLibSharedContext->fdWidMap.end()) {
-    fsServ = gServMngPtr->primaryServ;
-  } else {
-    fsServ = gServMngPtr->multiFsServMap[widIt->second];
-  }
-    
-  return fs_fstat_internal(fsServ, fd, statbuf, requestId);
+  int wid = -1;
+  // return fs_fstat_internal(fsServ, fd, statbuf, requestId);
+
   // return -1;
+retry:
+  auto fsServ = getFsServiceForFD(fd, wid);
+  int rc = fs_fstat_internal(fsServ, fd, statbuf, requestId);
+
+  if (rc >= 0) goto free_and_return;
+  if (rc < 0) {
+    if (handle_inode_in_transfer(static_cast<int>(rc))) {
+      goto retry;
+    }
+    bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
+    if (should_retry) {
+      goto retry;
+    }
+  }
+free_and_return:
+#ifdef CFS_LIB_SAVE_API_TS
+  tFsApiTs->addApiNormalDone(FsApiType::FS_STAT, tsIdx);
+#endif
+  if (rc != 0) {
+    errno = -rc;
+    rc = -1;
+  }
+  // std::cout << "[DEBUG] rc = " << rc << std::endl;
+  return rc;
 }
 
 int fs_fstat(int fd, struct stat *statbuf) {
@@ -5106,24 +5164,28 @@ void clean_up_notify_msg_from_server() {
   // go over entire ring once
   do {
     memset(&msg, 0, sizeof(struct shmipc_msg));
-    auto requestId = shmipc_mgr_poll_notify_msg(shmipc_mgr, ringIdx, &msg);
-    if (requestId != -1) {                        
-      gServMngPtr->queueMgr->dequePendingMsg(requestId);
-      
-      while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
-        // spin
-      }
-      gServMngPtr->retryMgr->removeRequestFromRingMap(requestId);
-      gReqRingMapLock.clear(std::memory_order_release);
-
-      if (gServMngPtr->retryMgr->isRequestAnAllocatedType(requestId)) {
-          while (gReqAllocatedDataMapLock.test_and_set(std::memory_order_acquire)) {
+    auto ret = shmipc_mgr_poll_notify_msg(shmipc_mgr, ringIdx, &msg);
+    if (ret != -1) {    
+      auto notifyOpXreq = (struct NotifyMsg *) IDX_TO_XREQ(shmipc_mgr, ringIdx);      
+      for (int i = 0; i < notifyOpXreq->count; i++) {
+        auto requestId = notifyOpXreq->requestIdList[i];
+        
+        gServMngPtr->queueMgr->dequePendingMsg(requestId);
+        
+        while (gReqRingMapLock.test_and_set(std::memory_order_acquire)) {
           // spin
         }
-        gServMngPtr->retryMgr->removeRequestFromDataMap(requestId);
-        gReqAllocatedDataMapLock.clear(std::memory_order_release);
-      } 
+        gServMngPtr->retryMgr->removeRequestFromRingMap(requestId);
+        gReqRingMapLock.clear(std::memory_order_release);
 
+        if (gServMngPtr->retryMgr->isRequestAnAllocatedType(requestId)) {
+            while (gReqAllocatedDataMapLock.test_and_set(std::memory_order_acquire)) {
+            // spin
+          }
+          gServMngPtr->retryMgr->removeRequestFromDataMap(requestId);
+          gReqAllocatedDataMapLock.clear(std::memory_order_release);
+        } 
+      }
       shmipc_mgr_dealloc_slot(shmipc_mgr, ringIdx);        
     }
     ringIdx++;

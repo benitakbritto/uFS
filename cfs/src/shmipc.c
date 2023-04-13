@@ -15,6 +15,8 @@
 __thread pid_t gServerPid = -1;
 __thread int gServerIsDown = 0;
 
+#define RING_SIZE 64 // TODO: Note, copied from param.h
+
 int is_server_up(pid_t pid) {
   if (kill(pid, 0) != 0 && errno == ESRCH) {
     // printf("[DEBUG] server is dead\n");
@@ -236,70 +238,93 @@ struct shmipc_msg *shmipc_mgr_get_msg_nowait(struct shmipc_mgr *mgr,
 off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   struct shmipc_msg *rmsg;
   off_t ring_idx;
+  int count = 0;
 
-  ring_idx = __sync_fetch_and_add(&(mgr->next), 1); 
-  ring_idx = ring_idx & mgr->mask;
-  // ring_idx 0 is reserved for getting server pid
-  if (ring_idx == 0) {
-    ring_idx = 1;
+  while (count < RING_SIZE) {
+    ring_idx = __sync_fetch_and_add(&(mgr->next), 1); 
+    ring_idx = ring_idx & mgr->mask;
+    // ring_idx 0 is reserved for getting server pid
+    if (ring_idx == 0) {
+      ring_idx = 1;
+    }
+    rmsg = IDX_TO_MSG(mgr, ring_idx);
+    printf("[DEBUG] trying to get ring_idx = %ld\n", ring_idx);
+    // // NOTE: If the buffer is not large enough and we happen to
+    // // circle back onto a slot that is still in use, we will have to wait
+    // // till it is free. Further, if some task ahead in the ring gets done
+    // // quickly, we won't be able to take it's slot as we already have one.
+    // // Sort of like hol blocking but only when the buffer is small.
+    // // We might have to change to a mechanism where we get a slot only
+    // // when slots are available.
+    // while (__builtin_expect(rmsg->status != shmipc_STATUS_EMPTY, 0))
+    //   ;
+
+    printf("[DEBUG] status = %ld\n", rmsg->status);
+
+    if (rmsg->status == shmipc_STATUS_EMPTY) {
+      // NOTE: This (below) might cause cache invalidations slowing down
+      // server poll. Maybe client side should have a bitmap for the
+      // ring slots to ensure that it is free?
+      // These are purely conflicts that should be resolved at client side.
+      rmsg->status = shmipc_STATUS_RESERVED;
+      return ring_idx;
+    }
+
+    count++;
   }
-  rmsg = IDX_TO_MSG(mgr, ring_idx);
 
-  // NOTE: If the buffer is not large enough and we happen to
-  // circle back onto a slot that is still in use, we will have to wait
-  // till it is free. Further, if some task ahead in the ring gets done
-  // quickly, we won't be able to take it's slot as we already have one.
-  // Sort of like hol blocking but only when the buffer is small.
-  // We might have to change to a mechanism where we get a slot only
-  // when slots are available.
-  while (__builtin_expect(rmsg->status != shmipc_STATUS_EMPTY, 0))
-    ;
-
-  
-  // NOTE: This (below) might cause cache invalidations slowing down
-  // server poll. Maybe client side should have a bitmap for the
-  // ring slots to ensure that it is free?
-  // These are purely conflicts that should be resolved at client side.
-  rmsg->status = shmipc_STATUS_RESERVED;
-  return ring_idx;
+  // Nothing is free
+  printf("[DEBUG] Couldn't get slot");
+  return -1;
 }
 
 off_t shmipc_mgr_alloc_slot_client(struct shmipc_mgr *mgr, int *isNotify) {
   struct shmipc_msg *rmsg;
   off_t ring_idx;
+  int count = 0;
 
-  ring_idx = __sync_fetch_and_add(&(mgr->next), 1); 
-  ring_idx = ring_idx & mgr->mask;
-  // ring_idx 0 is reserved for getting server pid
-  if (ring_idx == 0) {
-    ring_idx = 1;
-  }
-  rmsg = IDX_TO_MSG(mgr, ring_idx);
+  while (count < RING_SIZE) {
+    ring_idx = __sync_fetch_and_add(&(mgr->next), 1); 
+    ring_idx = ring_idx & mgr->mask;
 
-  if (__builtin_expect(rmsg->status == shmipc_STATUS_NOTIFY_FOR_CLIENT, 1)) {
-    *isNotify = 1;
-    return ring_idx;
-  }
-
-  // NOTE: If the buffer is not large enough and we happen to
-  // circle back onto a slot that is still in use, we will have to wait
-  // till it is free. Further, if some task ahead in the ring gets done
-  // quickly, we won't be able to take it's slot as we already have one.
-  // Sort of like hol blocking but only when the buffer is small.
-  // We might have to change to a mechanism where we get a slot only
-  // when slots are available.
-  while (__builtin_expect(rmsg->status != shmipc_STATUS_EMPTY, 0))
-    ;
-
+    // ring_idx 0 is reserved for getting server pid
+    if (ring_idx == 0) {
+      ring_idx = 1;
+    }
   
-  // NOTE: This (below) might cause cache invalidations slowing down
-  // server poll. Maybe client side should have a bitmap for the
-  // ring slots to ensure that it is free?
-  // These are purely conflicts that should be resolved at client side.
-  rmsg->status = shmipc_STATUS_RESERVED;
-  return ring_idx;
-}
+    rmsg = IDX_TO_MSG(mgr, ring_idx);
 
+    if (rmsg->status == shmipc_STATUS_NOTIFY_FOR_CLIENT) {
+      printf("[DEBUG] notify status at ring idx %d\n", ring_idx);
+      *isNotify = 1;
+      return ring_idx;
+    }
+
+    // NOTE: If the buffer is not large enough and we happen to
+    // circle back onto a slot that is still in use, we will have to wait
+    // till it is free. Further, if some task ahead in the ring gets done
+    // quickly, we won't be able to take it's slot as we already have one.
+    // Sort of like hol blocking but only when the buffer is small.
+    // We might have to change to a mechanism where we get a slot only
+    // when slots are available.
+    // while (__builtin_expect(rmsg->status != shmipc_STATUS_EMPTY, 0))
+    //   ;
+    if (rmsg->status == shmipc_STATUS_EMPTY) {
+      // NOTE: This (below) might cause cache invalidations slowing down
+      // server poll. Maybe client side should have a bitmap for the
+      // ring slots to ensure that it is free?
+      // These are purely conflicts that should be resolved at client side.
+      rmsg->status = shmipc_STATUS_RESERVED;
+      return ring_idx;
+    }
+
+    count++;
+  }
+
+  // Nothing is free
+  printf("[DEBUG] Couldn't get slot");
+  return -1;
+}
 
 void shmipc_increment_ring_index(struct shmipc_mgr *mgr) {
   __sync_fetch_and_add(&(mgr->next), 1);

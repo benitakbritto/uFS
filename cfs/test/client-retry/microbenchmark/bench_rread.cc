@@ -34,7 +34,7 @@ int runWorkload(const char *path, ssize_t ioSize, ssize_t fileSize, ssize_t iter
   char *buf = (char *) fs_malloc(ioSize + 1);
   for (int i = 0; i < iter; i++) {
     int offset = rand() % (fileSize - ioSize);
-    if (fs_allocated_pread(ino, (void *) buf, ioSize, offset, (void **) &buf) != ioSize) {
+    if (fs_allocated_pread(ino, (void *) buf, ioSize, offset) != ioSize) {
       fprintf(stderr, "fs_allocated_pread() failed at iter: %ld, offset: %d\n", iter, offset);
       fs_free(buf);
       return -1; // failure

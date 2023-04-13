@@ -893,8 +893,8 @@ ssize_t RetryMgr::fs_allocated_pwrite_retry(int fd, void *buf, ssize_t count,
 }
 
 ssize_t RetryMgr::fs_allocated_pread_retry(int fd, void *buf, size_t count, off_t offset, 
-  uint64_t requestId, void **bufPtr) {
-  return fs_allocated_pread_internal_common(fd, buf, count, offset, requestId, bufPtr, _notifyShmForThread[threadFsTid] /* isRetry */);
+  uint64_t requestId) {
+  return fs_allocated_pread_internal_common(fd, buf, count, offset, requestId, _notifyShmForThread[threadFsTid] /* isRetry */);
 }
 
 ssize_t RetryMgr::handle_pwrite_retry(uint64_t requestId) {
@@ -963,12 +963,11 @@ ssize_t RetryMgr::handle_pread_retry(uint64_t requestId, void* buf) {
   return ret;
 }
 
-ssize_t RetryMgr::handle_allocated_pread_retry(uint64_t requestId, void** bufPtr) {
+ssize_t RetryMgr::handle_allocated_pread_retry(uint64_t requestId) {
   auto op = gServMngPtr->queueMgr->getPendingXreq<struct allocatedPreadOpPacked>(getFirstRingIdxForRequest(requestId));
-  memset(*bufPtr, 0, op->rwOp.count + 1);
   void *buf = gServMngPtr->retryMgr->getRequestBufPtrFromDataMap(requestId);
   
-  auto ret = fs_allocated_pread_retry(op->rwOp.fd, buf, op->rwOp.count, op->offset, requestId, bufPtr);
+  auto ret = fs_allocated_pread_retry(op->rwOp.fd, buf, op->rwOp.count, op->offset, requestId);
   
   if (ret > 0) {
     // clean up
@@ -1088,10 +1087,9 @@ int RetryMgr::handle_fdatasync_retry(uint64_t requestId) {
   return ret;
 }
 
-// TODO: no need of bufPtr
 // TODO: fs_rename
 int RetryMgr::fs_retry_pending_ops(void *buf, struct stat *statbuf, 
-  CFS_DIR *dir, void **bufPtr) {
+  CFS_DIR *dir) {
   std::cout << "[DEBUG] Inside " << __func__ << " threadFsTid = " << threadFsTid <<  std::endl;
   std::lock_guard<std::recursive_mutex> lk(gRetryOpLock);
 
@@ -1117,14 +1115,14 @@ int RetryMgr::fs_retry_pending_ops(void *buf, struct stat *statbuf,
     if (threadFsTid == _backgroundThreadId) {
       for (int threadId = 1; threadId < numThreads; threadId++) {
         threadFsTid = threadId; // acts as that thread for the time being
-        fs_retry_pending_ops_for_thread(buf, statbuf, dir, bufPtr, true /*background*/); // should not retry last one
+        fs_retry_pending_ops_for_thread(buf, statbuf, dir, true /*background*/); // should not retry last one
       }
 
       threadFsTid = _backgroundThreadId; // restore
       
       return 0;
     } else {
-      return fs_retry_pending_ops_for_thread(buf, statbuf, dir, bufPtr, false /*background thread */);
+      return fs_retry_pending_ops_for_thread(buf, statbuf, dir, false /*background thread */);
     }
   }
 
@@ -1132,7 +1130,7 @@ int RetryMgr::fs_retry_pending_ops(void *buf, struct stat *statbuf,
 }
 
 int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf, 
-  CFS_DIR *dir, void **bufPtr, bool isBackground) {
+  CFS_DIR *dir, bool isBackground) {
   std::cout << "[DEBUG] " << __func__ << ": threadFsTid = " << threadFsTid << std::endl;
   // Clear out fsync pending
   clean_up_notify_msg_from_server(false /*sleep*/);
@@ -1195,7 +1193,7 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
           _notifyShmForThread[threadFsTid] = true;
           foundFirstNotifyShm = true;
         }
-        ret = handle_allocated_pread_retry(requestId, bufPtr);
+        ret = handle_allocated_pread_retry(requestId);
         _notifyShmForThread[threadFsTid] = false; // restore
         if (ret > 0) {
           this->_reqRingMap[threadFsTid].erase(itr++);
@@ -3903,7 +3901,7 @@ static ssize_t fs_allocated_read_internal(FsService *fsServ, int fd, void *buf,
 }
 
 static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
-  size_t count, off_t offset, uint64_t requestId, void **bufPtr, bool isNotifyRetry) {
+  size_t count, off_t offset, uint64_t requestId, bool isNotifyRetry) {
   struct shmipc_msg msg;
   struct allocatedPreadOpPacked *aprop_p;
   off_t ring_idx;
@@ -3964,7 +3962,7 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
     // cleanup
     shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
 
-    auto ret = gServMngPtr->retryMgr->fs_retry_pending_ops(nullptr, nullptr, nullptr, bufPtr);
+    auto ret = gServMngPtr->retryMgr->fs_retry_pending_ops();
     return ret;
   }
   unpack_allocatedPreadOp(aprop_p, &aprop);
@@ -3979,7 +3977,7 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
 }
 
 ssize_t fs_allocated_read_internal_common(int fd, void *buf, size_t count, 
-  uint64_t requestId, void **bufPtr, bool isNotifyRetry) {
+  uint64_t requestId, bool isNotifyRetry) {
   // std::cout << "Inside " << __func__ << std::endl; 
 #ifdef LDB_PRINT_CALL
   print_read(fd, buf, count, requestId);
@@ -3994,7 +3992,7 @@ retry:
   // ssize_t rc = fs_allocated_read_internal(service, fd, buf, count);
   auto offset = service->getOffset(fd);
   std::cout << "[DEBUG] offset = " << offset << std::endl;
-  ssize_t rc = fs_allocated_pread_internal(service, fd, buf, count, offset, requestId, bufPtr, isNotifyRetry);
+  ssize_t rc = fs_allocated_pread_internal(service, fd, buf, count, offset, requestId, isNotifyRetry);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
@@ -4011,14 +4009,14 @@ retry:
   return rc;
 }
 
-ssize_t fs_allocated_read(int fd, void *buf, size_t count, void **bufPtr) {
+ssize_t fs_allocated_read(int fd, void *buf, size_t count) {
   // std::cout << "Inside " << __func__ << std::endl; 
   auto requestId = getNewRequestId();
-  return fs_allocated_read_internal_common(fd, buf, count, requestId, bufPtr, false /* isRetry */);
+  return fs_allocated_read_internal_common(fd, buf, count, requestId, false /* isRetry */);
 }
 
 ssize_t fs_allocated_pread_internal_common(int fd, void *buf, size_t count, 
-  off_t offset, uint64_t requestId, void **bufPtr, bool isNotifyRetry) {
+  off_t offset, uint64_t requestId, bool isNotifyRetry) {
   // std::cout << "Inside " << __func__ << std::endl; 
 #ifdef LDB_PRINT_CALL
   print_pread(fd, buf, count, offset, requestId);
@@ -4037,7 +4035,7 @@ ssize_t fs_allocated_pread_internal_common(int fd, void *buf, size_t count,
 #endif
 retry:
   auto service = getFsServiceForFD(fd, wid);
-  ssize_t rc = fs_allocated_pread_internal(service, fd, buf, count, offset, requestId, bufPtr, isNotifyRetry);
+  ssize_t rc = fs_allocated_pread_internal(service, fd, buf, count, offset, requestId, isNotifyRetry);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
     bool should_retry = checkUpdateFdWid(static_cast<int>(rc), fd);
@@ -4052,9 +4050,9 @@ retry:
   return rc;
 }
 
-ssize_t fs_allocated_pread(int fd, void *buf, size_t count, off_t offset, void **bufPtr) {
+ssize_t fs_allocated_pread(int fd, void *buf, size_t count, off_t offset) {
   auto requestId = getNewRequestId();
-  return fs_allocated_pread_internal_common(fd, buf, count, offset, requestId, bufPtr, false /* isRetry */);
+  return fs_allocated_pread_internal_common(fd, buf, count, offset, requestId, false /* isRetry */);
 }
 
 // Note: not being used

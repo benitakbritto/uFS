@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
     if (fd < 0) throw std::runtime_error("Failed to open");
 
     if (stat_buf.st_size > 0) {
-      fs_allocated_read(fd, fspi.buf, stat_buf.st_size, (void **)&fspi.buf);
+      fs_allocated_read(fd, fspi.buf, stat_buf.st_size);
       WriteData(fname, fspi.buf, stat_buf.st_size);
     }
 

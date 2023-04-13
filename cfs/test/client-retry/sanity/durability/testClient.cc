@@ -251,7 +251,7 @@ int runAllocRead() {
   for (int i = 0; i < RUN_COUNT; i++) {
     char *buf = (char *)fs_malloc(IO_SIZE + 1);
     memset(buf, 0, IO_SIZE + 1);
-    auto ret = fs_allocated_read(ino, buf, IO_SIZE, (void **) &buf);
+    auto ret = fs_allocated_read(ino, buf, IO_SIZE);
     if (ret != IO_SIZE) {
       fprintf(stderr, "fs_allocated_read() failed. Received %ld\n", ret);
       return -1;
@@ -300,7 +300,7 @@ int runAllocWrite() {
 
     char *bufRead = (char *)fs_malloc(IO_SIZE + 1);
     memset(bufRead, 0, IO_SIZE + 1);
-    ret = fs_allocated_pread(ino, bufRead, IO_SIZE, i * IO_SIZE, (void **) &bufRead);
+    ret = fs_allocated_pread(ino, bufRead, IO_SIZE, i * IO_SIZE);
     if (strcmp(bufRead, bufWrite) != 0) {
       fprintf(stderr, "read and write bufs are not the same\n");
       return -1;
@@ -341,7 +341,7 @@ int runAllocPread() {
   for (int i = 0; i < RUN_COUNT; i++) {
     char *buf = (char *)fs_malloc(IO_SIZE + 1);
     memset(buf, 0, IO_SIZE + 1);
-    auto ret = fs_allocated_pread(ino, buf, IO_SIZE, i * IO_SIZE, (void **) &buf);
+    auto ret = fs_allocated_pread(ino, buf, IO_SIZE, i * IO_SIZE);
     if (ret != IO_SIZE) {
       fprintf(stderr, "fs_allocated_read() failed. Received %ld\n", ret);
       return -1;
@@ -390,7 +390,7 @@ int runAllocPwrite() {
 
     char *bufRead = (char *)fs_malloc(IO_SIZE + 1);
     memset(bufRead, 0, IO_SIZE + 1);
-    ret = fs_allocated_pread(ino, bufRead, IO_SIZE, i * IO_SIZE, (void **) &bufRead);
+    ret = fs_allocated_pread(ino, bufRead, IO_SIZE, i * IO_SIZE);
     if (strcmp(bufRead, bufWrite) != 0) {
       fprintf(stderr, "read and write bufs are not the same\n");
       return -1;

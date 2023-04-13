@@ -121,8 +121,8 @@ ssize_t fs_pwrite(int fd, const void *buf, size_t count, off_t offset);
 //  1) writing the *buf* should be page aligned
 //  2) never re-use this *buf* for other usage, always cal fs_free() after
 //  use this
-ssize_t fs_allocated_read(int fd, void *buf, size_t count, void **bufPtr);
-ssize_t fs_allocated_pread(int fd, void *buf, size_t count, off_t offset, void **bufPtr);
+ssize_t fs_allocated_read(int fd, void *buf, size_t count);
+ssize_t fs_allocated_pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t fs_allocated_write(int fd, void *buf, size_t count);
 ssize_t fs_allocated_pwrite(int fd, void *buf, ssize_t count, off_t offset);
 

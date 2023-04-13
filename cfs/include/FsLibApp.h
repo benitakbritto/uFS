@@ -138,14 +138,14 @@ public:
   int fs_close_retry(int fd, uint64_t requestId);
   int fs_fsync_retry(int fd, uint64_t requestId);
   ssize_t fs_allocated_pwrite_retry(int fd, void *buf, ssize_t count, off_t offset, uint64_t requestId);
-  ssize_t fs_allocated_pread_retry(int fd, void *buf, size_t count, off_t offset, uint64_t requestId, void **bufPtr);
+  ssize_t fs_allocated_pread_retry(int fd, void *buf, size_t count, off_t offset, uint64_t requestId);
 
   // retry handler
   ssize_t handle_pwrite_retry(uint64_t reqId);
   ssize_t handle_allocated_pwrite_retry(uint64_t reqId);
   int handle_create_retry(uint64_t reqId);
   ssize_t handle_pread_retry(uint64_t reqId, void* buf);
-  ssize_t handle_allocated_pread_retry(uint64_t reqId, void** bufPtr);
+  ssize_t handle_allocated_pread_retry(uint64_t reqId);
   int handle_unlink_retry(uint64_t reqId);
   int handle_mkdir_retry(uint64_t reqId);
   int handle_stat_retry(uint64_t reqId, struct stat* statbuf);
@@ -158,9 +158,9 @@ public:
 
   // main retry function
   int fs_retry_pending_ops(void *buf = nullptr, struct stat *statbuf = nullptr, 
-    CFS_DIR *dir = nullptr, void **bufPtr = nullptr);
+    CFS_DIR *dir = nullptr);
   int fs_retry_pending_ops_for_thread(void *buf = nullptr, struct stat *statbuf = nullptr, 
-    CFS_DIR *dir = nullptr, void **bufPtr = nullptr, bool isBackground = false);
+    CFS_DIR *dir = nullptr, bool isBackground = false);
 
   void initNotifyShmForThread(int numThreads) {
     this->_notifyShmForThread = std::vector<bool>(numThreads, false);
@@ -510,9 +510,9 @@ ssize_t fs_pread_internal_common(int fd, void *buf, size_t count, off_t offset, 
 ssize_t fs_pwrite_internal_common(int fd, const void *buf, size_t count, off_t offset, uint64_t requestId);
 ssize_t fs_write_internal_common(int fd, const void *buf, size_t count,  uint64_t requestId);
 ssize_t fs_allocated_read_internal_common(int fd, void *buf, size_t count, 
-  uint64_t requestId, void **bufPtr, bool isRetry);
+  uint64_t requestId, bool isRetry);
   ssize_t fs_allocated_pread_internal_common(int fd, void *buf, size_t count, 
-  off_t offset, uint64_t requestId, void **bufPtr, bool isRetry);
+  off_t offset, uint64_t requestId, bool isRetry);
   ssize_t fs_allocated_write_internal_common(int fd, void *buf, size_t count, 
   uint64_t requestId, bool isRetry);
   ssize_t fs_allocated_pwrite_internal_common(int fd, void *buf, ssize_t count, 

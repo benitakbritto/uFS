@@ -28,7 +28,6 @@ extern FsProc *gFsProcPtr;
 FileMng::FileMng(FsProcWorker *worker, const char *memPtr,
                  float dataDirtyFlushRatio, int numPartitions)
     : fsWorker_(worker), memPtr_(memPtr) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (worker->isMasterWorker()) {
     fsImpl_ = new FsImpl(worker, memPtr, dataDirtyFlushRatio, numPartitions);
   } else {
@@ -36,14 +35,12 @@ FileMng::FileMng(FsProcWorker *worker, const char *memPtr,
         "FileMng constructor is called for whole memPtr but not master. "
         "FORBIDDEN");
   }
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FileMng::FileMng(FsProcWorker *worker, const char *bmapMemPtr,
                  char *dataBlockMemPtr, uint32_t numBmapBlocksTotal,
                  float dataDirtyFlushRatio, int numPartitions)
     : fsWorker_(worker), memPtr_(nullptr) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (worker->isMasterWorker()) {
     SPDLOG_ERROR("FileMng construct should not be master for partial mng");
   } else {
@@ -51,7 +48,6 @@ FileMng::FileMng(FsProcWorker *worker, const char *bmapMemPtr,
         new FsImpl(worker, bmapMemPtr, dataBlockMemPtr, numBmapBlocksTotal,
                    dataDirtyFlushRatio, numPartitions);
   }
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FileMng::~FileMng() { delete fsImpl_; }
@@ -195,14 +191,12 @@ int FileMng::processReq(FsReq *req) {
       // FIXME: memory leak. Mark as failure and reclaim req memory.
       SPDLOG_ERROR("FileMng::processReq not supported");
   }
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }
 
 void FileMng::submitFsGeneratedRequestsCheckSinglePendingMap(
     FsReq *req, iou_map_t::const_iterator beginIt,
     iou_map_t::const_iterator endIt, bool isSector) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("submitFsGeneratedReqs isSector:{}", isSector);
 #ifndef USE_SPDK
   // POSIX DEV
@@ -271,11 +265,9 @@ void FileMng::submitFsGeneratedRequestsCheckSinglePendingMap(
     req->submittedSectorReqDone(secno);
   }
 #endif
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::submitFsGeneratedRequests(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->numPendingBlockReq() > 0) {
     submitFsGeneratedRequestsCheckSinglePendingMap(
         req, req->blockPendingBegin(), req->blockPendingEnd());
@@ -285,34 +277,28 @@ void FileMng::submitFsGeneratedRequests(FsReq *req) {
         req, req->sectorPendingBegin(), req->sectorPendingEnd(), true);
   }
   req->stopOnCpuTimer();
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FileMng *FileMng::generateSubFileMng(FsProcWorker *curWorker) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(curWorker != nullptr);
   assert(!curWorker->isMasterWorker());
   auto fm = new FileMng(
       curWorker, fsImpl_->getBmapMemPtr(), fsImpl_->getDataBlockMemPtr(),
       fsImpl_->getOnDiskNumBmapBlocksTotal(), fsImpl_->getDataDirtuFlushRatio(),
       fsImpl_->getNumPartitions());
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return fm;
 }
 
 void FileMng::installInode(InMemInode *inode) { fsImpl_->installInode(inode); }
 
 void FileMng::addFdMappingOnOpen(pid_t pid, FileObj *fobj) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(fobj != nullptr);
   auto inodePtr = fobj->ip;
   inodePtr->addFd(pid, fobj);
   ownerAppFdMap_[pid].emplace(fobj->readOnlyFd, fobj);
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::delFdMappingOnClose(pid_t pid, FileObj *fobj) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(fobj != nullptr);
   auto inodePtr = fobj->ip;
   inodePtr->delFd(pid, fobj);
@@ -327,11 +313,9 @@ void FileMng::delFdMappingOnClose(pid_t pid, FileObj *fobj) {
   // ownerAppFdMap_, please also consider modifying closeAllFileDescriptors as
   // that is a batch optimized version of this function.
   delete fobj;
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::closeAllFileDescriptors(pid_t pid) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG("[wid={}] closing all fd's for pid {}", fsWorker_->getWid(),
                pid);
   auto search = ownerAppFdMap_.find(pid);
@@ -356,24 +340,20 @@ void FileMng::closeAllFileDescriptors(pid_t pid) {
   }
 
   ownerAppFdMap_.erase(search);
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 // When importing an inode, all the file descriptor mappings need to be copied
 // to an outer level so fd's can be resolved.
 void FileMng::addImportedInodeFdMappings(const InMemInode *inodePtr) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (const auto &[pid, inodeFdMap] : inodePtr->getAppFdMap()) {
     auto &fdMap = ownerAppFdMap_[pid];
     fdMap.insert(inodeFdMap.begin(), inodeFdMap.end());
   }
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 // When exporting an inode, all outer level mappings must be deleted so this fd
 // can never be resolved.
 void FileMng::delExportedInodeFdMappings(const InMemInode *inodePtr) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   for (const auto &[pid, inodeFdMap] : inodePtr->getAppFdMap()) {
     auto search = ownerAppFdMap_.find(pid);
     if (search == ownerAppFdMap_.end()) continue;
@@ -387,11 +367,9 @@ void FileMng::delExportedInodeFdMappings(const InMemInode *inodePtr) {
 
     if (fdMap.empty()) ownerAppFdMap_.erase(search);
   }
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FileObj *FileMng::getFileObjForFd(pid_t pid, int fd) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto outer_search = ownerAppFdMap_.find(pid);
   if (outer_search == ownerAppFdMap_.end()) return nullptr;
 
@@ -399,7 +377,6 @@ FileObj *FileMng::getFileObjForFd(pid_t pid, int fd) {
   auto inner_search = fdMap.find(fd);
   if (inner_search == fdMap.end()) return nullptr;
 
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return inner_search->second;
 }
 
@@ -414,7 +391,6 @@ void FileMng::blockingStoreInode(cfs_ino_t inum) {
 }
 
 bool FileMng::exportInode(cfs_ino_t inum, ExportedInode &exp) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // NOTE: exportInode only exports the inode and removes all state related to
   // it from the FileMng. It does not update primary about the export. Caller
   // must inform the primary about ownership changes.
@@ -1382,7 +1358,6 @@ void FileMng::processAllocWrite(FsReq *req) {
 }
 
 void FileMng::processAllocPwrite(FsReq *req) {
-  std::cout << "[DEBUG]" << __func__ << "\t" << __LINE__ << std::endl;
   if (req->getState() == FsReqState::ALLOCPWRITE_TOCACHE_MODIFY) {
     // TO be implemented
     throw std::runtime_error("allocpwrite not supported");
@@ -3393,7 +3368,6 @@ void FileMng::processMkdir(FsReq *req) {
         // here we do a trick to check if this dir's name is already
         // existing in target directory by checking the path cache.
         if (req->isRetry) {
-          std::cout << "within retry" << std::endl;
           fsWorker_->onTargetInodeFiguredOut(req, curInode);
           req->setState(FsReqState::MKDIR_RETRY);
         } else {
@@ -3689,7 +3663,6 @@ void FileMng::processOpendir(FsReq *req) {
 }
 
 void FileMng::processNewShmAllocated(FsReq *req) {
-  std::cout << "[DEBUG] Inside " << __func__ << std::endl;
   if (req->getState() == FsReqState::NEW_SHM_ALLOC_SEND_MSG) {
     SPDLOG_DEBUG("FsReq::processNewShmAllocated wid:{} reqType:{}",
                  req->getWid(), getFsReqTypeOutputString(req->getType()));
@@ -3719,19 +3692,15 @@ void FileMng::processNewShmAllocated(FsReq *req) {
       fsWorker_->submitFsReqCompletion(req);
     }
   }
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processPing(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // to mark completion
   req->getClientOp()->op.ping.ret = 0;
   fsWorker_->submitFsReqCompletion(req);
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::processDumpInodes(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   std::stringstream ss;
   ss << "/tmp/dumpInodesPid_";
   ss << fsWorker_->getWid();
@@ -3743,25 +3712,21 @@ void FileMng::processDumpInodes(FsReq *req) {
   req->getClientOp()->op.dumpinodes.ret =
       fsImpl_->dumpAllInodesToFile(dumpDirname.c_str());
   fsWorker_->submitFsReqCompletion(req);
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::fromInMemInode2Statbuf(InMemInode *inodePtr,
                                      struct stat *cur_stat_ptr) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   SPDLOG_DEBUG(
       "fromInMemInode2Statbuf inode data fields - in-mem_ino:{}, "
       "size:{}, i_block_count",
       inodePtr->i_no, inodePtr->inodeData->size,
       inodePtr->inodeData->i_block_count);
   if (inodePtr->inodeData->type == T_DIR) {
-    // std::cout << "[DEBUG]" << __func__ << inodePtr->i_no << "is dir" << std::endl;
     cur_stat_ptr->st_size =
         sizeof(struct cfs_dirent) * inodePtr->inodeData->i_dentry_count;
     // cur_stat_ptr->st_mode = cur_stat_ptr->st_mode | S_IFDIR;
     cur_stat_ptr->st_mode = S_IFDIR;
   } else {
-    // std::cout << "[DEBUG]" << __func__ << inodePtr->i_no << "is reg file" << std::endl;
     cur_stat_ptr->st_size = inodePtr->inodeData->size;
     // cur_stat_ptr->st_mode = cur_stat_ptr->st_mode | S_IFREG;
      cur_stat_ptr->st_mode = S_IFREG;
@@ -3772,25 +3737,19 @@ void FileMng::fromInMemInode2Statbuf(InMemInode *inodePtr,
   cur_stat_ptr->st_nlink = inodePtr->inodeData->nlink;
   cur_stat_ptr->st_ino = inodePtr->inodeData->i_no;
   assert(cur_stat_ptr->st_ino == inodePtr->i_no);
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::splitInodeDataBlockBufferSlot(
     InMemInode *inode, std::unordered_set<BlockBufferItem *> &items) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   fsImpl_->splitInodeDataBlockBufferSlot(inode, items);
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 void FileMng::installDataBlockBufferSlot(
     InMemInode *inode, const std::unordered_set<BlockBufferItem *> &items) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   fsImpl_->installInodeDataBlockBufferSlot(inode, items);
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 FsPermission::PCR FileMng::checkPermission(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   InMemInode *temp = nullptr;
   auto ret = fsImpl_->permission->checkPermission(req->getPathTokens(), {0, 0},
                                                   &req->parDirMap,
@@ -3799,12 +3758,10 @@ FsPermission::PCR FileMng::checkPermission(FsReq *req) {
   if (req->getPathTokens().size() == 1) {
     req->parDirInodePtr = fsImpl_->root_inode_;
   }
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return ret;
 }
 
 FsPermission::PCR FileMng::checkDstPermission(FsReq *req) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   InMemInode *temp = nullptr;
   auto ret = fsImpl_->permission->checkPermission(
       req->getDstPathTokens(), {0, 0}, &req->dstParDirMap,
@@ -3814,7 +3771,6 @@ FsPermission::PCR FileMng::checkDstPermission(FsReq *req) {
     req->dstParDirInodePtr = fsImpl_->root_inode_;
   }
   
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return ret;
 }
 
@@ -3831,14 +3787,12 @@ InMemInode::InMemInode(uint32_t ino, int wid)
       mngWid_(wid) {}
 
 void InMemInode::initNewAllocatedDinodeContent(mode_t tp) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(inodeData != nullptr);
   memset(inodeData, 0, sizeof(cfs_dinode));
   inodeData->type = tp;
   setNlink(1);
   inodeData->i_no = i_no;
   logEntry->set_mode(tp);
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 bool InMemInode::tryLock() {
@@ -3878,9 +3832,7 @@ bool InMemInode::unLock() {
 }
 
 bool InMemInode::isAppProcReferring(pid_t pid) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   auto it = appFdMap_.find(pid);
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return !((it == appFdMap_.end()) || it->second.empty());
 }
 
@@ -3888,7 +3840,6 @@ void InMemInode::addDentryDataBlockPosition(InMemInode *parInode,
                                             const std::string &fileName,
                                             block_no_t dentryDataBlockNo,
                                             int withinBlockDentryIndex) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   // assert(parInode != nullptr);
   auto it = inodeDentryDataBlockPosMap_.find(parInode);
   if (it == inodeDentryDataBlockPosMap_.end()) {
@@ -3897,12 +3848,10 @@ void InMemInode::addDentryDataBlockPosition(InMemInode *parInode,
   }
   (inodeDentryDataBlockPosMap_[parInode])[fileName] =
       std::make_pair(dentryDataBlockNo, withinBlockDentryIndex);
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
 inode_dentry_dbpos_t *InMemInode::getDentryDataBlockPosition(
     InMemInode *parInode, const std::string &fileName) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(parInode != nullptr);
   auto it = inodeDentryDataBlockPosMap_.find(parInode);
   if (it != inodeDentryDataBlockPosMap_.end()) {
@@ -3912,13 +3861,11 @@ inode_dentry_dbpos_t *InMemInode::getDentryDataBlockPosition(
     }
   }
   
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return nullptr;
 }
 
 int InMemInode::delDentryDataBlockPosition(InMemInode *parInode,
                                            const std::string &fileName) {
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   assert(parInode != nullptr);
   auto it = inodeDentryDataBlockPosMap_.find(parInode);
   assert(it != inodeDentryDataBlockPosMap_.end());
@@ -3926,6 +3873,5 @@ int InMemInode::delDentryDataBlockPosition(InMemInode *parInode,
   assert(inIt != (it->second).end());
   (it->second).erase(inIt);
   
-  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
   return 0;
 }

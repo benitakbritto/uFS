@@ -248,7 +248,7 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
       ring_idx = 1;
     }
     rmsg = IDX_TO_MSG(mgr, ring_idx);
-    printf("[DEBUG] trying to get ring_idx = %ld\n", ring_idx);
+    printf("[DEBUG] trying to get ring_idx = %ld\n", ring_idx); fflush(stdout);
     // // NOTE: If the buffer is not large enough and we happen to
     // // circle back onto a slot that is still in use, we will have to wait
     // // till it is free. Further, if some task ahead in the ring gets done
@@ -258,8 +258,6 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
     // // when slots are available.
     // while (__builtin_expect(rmsg->status != shmipc_STATUS_EMPTY, 0))
     //   ;
-
-    printf("[DEBUG] status = %ld\n", rmsg->status);
 
     if (rmsg->status == shmipc_STATUS_EMPTY) {
       // NOTE: This (below) might cause cache invalidations slowing down
@@ -274,7 +272,7 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   }
 
   // Nothing is free
-  printf("[DEBUG] Couldn't get slot");
+  printf("[DEBUG] Couldn't get slot"); fflush(stdout);
   return -1;
 }
 
@@ -322,7 +320,6 @@ off_t shmipc_mgr_alloc_slot_client(struct shmipc_mgr *mgr, int *isNotify) {
   }
 
   // Nothing is free
-  printf("[DEBUG] Couldn't get slot");
   return -1;
 }
 

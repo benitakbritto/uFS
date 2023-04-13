@@ -216,6 +216,7 @@ retry:
 
   // ring buffer is full
   if (ring_idx == -1) {
+    std::cout << "[DEBUG] ring_idx is -1" << std::endl;
     fs_syncall();
     clean_up_notify_msg_from_server();
     goto retry;
@@ -1109,7 +1110,7 @@ int RetryMgr::fs_retry_pending_ops(void *buf, struct stat *statbuf,
     return -1;
   } else {
     std::cout << "[DEBUG] " << __func__ << ": Connected to server successfully" << " threadFsTid = " << threadFsTid <<  std::endl;
-    int numThreads = gLibSharedContext->tidIncr.load(); // TODO: check
+    int numThreads = gLibSharedContext->tidIncr.load(); 
     std::cout << "[DEBUG] " << __func__ << ": numThreads = " << numThreads << " threadFsTid = " << threadFsTid <<  std::endl;
     initNotifyShmForThread(numThreads);
 
@@ -1134,7 +1135,7 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
   CFS_DIR *dir, void **bufPtr, bool isBackground) {
   std::cout << "[DEBUG] " << __func__ << ": threadFsTid = " << threadFsTid << std::endl;
   // Clear out fsync pending
-  clean_up_notify_msg_from_server();
+  clean_up_notify_msg_from_server(false /*sleep*/);
 
   bool foundFirstNotifyShm = false;
   uint64_t lastRequestId = (this->_reqRingMap.count(threadFsTid) == 0 
@@ -3423,7 +3424,7 @@ retry:
       goto retry;
     }
   } else {
-    service->updateOffset(fd, prevOffset + rc - 1);
+    service->updateOffset(fd, rc);
   }
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_READ, tsIdx);
@@ -3685,7 +3686,7 @@ retry:
       goto retry;
     }
   } else {
-    service->updateOffset(fd, prevOffset + rc - 1);
+    service->updateOffset(fd, rc);
   }
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_WRITE, tsIdx);
@@ -3992,6 +3993,7 @@ retry:
   auto service = getFsServiceForFD(fd, wid);
   // ssize_t rc = fs_allocated_read_internal(service, fd, buf, count);
   auto offset = service->getOffset(fd);
+  std::cout << "[DEBUG] offset = " << offset << std::endl;
   ssize_t rc = fs_allocated_pread_internal(service, fd, buf, count, offset, requestId, bufPtr, isNotifyRetry);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;
@@ -4001,7 +4003,7 @@ retry:
       goto retry;
     }
   } else {
-    service->updateOffset(fd, offset + rc - 1);
+    service->updateOffset(fd, rc);
   }
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_READ, tsIdx);
@@ -4229,7 +4231,7 @@ retry:
       goto retry;
     }
   } else {
-    service->updateOffset(fd, offset + rc - 1);
+    service->updateOffset(fd, rc);
   }
 
 #ifdef CFS_LIB_SAVE_API_TS
@@ -5091,7 +5093,7 @@ retry:
   int rc = fs_lseek_internal(service, fd, offset, whence, file_offset);
 
   if (rc >= 0) {
-    service->updateOffset(fd, rc - 1);
+    service->setOffset(fd, rc);
     return rc;
   }
   if (handle_inode_in_transfer(rc)) goto retry;
@@ -5153,9 +5155,14 @@ void fs_free_pad(void *ptr) { fs_free_pad(ptr, threadFsTid); }
 
 void fs_init_thread_local_mem() { check_app_thread_mem_buf_ready(false /*isRetry*/); }
 
-// TODO: Test
-void clean_up_notify_msg_from_server() {
-  sleep(1); // TODO: Is this needed?
+// TODO: Fix, should cleanup for all threads's requests
+void clean_up_notify_msg_from_server(bool shouldSleep) {
+  if (shouldSleep) {
+    std::cout << "[DEBUG] Sleeping .." << std::endl;
+    // usleep(100);
+    sleep(1);
+  } 
+
   uint8_t count = 0;
   shmipc_msg msg;
   off_t ringIdx = 0;
@@ -5166,7 +5173,9 @@ void clean_up_notify_msg_from_server() {
     memset(&msg, 0, sizeof(struct shmipc_msg));
     auto ret = shmipc_mgr_poll_notify_msg(shmipc_mgr, ringIdx, &msg);
     if (ret != -1) {    
+      std::cout << "[DEBUG] Received notify op" << std::endl;
       auto notifyOpXreq = (struct NotifyMsg *) IDX_TO_XREQ(shmipc_mgr, ringIdx);      
+      std::cout << "[DEBUG] notify count = " << notifyOpXreq->count << std::endl;
       for (int i = 0; i < notifyOpXreq->count; i++) {
         auto requestId = notifyOpXreq->requestIdList[i];
         
@@ -5206,6 +5215,7 @@ retry:
   retryCount++;
   // No space, try calling syncall
   if (ptr == nullptr && retryCount == 1) {
+    std::cout << "[DEBUG] " << __func__ << ": ptr is null, retrying .." << std::endl;
     fs_syncall();
     clean_up_notify_msg_from_server();
     goto retry;

@@ -202,7 +202,9 @@ public:
 
   // Data Map
   void removeRequestFromDataMap(uint64_t requestId) {
+    void *buf = this->_reqAllocatedDataMap[requestId];
     this->_reqAllocatedDataMap.erase(requestId);
+    fs_free(buf);
   }
 
   void *getRequestBufPtrFromDataMap(uint64_t requestId) {
@@ -517,6 +519,6 @@ ssize_t fs_allocated_read_internal_common(int fd, void *buf, size_t count,
   off_t offset, uint64_t requestId, bool isRetry);
 // =======
 
-void clean_up_notify_msg_from_server();
+void clean_up_notify_msg_from_server(bool shouldSleep = true);
 
 #endif  // CFS_FSLIBAPP_H

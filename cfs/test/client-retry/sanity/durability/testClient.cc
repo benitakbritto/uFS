@@ -4,8 +4,10 @@
 // Test with two worker client threads
 // Improve file bench
 
+// TODO: Update the pending count since the addition of the threshold
 #include <assert.h>
 #include <fcntl.h>
+#include <future>
 #include "util.h"
 #include "../../../client/testClient_common.h"
 #include <fsapi.h>
@@ -14,7 +16,7 @@
 /******************************************************************************
  * MACROS
  *****************************************************************************/
-#define RUN_COUNT 65
+#define RUN_COUNT 100
 #define RING_SIZE 64
 #define IO_SIZE 1024
 #define STRESS_IO_SIZE (IO_SIZE * IO_SIZE)
@@ -45,6 +47,13 @@ enum TestCase
     UNLINK, // 11
     FSYNC, // 12
     STRESS_MALLOC, // 13
+    OPEN_DIR_THREADS, // 14
+    OPEN_THREADS, // 15
+    CREATE_THREADS, // 16
+    ALLOC_READ_THREADS, // 17
+    ALLOC_WRITE_THREADS, // 18
+    ALLOC_PREAD_THREADS, // 19
+    ALLOC_PWRITE_THREADS, // 20
 };
 
 /******************************************************************************
@@ -68,6 +77,22 @@ int runUnlink();
 int runFsync();
 int runStressMalloc();
 void printHelp(const char *executableName);
+
+int runOpenDirSingle(const char *path);
+int runOpenDirWithThreads(int numThreads);
+int runOpenSingle(const char *path);
+int runOpenWithThreads(int numThreads);
+int runCreateSingle(std::string dirPath);
+int runCreateWithThreads(int numThreads);
+int runAllocReadSingle(std::string path);
+int runAllocReadWithThreads(int numThreads);
+int runAllocWriteSingle(std::string path);
+int runAllocWriteWithThreads(int numThreads);
+int runAllocPreadSingle(std::string path);
+int runAllocPreadWithThreads(int numThreads);
+int runAllocPwriteSingle(std::string path);
+int runAllocPwriteWithThreads(int numThreads);
+
 
 /******************************************************************************
  * DRIVER
@@ -217,14 +242,15 @@ int runCreate() {
   return 0;
 }
 
-int initAllocRead() {
-  auto ino = fs_open("db", O_RDONLY, 0);
+int initAllocRead(std::string path) {
+  std::cout << "[DEBUG] Inside " << __func__ << std::endl;
+  auto ino = fs_open(path.c_str(), O_RDONLY, 0);
   if (ino == 0) {
     fprintf(stderr, "fs_open() failed\n");
     return -1;
   }
 
-  char *buf = (char *)fs_malloc(IO_SIZE * RUN_COUNT + 1);
+  char *buf = (char *) fs_malloc(IO_SIZE * RUN_COUNT + 1);
   memset(buf, 0, IO_SIZE * RUN_COUNT + 1);
   auto ret = fs_allocated_pwrite(ino, buf, IO_SIZE * RUN_COUNT, 0);
   if (ret != IO_SIZE * RUN_COUNT) {
@@ -240,7 +266,7 @@ int initAllocRead() {
 }
 
 int runAllocRead() {
-  initAllocRead();
+  initAllocRead("db");
 
   auto ino = fs_open("db", O_RDONLY, 0);
   if (ino == 0) {
@@ -330,7 +356,7 @@ int runAllocWrite() {
 }
 
 int runAllocPread() {
-  initAllocRead();
+  initAllocRead("db");
 
   auto ino = fs_open("db", O_RDONLY, 0);
   if (ino == 0) {
@@ -587,8 +613,290 @@ int runStressMalloc() {
   return 0;
 }
 
+int runOpenDirSingle(const char *path) {
+  for (int i = 0; i < RUN_COUNT; i++) {
+    // Calls opendir on root
+    auto dir = fs_opendir(path);
+    if (dir == nullptr) {
+      return -1;
+    }
+  }
+  
+  return 0;
+}
+
+int runOpenDirWithThreads(int numThreads) {
+  std::future<int> workers[numThreads];
+
+  for (int i = 0; i < numThreads; i++) {
+    workers[i] = std::async(runOpenDirSingle, "/"); 
+  }
+
+  for(int i = 0; i < numThreads; i++) {
+    if (workers[i].get() != 0) {
+      printf("[ERR] runOpenDirWithThreads failed with worker %d\n", i);
+      return workers[i].get();
+    }
+  }
+
+  return 0;
+}
+
+int runOpenSingle(const char *path) {
+  for (int i = 0; i < RUN_COUNT; i++) {
+    // Calls opendir on root
+    auto ino = fs_open(path, O_RDWR, 0);
+    if (ino == 0) {
+      return -1;
+    }
+  }
+  
+  return 0;
+}
+
+int runOpenWithThreads(int numThreads) {
+  std::future<int> workers[numThreads];
+
+  // cannot support more than 9 threads (since only t9 exists)
+  for (int i = 0; i < numThreads; i++) {
+    std::string path = "t" + std::to_string(i + 1);
+    workers[i] = std::async(runOpenSingle, path.c_str()); 
+  }
+
+  for(int i = 0; i < numThreads; i++) {
+    if (workers[i].get() != 0) {
+      printf("[ERR] runOpenDirWithThreads failed with worker %d\n", i);
+      return workers[i].get();
+    }
+  }
+
+  return 0;
+}
+
+// dirPath without / at the end
+int runCreateSingle(std::string dirPath) {
+  auto ret = fs_mkdir(dirPath.c_str(), 0);
+  if (ret != 0) {
+    fprintf(stderr, "fs_mkdir() failed\n");
+    return -1;
+  }
+
+  for (int i = 0; i < RUN_COUNT; i++) {
+    auto ino = fs_open((dirPath + "/" + std::to_string(i)).c_str(), O_CREAT, 0644);
+    if (ino == 0) {
+      fprintf(stderr, "fs_open() failed\n");
+      return -1;
+    }
+  }
+  
+  return 0;
+} 
+
+int runCreateWithThreads(int numThreads) {
+  std::future<int> workers[numThreads];
+
+  for (int i = 0; i < numThreads; i++) {
+    std::string path = "test" + std::to_string(i);
+    workers[i] = std::async(runCreateSingle, path); 
+  }
+
+  for(int i = 0; i < numThreads; i++) {
+    if (workers[i].get() != 0) {
+      printf("[ERR] runCreateWithThreads failed with worker %d\n", i);
+      return workers[i].get();
+    }
+  }
+
+  return 0;
+}
+
+int runAllocReadSingle(std::string path) {
+  std::cout << "[DEBUG] Inside " << __func__ << std::endl;
+  initAllocRead(path);
+
+  auto ino = fs_open(path.c_str(), O_RDONLY, 0);
+  if (ino == 0) {
+    fprintf(stderr, "fs_open() failed\n");
+    return -1;
+  }
+
+  for (int i = 0; i < RUN_COUNT; i++) {
+    char *buf = (char *) fs_malloc(IO_SIZE + 1);
+    memset(buf, 0, IO_SIZE + 1);
+    auto ret = fs_allocated_read(ino, buf, IO_SIZE);
+    if (ret != IO_SIZE) {
+      fprintf(stderr, "fs_allocated_read() failed. Received %ld\n", ret);
+      return -1;
+    }
+
+    fs_free(buf);
+  }
+
+  return 0;
+}
+
+int runAllocReadWithThreads(int numThreads) {
+  std::future<int> workers[numThreads];
+
+  for (int i = 0; i < numThreads; i++) {
+    std::string path = "t" + std::to_string(i + 1);
+    workers[i] = std::async(runAllocReadSingle, path); 
+  }
+
+  for(int i = 0; i < numThreads; i++) {
+    if (workers[i].get() != 0) {
+      printf("[ERR] runAllocPreadWithThreads failed with worker %d\n", i);
+      return workers[i].get();
+    }
+  }
+
+  return 0;
+}
+
+int runAllocWriteSingle(std::string path) {
+  auto ino = fs_open(path.c_str(), O_RDONLY, 0);
+  if (ino == 0) {
+    fprintf(stderr, "fs_open() failed\n");
+    return -1;
+  }
+
+  for (int i = 0; i < RUN_COUNT; i++) {
+    char *bufWrite = (char *)fs_malloc(IO_SIZE + 1);
+    memset(bufWrite, 0, IO_SIZE + 1);
+    memcpy(bufWrite, generateString("a", IO_SIZE).c_str(), IO_SIZE);
+
+    auto ret = fs_allocated_write(ino, bufWrite, IO_SIZE);
+    if (ret != IO_SIZE) {
+      fprintf(stderr, "fs_allocated_write() failed. Received %ld\n", ret);
+      return -1;
+    }
+
+    char *bufRead = (char *)fs_malloc(IO_SIZE + 1);
+    memset(bufRead, 0, IO_SIZE + 1);
+    ret = fs_allocated_pread(ino, bufRead, IO_SIZE, i * IO_SIZE);
+    if (strcmp(bufRead, bufWrite) != 0) {
+      fprintf(stderr, "read and write bufs are not the same\n");
+      return -1;
+    }
+
+    fs_free(bufRead);
+  }
+  
+  return 0;
+}
+
+int runAllocWriteWithThreads(int numThreads) {
+  std::future<int> workers[numThreads];
+
+  for (int i = 0; i < numThreads; i++) {
+    std::string path = "t" + std::to_string(i + 1);
+    workers[i] = std::async(runAllocWriteSingle, path); 
+  }
+
+  for(int i = 0; i < numThreads; i++) {
+    if (workers[i].get() != 0) {
+      printf("[ERR] runAllocWriteWithThreads failed with worker %d\n", i);
+      return workers[i].get();
+    }
+  }
+
+  return 0;
+}
+
+int runAllocPreadSingle(std::string path) {
+  initAllocRead(path);
+
+  auto ino = fs_open(path.c_str(), O_RDONLY, 0);
+  if (ino == 0) {
+    fprintf(stderr, "fs_open() failed\n");
+    return -1;
+  }
+
+  for (int i = 0; i < RUN_COUNT; i++) {
+    char *buf = (char *) fs_malloc(IO_SIZE + 1);
+    memset(buf, 0, IO_SIZE + 1);
+    auto ret = fs_allocated_pread(ino, buf, IO_SIZE, IO_SIZE * i);
+    if (ret != IO_SIZE) {
+      fprintf(stderr, "fs_allocated_read() failed. Received %ld\n", ret);
+      return -1;
+    }
+
+    fs_free(buf);
+  }
+
+  return 0;
+}
+
+int runAllocPreadWithThreads(int numThreads) {
+  std::future<int> workers[numThreads];
+
+  for (int i = 0; i < numThreads; i++) {
+    std::string path = "t" + std::to_string(i + 1);
+    workers[i] = std::async(runAllocPreadSingle, path); 
+  }
+
+  for(int i = 0; i < numThreads; i++) {
+    if (workers[i].get() != 0) {
+      printf("[ERR] runAllocPreadWithThreads failed with worker %d\n", i);
+      return workers[i].get();
+    }
+  }
+
+  return 0;
+}
+
+int runAllocPwriteSingle(std::string path) {
+  auto ino = fs_open(path.c_str(), O_RDONLY, 0);
+  if (ino == 0) {
+    fprintf(stderr, "fs_open() failed\n");
+    return -1;
+  }
+
+  for (int i = 0; i < RUN_COUNT; i++) {
+    char *bufWrite = (char *)fs_malloc(IO_SIZE + 1);
+    memset(bufWrite, 0, IO_SIZE + 1);
+    memcpy(bufWrite, generateString("a", IO_SIZE).c_str(), IO_SIZE);
+
+    auto ret = fs_allocated_pwrite(ino, bufWrite, IO_SIZE, i * IO_SIZE);
+    if (ret != IO_SIZE) {
+      fprintf(stderr, "fs_allocated_write() failed. Received %ld\n", ret);
+      return -1;
+    }
+
+    char *bufRead = (char *)fs_malloc(IO_SIZE + 1);
+    memset(bufRead, 0, IO_SIZE + 1);
+    ret = fs_allocated_pread(ino, bufRead, IO_SIZE, i * IO_SIZE);
+    if (strcmp(bufRead, bufWrite) != 0) {
+      fprintf(stderr, "read and write bufs are not the same\n");
+      return -1;
+    }
+
+    fs_free(bufRead);
+  }
+  
+  return 0;
+}
+
+int runAllocPwriteWithThreads(int numThreads) {
+  std::future<int> workers[numThreads];
+
+  for (int i = 0; i < numThreads; i++) {
+    std::string path = "t" + std::to_string(i + 1);
+    workers[i] = std::async(runAllocPwriteSingle, path); 
+  }
+
+  for(int i = 0; i < numThreads; i++) {
+    if (workers[i].get() != 0) {
+      printf("[ERR] runAllocPwriteWithThreads failed with worker %d\n", i);
+      return workers[i].get();
+    }
+  }
+
+  return 0;
+}
+
 void printHelp(const char *executableName) {
-  fprintf(stderr, "Usage %s <pid1,pid2,..> <test case num>\n", executableName);
+  fprintf(stderr, "Usage %s -p <pid1,pid2,..> -t <test case num> -n <num threads>\n", executableName);
   fprintf(stderr, "\t requires two arguments\n");
   fprintf(stderr,
           "\t Argument 1 --- pid1,pid2,..: a list of integers separated by , "
@@ -622,20 +930,51 @@ void printHelp(const char *executableName) {
   fprintf(stderr,
           "\t\t 12: fs_fsync()\n");
   fprintf(stderr,
-          "\t\t 13: stress fs_malloc()\n");        
+          "\t\t 13: stress fs_malloc()\n"); 
+  fprintf(stderr,
+          "\t\t 14: fs_opendir() with threads\n");
+  fprintf(stderr,
+          "\t\t 15: fs_open() with threads\n");
+  fprintf(stderr,
+          "\t\t 16: fs_open(create) with threads\n"); 
+  fprintf(stderr,
+          "\t\t 17: fs_allocated_read() with threads\n"); 
+  fprintf(stderr,
+          "\t\t 18: fs_allocated_write() with threads\n"); 
+  fprintf(stderr,
+          "\t\t 19: fs_allocated_pread() with threads\n");  
+  fprintf(stderr,
+          "\t\t 20: fs_allocated_pwrite() with threads\n");        
 }
 
 int main(int argc, char **argv) {
-  if (argc != 3) {
-    printHelp(argv[0]);
+  // Get command line args
+  char c = '\0';
+  std::string pids = "";
+  int testCaseNum = -1;
+  int numThreads = 1;
+  while ((c = getopt(argc, argv, "p:t:n:")) != -1) {
+    switch (c) {
+      case 'p':
+        pids = std::string(optarg);
+        break;
+      case 't':
+        testCaseNum = std::stoi(optarg);
+        break;
+      case 'n':
+        numThreads = std::stoi(optarg);
+        break;
+      default:
+        printf("Invalid arg\n");
+        exit(1);
+    }
+  }
+
+  if (initClient(pids) != 0) {
     exit(1);
   }
 
-  if (initClient(argv[1]) != 0) {
-    exit(1);
-  }
-
-  switch(atoi(argv[2])) {
+  switch(testCaseNum) {
     case TestCase::OPEN_DIR: {
       if (runOpenDir() != 0) {
         fprintf(stderr, "runOpenDir() failed\n");
@@ -730,6 +1069,55 @@ int main(int argc, char **argv) {
     case TestCase::STRESS_MALLOC: {
       if (runStressMalloc() != 0) {
         fprintf(stderr, "runFsync() failed\n");
+        exit(1);
+      }
+      break;
+    } 
+    case TestCase::OPEN_DIR_THREADS: {
+      if (runOpenDirWithThreads(2 /*numThreads*/) != 0) {
+        fprintf(stderr, "runOpenDirWithThreads() failed\n");
+        exit(1);
+      }
+      break;
+    }
+    case TestCase::OPEN_THREADS: {
+      if (runOpenWithThreads(numThreads) != 0) {
+        fprintf(stderr, "runOpenDirWithThreads() failed\n");
+        exit(1);
+      }
+      break;
+    }
+    case TestCase::CREATE_THREADS: {
+      if (runCreateWithThreads(numThreads) != 0) {
+        fprintf(stderr, "runCreateWithThreads() failed\n");
+        exit(1);
+      }
+      break;
+    }
+    case TestCase::ALLOC_READ_THREADS: {
+      if (runAllocReadWithThreads(numThreads) != 0) {
+        fprintf(stderr, "runAllocReadWithThreads() failed\n");
+        exit(1);
+      }
+      break;
+    }
+    case TestCase::ALLOC_WRITE_THREADS: {
+      if (runAllocWriteWithThreads(numThreads) != 0) {
+        fprintf(stderr, "runAllocWriteWithThreads() failed\n");
+        exit(1);
+      }
+      break;
+    }
+    case TestCase::ALLOC_PREAD_THREADS: {
+      if (runAllocPreadWithThreads(numThreads) != 0) {
+        fprintf(stderr, "runAllocPreadWithThreads() failed\n");
+        exit(1);
+      }
+      break;
+    }
+    case TestCase::ALLOC_PWRITE_THREADS: {
+      if (runAllocPwriteWithThreads(numThreads) != 0) {
+        fprintf(stderr, "runAllocPwriteWithThreads() failed\n");
         exit(1);
       }
       break;

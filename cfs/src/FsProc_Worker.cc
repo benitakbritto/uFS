@@ -2798,6 +2798,7 @@ void FsProcWorker::notifyFileMetadataOps(cfs_ino_t inodeNum) {
         xreq->count = (itr->second).size();
         int i = 0;
         for (auto listItr = itr->second.begin(); listItr != itr->second.end(); listItr++) {
+          std::cout << "[DEBUG] req = " << *listItr << std::endl;
           xreq->requestIdList[i++] = *listItr;
         }
 

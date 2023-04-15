@@ -11,10 +11,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-// thread local variables
-__thread pid_t gServerPid = -1;
-__thread int gServerIsDown = 0;
-
 #define RING_SIZE 64 // TODO: Note, copied from param.h
 
 int is_server_up(pid_t pid) {
@@ -25,18 +21,6 @@ int is_server_up(pid_t pid) {
   
   // printf("[DEBUG] server is alive\n");
   return 1;
-}
-
-void sig_handler(int signum) {
-  printf("Inside handler function\n"); fflush(stdout);
-  // server is up, reset alarm
-  if (is_server_up(gServerPid) == 1) {
-    alarm(1); 
-  } 
-  // server is down
-  else {
-    gServerIsDown = 1;
-  }
 }
 
 static_assert(sizeof(struct shmipc_msg) <= 64,
@@ -107,7 +91,6 @@ void shmipc_qp_destroy(struct shmipc_qp *qp) {
 struct shmipc_mgr *shmipc_mgr_init(const char *name, size_t rsize, int create) {
   struct shmipc_mgr *mgr = NULL;
   size_t mem_required;
-  signal(SIGALRM, sig_handler);
 
   // rsize must be a power of 2
   if ((rsize < 4) || ((rsize & (rsize - 1)) != 0)) return NULL;
@@ -244,11 +227,10 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
     ring_idx = __sync_fetch_and_add(&(mgr->next), 1); 
     ring_idx = ring_idx & mgr->mask;
     // ring_idx 0 is reserved for getting server pid
-    if (ring_idx == 0) {
-      ring_idx = 1;
-    }
+    // if (ring_idx == 0) {
+    //   ring_idx = 1;
+    // }
     rmsg = IDX_TO_MSG(mgr, ring_idx);
-    printf("[DEBUG] trying to get ring_idx = %ld\n", ring_idx); fflush(stdout);
     // // NOTE: If the buffer is not large enough and we happen to
     // // circle back onto a slot that is still in use, we will have to wait
     // // till it is free. Further, if some task ahead in the ring gets done
@@ -272,7 +254,6 @@ off_t shmipc_mgr_alloc_slot(struct shmipc_mgr *mgr) {
   }
 
   // Nothing is free
-  printf("[DEBUG] Couldn't get slot"); fflush(stdout);
   return -1;
 }
 
@@ -286,9 +267,9 @@ off_t shmipc_mgr_alloc_slot_client(struct shmipc_mgr *mgr, int *isNotify) {
     ring_idx = ring_idx & mgr->mask;
 
     // ring_idx 0 is reserved for getting server pid
-    if (ring_idx == 0) {
-      ring_idx = 1;
-    }
+    // if (ring_idx == 0) {
+    //   ring_idx = 1;
+    // }
   
     rmsg = IDX_TO_MSG(mgr, ring_idx);
 
@@ -357,8 +338,7 @@ void shmipc_mgr_put_msg(struct shmipc_mgr *mgr, off_t ring_idx,
 }
 
 // If -1 is returned it means that server did not respond
-// TODO: rename function since not exponential backoff
-int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off_t ring_idx,
+int16_t shmipc_mgr_put_msg_with_timeout(struct shmipc_mgr *mgr, off_t ring_idx,
                         struct shmipc_msg *msg, pid_t serverPid) {  
   // printf("[DEBUG] Inside put msg\n"); fflush(stdout);
   int ret = -1;
@@ -366,23 +346,23 @@ int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off
 
   shmipc_mgr_put_msg_nowait(mgr, ring_idx, msg, shmipc_STATUS_READY_FOR_SERVER);
   
-  // To detect server failure
-  gServerPid = serverPid;
-  alarm(1);
-
+retry:
   // Tries until server is alive
   while ((ret = shmipc_mgr_poll_msg(mgr, ring_idx, msg)) != 0) {
-    if (gServerIsDown == 1) {
-      break;
+    count++;
+    // TODO: This is a hacky way
+    if (count == INT16_MAX) {
+      if (is_server_up(serverPid) == 0) {
+        return ret;
+      } else {
+        count = 0; // reset
+        goto retry;
+      }
     }
+
     // printf("[DEBUG] trying again %d\n", count++); fflush(stdout);
   }
-
-  gServerIsDown = 0; // reset
   
-  // cancel alarm
-  alarm(0);
-
   return ret;
 }
 

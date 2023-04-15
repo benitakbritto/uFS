@@ -134,7 +134,7 @@ void shmipc_mgr_dealloc_slot(struct shmipc_mgr *mgr, off_t ring_idx);
 void shmipc_mgr_put_msg(struct shmipc_mgr *mgr, off_t ring_idx,
                         struct shmipc_msg *msg);
 
-int16_t shmipc_mgr_put_msg_retry_exponential_backoff(struct shmipc_mgr *mgr, off_t ring_idx,
+int16_t shmipc_mgr_put_msg_with_timeout(struct shmipc_mgr *mgr, off_t ring_idx,
                         struct shmipc_msg *msg, pid_t serverPid);
 
 // Similar to put_msg but returns immediately without waiting for server to

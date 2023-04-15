@@ -24,6 +24,11 @@
 // Only used in FsLib
 //
 
+
+typedef std::shared_mutex Lock;
+typedef std::unique_lock<Lock>  WriteLock;
+typedef std::shared_lock<Lock>  ReadLock;
+
 // debug print flag
 ////#define _CFS_LIB_DEBUG_
 // number of blocks (pages) that is used for each thread's cache
@@ -33,6 +38,8 @@
 // On/Off of using app buffer, assume always use this if using allocated_X API
 // By default, enable APP BUF
 #define FS_LIB_USE_APP_BUF (1)
+
+#define REQUEST_ID_BASE 10000 
 
 // INVARIANT: threadFsTid == 0: thread uninitialized
 // Otherwise, threadFsTid >= 1
@@ -169,53 +176,121 @@ public:
   int check_primary_server_availability();
   int get_server_pid();
 
+  int getThreadIdFromRequestId(uint64_t requestId) {
+    return requestId / REQUEST_ID_BASE;
+  }
+
   // Ring Map
-  std::vector<off_t> getRingIdxsForRequest(uint64_t requestId) {
-    return this->_reqRingMap[threadFsTid][requestId];
+  std::vector<uint64_t> getLeftoverRequestsToClean() {
+    return std::vector<uint64_t>{this->_leftoverRequestToBeCleaned.begin(), 
+      this->_leftoverRequestToBeCleaned.end()};
+  }
+
+  void clearLeftoverRequests() {
+    this->_leftoverRequestToBeCleaned.clear();
+  }
+
+  std::vector<off_t> getRingIdxsForRequest(uint64_t requestId) {    
+    ReadLock r_lock(_reqRingMapLock);
+    if (_reqRingMap.count(requestId) == 0) {
+      // std::cout << "[DEBUG] IMPORTANT request id does not exist in map" << std::endl; fflush(stdout);
+      _leftoverRequestToBeCleaned.insert(requestId);
+    } else {
+      // std::cout << "[DEBUG] list size is = " << _reqRingMap[requestId].size() << std::endl;
+    }
+
+    return _reqRingMap[requestId];
   }
 
   bool doesRequestIdExistInRingMap(uint64_t requestId) {
-    return this->_reqRingMap[threadFsTid].count(requestId) != 0 &&
-      this->_reqRingMap[threadFsTid][requestId].size() != 0;
+    ReadLock r_lock(_reqRingMapLock);
+    return _reqRingMap.count(requestId) != 0;
   }
 
   // Assumes requestId exists
   off_t getFirstRingIdxForRequest(uint64_t requestId) {
-    return this->_reqRingMap[threadFsTid][requestId][0];
+    ReadLock r_lock(_reqRingMapLock);
+    return _reqRingMap[requestId][0];
   }
 
   void removeRequestFromRingMap(uint64_t requestId) {
-    this->_reqRingMap[threadFsTid].erase(requestId);
+    if (_reqRingMap.count(requestId) != 0) {
+      // std::cout << "[DEBUG] Deleted requestId = " << requestId << std::endl;
+      WriteLock w_lock(_reqRingMapLock);
+      _reqRingMap.erase(requestId);
+      return;
+    }
   }
 
+  // NOTE: caller thread specific
+  // TODO: Test
+  uint64_t getLastRequestIdForThread() {
+    ReadLock r_lock(_reqRingMapLock);
+    auto endRequestIdItr = _reqRingMap.lower_bound((threadFsTid + 1) * REQUEST_ID_BASE);
+    if ((--endRequestIdItr) == _reqRingMap.end()) {
+      return 0;
+    } else {
+      return (--endRequestIdItr)->first; // key
+    }
+  }
+
+
+  // NOTE: caller thread specific
+  // TODO: Test
+  std::map<uint64_t, std::vector<off_t>>::iterator getStartIteratorForThread() {
+    ReadLock r_lock(_reqRingMapLock);
+    return _reqRingMap.lower_bound(threadFsTid * REQUEST_ID_BASE);
+  }
+
+  // NOTE: caller thread specific
+  // TODO: Test
+  std::map<uint64_t, std::vector<off_t>>::iterator getEndIteratorForThread() {
+    ReadLock r_lock(_reqRingMapLock);
+    return _reqRingMap.lower_bound((threadFsTid + 1) * REQUEST_ID_BASE);
+  }
+
+  // Note: caller thread specific
+  // Note: This is expensive
+  // TODO: Improve on this
+  // TODO: Test
   std::map<uint64_t, std::vector<off_t>> getReqRingMap() {
-    return this->_reqRingMap[threadFsTid];
+    ReadLock r_lock(_reqRingMapLock);
+    auto startRequestIdItr = getStartIteratorForThread();
+    auto endRequestIdItr = getEndIteratorForThread();
+
+    std::map<uint64_t, std::vector<off_t>> res;
+    for (auto itr = startRequestIdItr; itr != endRequestIdItr; itr++) {
+      res[itr->first] = itr->second;
+    }
+    // return std::copy(startRequestIdItr, endRequestIdItr, res);
+    return res;
   }
 
   void addOffsetToRingMapForRequest(uint64_t requestId, off_t off) {
-    this->_reqRingMap[threadFsTid][requestId].push_back(off);
-  }
-
-  int getRingMapSize() {
-    return this->_reqRingMap[threadFsTid].size();
+    WriteLock w_lock(_reqRingMapLock);
+    this->_reqRingMap[requestId].push_back(off);
   }
 
   // Data Map
   void removeRequestFromDataMap(uint64_t requestId) {
+    WriteLock w_lock(_reqAllocDataMapLock);
     void *buf = this->_reqAllocatedDataMap[requestId];
     this->_reqAllocatedDataMap.erase(requestId);
     fs_free(buf);
   }
 
   void *getRequestBufPtrFromDataMap(uint64_t requestId) {
+    ReadLock r_lock(_reqAllocDataMapLock);
     return this->_reqAllocatedDataMap[requestId];
   }
 
   void addBufPtrToDataMapForRequest(uint64_t requestId, void *buf) {
+    WriteLock w_lock(_reqAllocDataMapLock);
     this->_reqAllocatedDataMap[requestId] = buf;
   }
 
   bool isRequestAnAllocatedType(uint64_t requestId) {
+    ReadLock r_lock(_reqAllocDataMapLock);
     return this->_reqAllocatedDataMap.count(requestId) != 0;
   }
 
@@ -223,12 +298,22 @@ public:
   void detectServerUnavailLoop();
   std::thread detectServerAliveThread;
 
+  int getPendingRequestPercentage() {
+    ReadLock r_lock(_reqRingMapLock);
+    int ret = (_reqRingMap.size() * 100) / 64;
+    // printf("[DEBUG] getPendingRequestPercentage: #reqs = %ld, percent = %d\n", _reqRingMap.size(), ret);
+    return ret;
+  }
+
 private:
   std::vector<bool> _notifyShmForThread;
-  // threadid, requestId, [ring idx offset]
-  std::unordered_map<int, std::map<uint64_t, std::vector<off_t>>> _reqRingMap;
+  // requestId, [ring idx offset]
+  std::map<uint64_t, std::vector<off_t>> _reqRingMap;
+  std::unordered_set<uint64_t> _leftoverRequestToBeCleaned; // create -> pending paradigm 
   std::unordered_map<uint64_t, void *> _reqAllocatedDataMap;
   int _backgroundThreadId = 10000;
+  Lock _reqRingMapLock;
+  Lock _reqAllocDataMapLock;
 };
 
 class PendingQueueMgr {
@@ -237,6 +322,7 @@ class PendingQueueMgr {
   ~PendingQueueMgr();
 
   void init(key_t shmKey);
+  off_t shmipc_mgr_alloc_slot_pending(struct shmipc_mgr *mgr);
   off_t enqueuePendingMsg(struct shmipc_msg* msgSrc);
   template <typename T>   
   void enqueuePendingXreq(T *opSrc, off_t idx);
@@ -252,6 +338,22 @@ class PendingQueueMgr {
 
   struct shmipc_mgr *getShmManager();
 
+  // TODO: Del later
+  int getCountOfEmptySlots() {
+    int count = 0;
+    for (int i = 0; i < 64; i++) {
+      auto msg = IDX_TO_MSG(queue_shmipc_mgr, i);
+      if (msg->status == shmipc_STATUS_EMPTY) {
+        count++;
+      } else {
+        // std::cout << "[DEBUG] off " << i << " is NOT EMPTY" << std::endl;
+        // std::cout << "[DEBUG] has status =  " << unsigned(msg->status) << std::endl;
+      }
+    }
+
+    return count;
+  }
+  
  private:
   struct shmipc_mgr *queue_shmipc_mgr = NULL;
 };
@@ -520,5 +622,6 @@ ssize_t fs_allocated_read_internal_common(int fd, void *buf, size_t count,
 // =======
 
 void clean_up_notify_msg_from_server(bool shouldSleep = true);
+void clean_up_notify_internal(shmipc_mgr *mgr, off_t ringIdx);
 
 #endif  // CFS_FSLIBAPP_H

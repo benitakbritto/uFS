@@ -274,7 +274,7 @@ off_t shmipc_mgr_alloc_slot_client(struct shmipc_mgr *mgr, int *isNotify) {
     rmsg = IDX_TO_MSG(mgr, ring_idx);
 
     if (rmsg->status == shmipc_STATUS_NOTIFY_FOR_CLIENT) {
-      printf("[DEBUG] notify status at ring idx %d\n", ring_idx);
+      // printf("[DEBUG] notify status at ring idx %d\n", ring_idx);
       *isNotify = 1;
       return ring_idx;
     }

@@ -641,10 +641,10 @@ int FsLibMemMng::init(bool initShm) {
     shmidVec_[i] = -1;
     shmFnameVec_[i] = shmNameStr;
   }
-  fprintf(stdout,
-          "FsLibMemMng:init() will create FsLibLinearListsAllocator "
-          "threadFsTid: %d\n",
-          memMngId_);
+  // fprintf(stdout,
+  //         "FsLibMemMng:init() will create FsLibLinearListsAllocator "
+  //         "threadFsTid: %d\n",
+  //         memMngId_);
   bufferAllocator_ = new FsLibLinearListsAllocator(kBlockSizeNum, kBlockSizeArr,
                                                    bufferMemArrVec_);
 
@@ -766,10 +766,10 @@ void *shmOpenInit(int &fd, std::string &shmNameStr, uint64_t sizeBytes,
   auto shmName = shmNameStr.c_str();
   int shmFd = shm_open(shmName, O_CREAT | O_EXCL | O_RDWR, 0666);
   if (shmFd < 0) {
-    fprintf(stderr,
-            "shm_open(O_CREAT, %s) fail warning (will go on to attach) "
-            "error:%s. \n",
-            shmName, strerror(errno));
+    // fprintf(stderr,
+    //         "shm_open(O_CREAT, %s) fail warning (will go on to attach) "
+    //         "error:%s. \n",
+    //         shmName, strerror(errno));
     if (errno != EEXIST) {
       err = 1;
       return nullptr;

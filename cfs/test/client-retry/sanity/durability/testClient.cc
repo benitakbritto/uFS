@@ -1,9 +1,3 @@
-// Try 64 requests for each fs_call
-// Try with crash and without crash
-// Test till fs_malloc is filled
-// Test with two worker client threads
-// Improve file bench
-
 // TODO: Update the pending count since the addition of the threshold
 #include <assert.h>
 #include <fcntl.h>

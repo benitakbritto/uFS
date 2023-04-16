@@ -2689,14 +2689,14 @@ void FsProcWorker::opStatsAccountSingleOpDone(FsReqType reqType, size_t bytes) {
 }
 
 void FsProcWorker::notifyAllWriteOps() {
-  std::cout << "[DEBUG] Inside " << __func__ << std::endl;
+  // std::cout << "[DEBUG] Inside " << __func__ << std::endl;
   for (auto &[appPid, inodeReqMap]: flushPendingDataOpMap) {
     // put msg in ring buff
     struct shmipc_msg msg;
     off_t ring_idx;
     memset(&msg, 0, sizeof(msg));
     ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
-    std::cout << "[DEBUG] ring_idx = " << ring_idx << std::endl;
+    // std::cout << "[DEBUG] ring_idx = " << ring_idx << std::endl;
 
     // fill xreq
     struct NotifyMsg* xreq = (struct NotifyMsg *) IDX_TO_XREQ(appMap[appPid]->shmipc_mgr, ring_idx);
@@ -2709,7 +2709,7 @@ void FsProcWorker::notifyAllWriteOps() {
       }
     }
 
-    std::cout << "[DEBUG] xreq->count = " << xreq->count << std::endl;
+    // std::cout << "[DEBUG] xreq->count = " << xreq->count << std::endl;
     shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, 
         ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
   } 
@@ -2719,14 +2719,14 @@ void FsProcWorker::notifyAllWriteOps() {
 }
 
 void FsProcWorker::notifyAllMetadataOps() {
-  std::cout << "[DEBUG] Inside " << __func__ << std::endl;
+  // std::cout << "[DEBUG] Inside " << __func__ << std::endl;
   for (auto &[appPid, inodeReqMap]: flushPendingMetadataOpMap) {
     // put msg in ring buff
     struct shmipc_msg msg;
     off_t ring_idx;
     memset(&msg, 0, sizeof(msg));
     ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
-    std::cout << "[DEBUG] ring_idx = " << ring_idx << std::endl;
+    // std::cout << "[DEBUG] ring_idx = " << ring_idx << std::endl;
 
     // fill xreq
     struct NotifyMsg* xreq = (struct NotifyMsg *) IDX_TO_XREQ(appMap[appPid]->shmipc_mgr, ring_idx);
@@ -2739,7 +2739,7 @@ void FsProcWorker::notifyAllMetadataOps() {
       }
     }
 
-    std::cout << "[DEBUG] xreq->count = " << xreq->count << std::endl;
+    // std::cout << "[DEBUG] xreq->count = " << xreq->count << std::endl;
     shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, 
         ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
   } 
@@ -2749,7 +2749,7 @@ void FsProcWorker::notifyAllMetadataOps() {
 }
 
 void FsProcWorker::notifyFileWriteOps(cfs_ino_t inodeNum) {
-  std::cout << "[DEBUG] Inside " << __func__ << std::endl;
+  // std::cout << "[DEBUG] Inside " << __func__ << std::endl;
   for (auto &[appPid, inodeReqMap]: flushPendingDataOpMap) {
     auto itr = inodeReqMap.find(inodeNum);
     if (itr != inodeReqMap.end()) {
@@ -2780,9 +2780,8 @@ void FsProcWorker::notifyFileWriteOps(cfs_ino_t inodeNum) {
   }  
 }
 
-// TODO: Add all requests in one msg in the xreq section
 void FsProcWorker::notifyFileMetadataOps(cfs_ino_t inodeNum) {
-  std::cout << "[DEBUG] Inside " << __func__ << std::endl;
+  // std::cout << "[DEBUG] Inside " << __func__ << std::endl;
   for (auto &[appPid, inodeReqMap]: flushPendingMetadataOpMap) {
     auto itr = inodeReqMap.find(inodeNum);
     if (itr != inodeReqMap.end()) {
@@ -2798,7 +2797,7 @@ void FsProcWorker::notifyFileMetadataOps(cfs_ino_t inodeNum) {
         xreq->count = (itr->second).size();
         int i = 0;
         for (auto listItr = itr->second.begin(); listItr != itr->second.end(); listItr++) {
-          std::cout << "[DEBUG] req = " << *listItr << std::endl;
+          // std::cout << "[DEBUG] req = " << *listItr << std::endl;
           xreq->requestIdList[i++] = *listItr;
         }
 

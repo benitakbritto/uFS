@@ -48,10 +48,8 @@
 /* #region macros */
 // if enabled, will print each api invocation
 // #define _CFS_LIB_PRINT_REQ_
-#define LDB_PRINT_CALL
-#define COULDNT_ACQUIRE_LOCK -100000
-// TODO: Remove this later
-#define _SHMIPC_DBG_
+// #define LDB_PRINT_CALL
+// #define _SHMIPC_DBG_
 /* #endregion macros */
 
 /* #region FS global variables */
@@ -3938,7 +3936,7 @@ retry:
   auto service = getFsServiceForFD(fd, wid);
   // ssize_t rc = fs_allocated_read_internal(service, fd, buf, count);
   auto offset = service->getOffset(fd);
-  std::cout << "[DEBUG] offset = " << offset << std::endl;
+  // std::cout << "[DEBUG] offset = " << offset << std::endl;
   ssize_t rc = fs_allocated_pread_internal(service, fd, buf, count, offset, requestId, isNotifyRetry);
   if (rc < 0) {
     if (handle_inode_in_transfer(static_cast<int>(rc))) goto retry;

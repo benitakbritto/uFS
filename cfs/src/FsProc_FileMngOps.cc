@@ -724,11 +724,9 @@ void FileMng::UnlinkOp::ProcessReq(FileMng *mng, FsReq *req) {
     auto curState = req->getState();
     switch (curState) {
       case FsReqState::UNLINK_PRIMARY_LOAD_PRT_INODE:
-        std::cout << "UNLINK_PRIMARY_LOAD_PRT_INODE" << std::endl;
         UnlinkOp::PrimaryLoadParentInode(mng, req);
         break;
       case FsReqState::UNLINK_PRIMARY_GET_FILE_INUM:
-        std::cout << "UNLINK_PRIMARY_GET_FILE_INUM" << std::endl;
         UnlinkOp::PrimaryGetFileInum(mng, req);
         break;
       case FsReqState::UNLINK_PRIMARY_LOAD_INODE:
@@ -744,11 +742,9 @@ void FileMng::UnlinkOp::ProcessReq(FileMng *mng, FsReq *req) {
         UnlinkOp::PrimaryHandoffToOwner(mng, req);
         break;
       case FsReqState::UNLINK_PRIMARY_RETRY:
-        std::cout << "UNLINK_PRIMARY_RETRY" << std::endl;
         UnlinkOp::PrimaryHandleRetry(mng, req);
         break;
       case FsReqState::UNLINK_ERR:
-        std::cout << "UNLINK_ERR" << std::endl;
         UnlinkOp::PrimaryHandleError(mng, req);
         return;  // <-- early return
       default:

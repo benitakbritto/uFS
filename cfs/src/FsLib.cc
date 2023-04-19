@@ -2735,11 +2735,12 @@ int fs_unlink_internal(FsService *fsServ, const char *pathname, uint64_t request
   unlkop = (struct unlinkOp *)IDX_TO_XREQ(fsServ->shmipc_mgr, ring_idx);
   prepare_unlinkOp(&msg, unlkop, pathname, requestId);
 
-  if (!gServMngPtr->retryMgr->doesRequestIdExistInRingMap(requestId)) {
-    auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
-    gServMngPtr->queueMgr->enqueuePendingXreq<struct unlinkOp>(unlkop, off);
-    gServMngPtr->retryMgr->addOffsetToRingMapForRequest(requestId, off);
-  }
+  // It is a sync op
+  // if (!gServMngPtr->retryMgr->doesRequestIdExistInRingMap(requestId)) {
+  //   auto off = gServMngPtr->queueMgr->enqueuePendingMsg(&msg);
+  //   gServMngPtr->queueMgr->enqueuePendingXreq<struct unlinkOp>(unlkop, off);
+  //   gServMngPtr->retryMgr->addOffsetToRingMapForRequest(requestId, off);
+  // }
 
   // shmipc_mgr_put_msg(fsServ->shmipc_mgr, ring_idx, &msg);
   if (shmipc_mgr_put_msg_with_timeout(fsServ->shmipc_mgr, ring_idx, 

@@ -33,8 +33,7 @@ int callOpen(std::string path);
 int getReadFileInode(int index, int threadId);
 int getWriteFileInode(int index, int threadId);
 int readFile(int index, int fileSize, int ioSize, int threadId);
-int appendToFile(int index, int fileSize, int ioSize, char *buf, 
-  int threadId);
+int overwriteFile(int index, int fileSize, int ioSize, int threadId);
 int closeFile(int ino);
 int runTask(int threadId, int numFilesPerDir, int readFileSize, 
   int writeFileSize, int ioSize, int type);
@@ -85,7 +84,7 @@ int readFile(int index, int fileSize, int ioSize, int threadId) {
 
   int iterations = (fileSize * ONE_MB) / ioSize;
   for (int j = 0; j < iterations; j++) {
-    auto ret = fs_allocated_read(ino, buf, ioSize);
+    auto ret = fs_allocated_pread(ino, buf, ioSize, j * ioSize);
     if (ret != ioSize) {
       fprintf(stderr, "fs_allocated_read() failed. Received %ld\n", 
         ret);
@@ -93,7 +92,7 @@ int readFile(int index, int fileSize, int ioSize, int threadId) {
     }
   }
 
-  fs_free(buf);
+  // fs_free(buf);
 
   if (closeFile(ino) != 0) {
     return -1;
@@ -111,14 +110,18 @@ int closeFile(int ino) {
   return 0;
 }
 
-int appendToFile(int index, int fileSize, int ioSize, char *buf, 
-  int threadId) {
-  int ino = getWriteFileInode(index, threadId);
+int overwriteFile(int index, int fileSize, int ioSize, int threadId) {
+  int ino = getReadFileInode(index, threadId);
 
   int iterations = (fileSize * ONE_MB) / ioSize;
+
+  char* buf = (char *) fs_malloc(ioSize + 1);
+  memset(buf, 0, ioSize + 1);
+  memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
  
   for (int i = 0; i < iterations; i++) {
-    if (fs_allocated_write(ino, buf, ioSize) != ioSize) {
+    // std::cout << "[DEBUG] i = " << i << std::endl;
+    if (fs_allocated_pwrite(ino, buf, ioSize, i * ioSize) != ioSize) {
       fprintf(stderr, "fs_allocated_write() failed.\n");
       return -1;
     } 
@@ -127,21 +130,14 @@ int appendToFile(int index, int fileSize, int ioSize, char *buf,
   if (closeFile(ino) != 0) {
     return -1;
   }
+
+  // fs_free(buf);
   
   return 0;
 }
 
 int runTask(int threadId, int numFilesPerDir, int readFileSize, 
   int writeFileSize, int ioSize, int type) {
-  
-  // setup buffers
-  char *bufWrite = nullptr;
-  
-  if (type == TestCase::READ_WRITE) {
-    bufWrite = (char *) fs_malloc(ioSize + 1);
-    memset(bufWrite, 0, ioSize + 1);
-    memcpy(bufWrite, generateString("a", ioSize).c_str(), ioSize);
-  }
 
   for (int i = 0; i < numFilesPerDir; i++) {
     // Read whole file in IO_SIZE chunks
@@ -150,7 +146,7 @@ int runTask(int threadId, int numFilesPerDir, int readFileSize,
     }
 
     if (type == TestCase::READ_WRITE) {
-      if (appendToFile(i, writeFileSize, ioSize, bufWrite, threadId) == -1) {
+      if (overwriteFile(i, writeFileSize, ioSize, threadId) == -1) {
         return -1;
       }
     }

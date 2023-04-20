@@ -1,34 +1,34 @@
 #!/bin/sh
 
 # Workload: webserver-ro
-echo "Read only"
-for thread in $(seq 1 5); do
-    echo "Running Workload: webserver-ro threads = $thread"
-    for run in $(seq 1 5); do
-        echo "run = {$run}"
-        sleep 10
-        EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/workload/webserver
-        $EXECUTABLE -p 1,3 -n $thread -f 2 -r 100 -i 1024 -t 0
-
-        # kill server
-        sudo killall fsMain
-    done
-done
-
-# Workload: webserver-rw
-# echo "Read write"
-# for thread in $(seq 1 6); do
-#     echo "Running Workload: webserver-rw threads = $thread"
+# echo "Read only"
+# for thread in $(seq 1 5); do
+#     echo "Running Workload: webserver-ro threads = $thread"
 #     for run in $(seq 1 5); do
 #         echo "run = {$run}"
 #         sleep 10
 #         EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/workload/webserver
-#         $EXECUTABLE -p 1,3 -n $thread -f 10 -r 1 -w 10 -i 1024 -t 1
+#         $EXECUTABLE -p 1,3 -n $thread -f 2 -r 100 -i 1024 -t 0
 
 #         # kill server
 #         sudo killall fsMain
 #     done
 # done
+
+# Workload: webserver-rw
+echo "Read write"
+for thread in $(seq 4 5); do
+    echo "Running Workload: webserver-rw threads = $thread"
+    for run in $(seq 1 5); do
+        echo "run = {$run}"
+        sleep 10
+        EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/workload/webserver
+        $EXECUTABLE -p 1,3 -n $thread -f 2 -r 100 -w 100 -i 1024 -t 1
+
+        # kill server
+        sudo killall fsMain
+    done
+done
 
 
 # Workload: varmail

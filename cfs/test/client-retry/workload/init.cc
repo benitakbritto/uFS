@@ -12,10 +12,11 @@
  * MACROS
  *****************************************************************************/
 #define ONE_KB 1024
+#define IO_SIZE (4 * ONE_KB)
 #define ONE_MB (1024 * 1024)
 #define DIR_PREFIX "dir"
-#define WRITE_FILE_PREFIX "f"
-#define CREATE_FILE_PREFIX "appendlog"
+#define READ_FILE_PREFIX "f"
+#define WRITE_FILE_PREFIX "appendlog"
 
 /******************************************************************************
  * GLOBALS
@@ -48,7 +49,7 @@ int runInitWebserver(int numDirs, int numFilesPerDir, int fileSize) {
     printf("[INFO] Created dir %s\n", dirName.c_str());
 
     for (int f = 0; f < numFilesPerDir; f++) {
-      std::string fileName = WRITE_FILE_PREFIX + std::to_string(f);
+      std::string fileName = READ_FILE_PREFIX + std::to_string(f);
       auto ino = fs_open((dirName + "/" + fileName).c_str(), O_CREAT, 0644);
       if (ino <= 0) {
         fprintf(stderr, "fs_open() failed\n");
@@ -57,16 +58,16 @@ int runInitWebserver(int numDirs, int numFilesPerDir, int fileSize) {
 
       printf("[INFO] Created file %s\n", (dirName + "/" + fileName).c_str());
 
-      char *buf = (char *) fs_malloc(ONE_KB + 1);
+      char *buf = (char *) fs_malloc(IO_SIZE + 1);
       assert(buf != nullptr);
-      memset(buf, 0, ONE_KB + 1);
-      memcpy(buf, generateString("a", ONE_KB).c_str(), ONE_KB);
+      memset(buf, 0, IO_SIZE + 1);
+      memcpy(buf, generateString("a", IO_SIZE).c_str(), IO_SIZE);
     
       int offset = 0;
-      int chunks = (fileSize  * ONE_MB) / ONE_KB;
+      int chunks = (fileSize  * ONE_MB) / IO_SIZE;
       for (int i = 0; i < chunks; i++) {
-        if (fs_allocated_pwrite(ino, (void *) buf, ONE_KB, i * ONE_KB) 
-          != ONE_KB) {
+        if (fs_allocated_pwrite(ino, (void *) buf, IO_SIZE, i * IO_SIZE) 
+          != IO_SIZE) {
           fprintf(stderr, 
             "fs_allocated_pwrite() failed at d = %d, f = %d and i = %d\n", 
             d, f, i);
@@ -78,14 +79,14 @@ int runInitWebserver(int numDirs, int numFilesPerDir, int fileSize) {
       fs_free(buf);
 
       // Create empty files
-      auto inoCreat = fs_open((dirName + "/" + CREATE_FILE_PREFIX + std::to_string(f)).c_str(), 
-        O_CREAT, 0644);
-      if (inoCreat <= 0) {
-        fprintf(stderr, "fs_open() failed\n");
-        return -1; // failure
-      }
+      // auto inoCreat = fs_open((dirName + "/" + WRITE_FILE_PREFIX + std::to_string(f)).c_str(), 
+      //   O_CREAT, 0644);
+      // if (inoCreat <= 0) {
+      //   fprintf(stderr, "fs_open() failed\n");
+      //   return -1; // failure
+      // }
 
-      printf("[INFO] Created file %s\n", (dirName + "/" + CREATE_FILE_PREFIX + std::to_string(f)).c_str());
+      // printf("[INFO] Created file %s\n", (dirName + "/" + WRITE_FILE_PREFIX + std::to_string(f)).c_str());
     }
 
     fs_syncall();
@@ -105,7 +106,7 @@ int runInitVarmail(int numDirs, int numFilesPerDir, int fileSize) {
     printf("[INFO] Created dir %s\n", dirName.c_str());
 
     for (int f = 0; f < numFilesPerDir; f++) {
-      std::string fileName = WRITE_FILE_PREFIX + std::to_string(f);
+      std::string fileName = READ_FILE_PREFIX + std::to_string(f);
       auto ino = fs_open((dirName + "/" + fileName).c_str(), O_CREAT, 0644);
       if (ino <= 0) {
         fprintf(stderr, "fs_open() failed\n");

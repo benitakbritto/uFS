@@ -227,7 +227,7 @@ const int kFsPerExtShareArr[] = {1, 639, 0, 0, 0, 0};  // levelDB
 const int kFsPerExtShareArr[] = {20, 200, 10,
                                  10, 10,  10};  // filebench
 #else
-const int kFsPerExtShareArr[] = {1, 1, 4, 8, 16, 20};  // micro-bench@bumble
+const int kFsPerExtShareArr[] = {20, 200, 10, 10, 10,  10};  // micro-bench@bumble
 #endif
 
 const int kFsExtArrShareSum = kFsPerExtShareArr[0] + kFsPerExtShareArr[1] +

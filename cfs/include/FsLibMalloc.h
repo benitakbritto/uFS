@@ -359,7 +359,7 @@ class FsLibMemMng {
 #elif defined(_EXTENT_FOR_FILEBENCH_)
       1UL * 1024 * 1024 * 1024, /* 1G for 8K pages*/
 #else
-      256 * 1024 * 1024, /* 256M for 8K pages*/
+      1UL * 1024 * 1024 * 1024, /* 256M for 8K pages*/
 #endif
       128 * 1024 * 1024, /* 128 M for 48K pages*/
       8 * 1024 * 1024,   /* 8 M for 2M pages*/

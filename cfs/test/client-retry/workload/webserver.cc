@@ -15,7 +15,6 @@
 #define WRITE_FILE_PREFIX "appendlog"
 #define ONE_KB 1024
 #define ONE_MB (ONE_KB * ONE_KB)
-#define WRITE_SIZE_PER_FILE (5 * ONE_KB)
 
 /******************************************************************************
  * GLOBALS
@@ -28,51 +27,31 @@ enum TestCase {
 /******************************************************************************
  * PROTOTYPES
  *****************************************************************************/
-std::string getReadFilePath(int index, int numFilesPerDir);
-std::string getWriteFilePath(int index, int numFilesPerDir);
-int getTotalNumOfFiles(int numDirs, int numFilesPerDir);
-int getNumFilesPerThread(int numThreads, int numDirs, int numFilesPerDir);
-int getReadFileInode(int index, int numFilesPerDir);
-int getWriteFileInode(int index, int numFilesPerDir);
-int readFile(int ino, int fileSize, int ioSize);
-int closeFile(int ino);
-int appendToFile(int index, int numFilesPerDir, int ioSize);
+std::string getReadFilePath(int index, int threadId);
+std::string getWriteFilePath(int index, int threadId);
 int callOpen(std::string path);
-void printUsage(char *executableName);
-
-int runTask(int startIndex, int endIndex, int numFilesPerDir, 
-  int fileSize, int ioSize, int type);
-int runWorkload(int numThreads, int numDirs, int numFilesPerDir, int fileSize, 
-  int ioSize, int type);
-
+int getReadFileInode(int index, int threadId);
+int getWriteFileInode(int index, int threadId);
+int readFile(int index, int fileSize, int ioSize, int threadId);
+int appendToFile(int index, int fileSize, int ioSize, char *buf, 
+  int threadId);
+int closeFile(int ino);
+int runTask(int threadId, int numFilesPerDir, int readFileSize, 
+  int writeFileSize, int ioSize, int type);
+int runWorkload(int numThreads, int numFilesPerDir, int readFileSize, 
+  int writeFileSize, int ioSize, int type);
 /******************************************************************************
  * DRIVER
  *****************************************************************************/
 
-// Assumption: equal number of files in every directory
-std::string getReadFilePath(int index, int numFilesPerDir) {
-  int dirNum = index / numFilesPerDir;
-  int fileNum = index % numFilesPerDir;
-
-  return DIR_PREFIX + std::to_string(dirNum) 
-    + "/" + READ_FILE_PREFIX + std::to_string(fileNum); 
+std::string getReadFilePath(int index, int threadId) {
+  return DIR_PREFIX + std::to_string(threadId) 
+    + "/" + READ_FILE_PREFIX + std::to_string(index); 
 }
 
-std::string getWriteFilePath(int index, int numFilesPerDir) {
-  int dirNum = index / numFilesPerDir;
-  int fileNum = index % numFilesPerDir;
-
-  return DIR_PREFIX + std::to_string(dirNum) 
-    + "/" + WRITE_FILE_PREFIX + std::to_string(fileNum); 
-}
-
-int getTotalNumOfFiles(int numDirs, int numFilesPerDir) {
-  return numDirs * numFilesPerDir;
-}
-
-int getNumFilesPerThread(int numThreads, int numDirs, 
-  int numFilesPerDir) {
-  return getTotalNumOfFiles(numDirs, numFilesPerDir) / numThreads;
+std::string getWriteFilePath(int index, int threadId) {
+  return DIR_PREFIX + std::to_string(threadId) 
+    + "/" + WRITE_FILE_PREFIX + std::to_string(index); 
 }
 
 int callOpen(std::string path) {
@@ -85,20 +64,25 @@ int callOpen(std::string path) {
   return ino;
 }
 
-int getReadFileInode(int index, int numFilesPerDir) {
-  std::string path = getReadFilePath(index, numFilesPerDir);
+int getReadFileInode(int index, int threadId) {
+  std::string path = getReadFilePath(index, threadId);
   return callOpen(path);
 }
 
-int getWriteFileInode(int index, int numFilesPerDir) {
-  std::string path = getWriteFilePath(index, numFilesPerDir);
+int getWriteFileInode(int index, int threadId) {
+  std::string path = getWriteFilePath(index, threadId);
   return callOpen(path);
 }
 
-int readFile(int ino, int fileSize, int ioSize) {
+int readFile(int index, int fileSize, int ioSize, int threadId) {
+  int ino = getReadFileInode(index, threadId);
+  if (ino == 0) {
+    return -1;
+  }
+
   char *buf = (char *) fs_malloc(ioSize + 1);
   memset(buf, 0, ioSize + 1);
-  
+
   int iterations = (fileSize * ONE_MB) / ioSize;
   for (int j = 0; j < iterations; j++) {
     auto ret = fs_allocated_read(ino, buf, ioSize);
@@ -110,6 +94,11 @@ int readFile(int ino, int fileSize, int ioSize) {
   }
 
   fs_free(buf);
+
+  if (closeFile(ino) != 0) {
+    return -1;
+  }
+
   return 0;
 }
 
@@ -122,44 +111,46 @@ int closeFile(int ino) {
   return 0;
 }
 
-int appendToFile(int index, int numFilesPerDir, int ioSize) {
-  int ino = getWriteFileInode(index, numFilesPerDir);
+int appendToFile(int index, int fileSize, int ioSize, char *buf, 
+  int threadId) {
+  int ino = getWriteFileInode(index, threadId);
 
-  int iterations = WRITE_SIZE_PER_FILE / ioSize;
-  char *buf = (char *) fs_malloc(ioSize + 1);
-  assert(buf != nullptr);
-  memset(buf, 0, ioSize + 1);
-  memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
-
+  int iterations = (fileSize * ONE_MB) / ioSize;
+ 
   for (int i = 0; i < iterations; i++) {
     if (fs_allocated_write(ino, buf, ioSize) != ioSize) {
       fprintf(stderr, "fs_allocated_write() failed.\n");
       return -1;
     } 
   }  
+
+  if (closeFile(ino) != 0) {
+    return -1;
+  }
   
   return 0;
 }
 
-int runTask(int startIndex, int endIndex, int numFilesPerDir, 
-  int fileSize, int ioSize, int type) {
-  for (int i = startIndex; i < endIndex; i++) {
-    int ino = getReadFileInode(i, numFilesPerDir);
-    if (ino == 0) {
-      return -1;
-    }
-
-    // Read whole file in IO_SIZE chunks
-    if (readFile(ino, fileSize, ioSize) == -1) {
-      return -1;
-    }
-
-    if (closeFile(ino) == -1) {
-      return -1;
-    }
+int runTask(int threadId, int numFilesPerDir, int readFileSize, 
+  int writeFileSize, int ioSize, int type) {
   
+  // setup buffers
+  char *bufWrite = nullptr;
+  
+  if (type == TestCase::READ_WRITE) {
+    bufWrite = (char *) fs_malloc(ioSize + 1);
+    memset(bufWrite, 0, ioSize + 1);
+    memcpy(bufWrite, generateString("a", ioSize).c_str(), ioSize);
+  }
+
+  for (int i = 0; i < numFilesPerDir; i++) {
+    // Read whole file in IO_SIZE chunks
+    if (readFile(i, readFileSize, ioSize, threadId) == -1) {
+      return -1;
+    }
+
     if (type == TestCase::READ_WRITE) {
-      if (appendToFile(i, numFilesPerDir, ioSize) == -1) {
+      if (appendToFile(i, writeFileSize, ioSize, bufWrite, threadId) == -1) {
         return -1;
       }
     }
@@ -169,20 +160,18 @@ int runTask(int startIndex, int endIndex, int numFilesPerDir,
   return 0;
 }
 
-int runWorkload(int numThreads, int numDirs, 
-  int numFilesPerDir, int fileSize, int ioSize, int type) {
+int runWorkload(int numThreads, int numFilesPerDir, int readFileSize, 
+  int writeFileSize, int ioSize, int type) {
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   std::future<int> workers[numThreads];
-
-  int filesPerThread = getNumFilesPerThread(numThreads, numDirs, numFilesPerDir);
 
   for (int i = 0; i < numThreads; i++) {
     workers[i] = std::async(
       runTask, 
-      filesPerThread * i /*start*/, 
-      filesPerThread * (i + 1) /*end non-inclusive*/,
-      numFilesPerDir, 
-      fileSize,
+      i,
+      numFilesPerDir,
+      readFileSize,
+      writeFileSize,
       ioSize,
       type); 
   }
@@ -203,8 +192,8 @@ int runWorkload(int numThreads, int numDirs,
 
 void printUsage(char *executableName) {
   printf("Usage: %s -p <pid1, ..> " \ 
-    "-d <numDirs> -f <numFilesPerDir>" \
-    "-s <fileSize MB> -i <ioSize B>" \
+    "-f <numFilesPerDir> -r <read fileSize MB>" \
+    "-w <write fileSize MB> -i <ioSize B>" \
     "-t <0: ro, 1: rw>\n",
     executableName);
 }
@@ -214,12 +203,13 @@ int main(int argc, char **argv) {
   char c = '\0';
   std::string pids = "";
   int numThreads = 1;
-  int numDirs = 1;
   int numFilesPerDir = 1;
-  int fileSize = 1;
+  int readFileSize = 1;
+  int writeFileSize = 1;
   int ioSize = 1;
   int type = 1;
-  while ((c = getopt(argc, argv, "p:n:f:s:i:t:h")) != -1) {
+
+  while ((c = getopt(argc, argv, "p:n:f:r:w:i:t:h")) != -1) {
     switch (c) {
       case 'p':
         pids = std::string(optarg);
@@ -230,8 +220,11 @@ int main(int argc, char **argv) {
       case 'f':
         numFilesPerDir = std::stoi(optarg);
         break;
-      case 's':
-        fileSize = std::stoi(optarg);
+      case 'r':
+        readFileSize = std::stoi(optarg);
+        break;
+      case 'w':
+        writeFileSize = std::stoi(optarg);
         break;
       case 'i':
         ioSize = std::stoi(optarg);
@@ -254,8 +247,8 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  if (runWorkload(numThreads, numDirs, numFilesPerDir, 
-    fileSize, ioSize, type) != 0) {
+  if (runWorkload(numThreads, numFilesPerDir, readFileSize, 
+    writeFileSize, ioSize, type) != 0) {
     fprintf(stderr, "runWorkload failed\n");
     exit(1);
   }
@@ -263,5 +256,6 @@ int main(int argc, char **argv) {
   if (fs_exit() != 0) {
     fprintf(stderr, "exit failed\n");
   }
+  
   return 0;
 }

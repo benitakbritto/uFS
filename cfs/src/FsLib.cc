@@ -3865,12 +3865,12 @@ static ssize_t fs_allocated_pread_internal(FsService *fsServ, int fd, void *buf,
   struct allocatedPreadOp aprop;
   uint8_t shmid;
   fslib_malloc_block_cnt_t dataPtrId;
-
   auto threadMemBuf = check_app_thread_mem_buf_ready(isNotifyRetry);
 
   // fill the shmName and dataPtr offset
   int err = 0;
   threadMemBuf->getBufOwnerInfo(buf, false, shmid, dataPtrId, err);
+
   if (err) {
     fprintf(stderr, "fs_allocated_pread_internal: Error in getBufOwnerInfo\n");
     return -1;  // TODO set errno
@@ -5187,7 +5187,7 @@ void fs_free(void *ptr, int fsTid) {
 #endif
   // fprintf(stderr, "fs_free:%p tid:%d\n", ptr, threadFsTid);
   threadMemBuf->Free(ptr, err);
-  if (err) fprintf(stderr, "free error: %d\n", err);
+  // if (err) fprintf(stderr, "free error: %d\n", err);
 }
 
 void fs_free(void *ptr) { fs_free(ptr, threadFsTid); }

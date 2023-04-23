@@ -387,7 +387,38 @@ void FileMng::blockingStoreInode(cfs_ino_t inum) {
   return;
 }
 
+std::unordered_map<pid_t, std::vector<uint64_t>> FileMng::exportPendingOpsForInum(cfs_ino_t inum) {
+  std::cout << "[DEBUG] Inside " << __func__ << "\t" << "inum = " << inum << std::endl;
+  std::unordered_map<pid_t, std::vector<uint64_t>> res;
+  for (auto &[pid, inodeMap] : fsWorker_->flushPendingOpMap) {
+    auto itr = fsWorker_->flushPendingOpMap[pid].find(inum);
+    if (itr != fsWorker_->flushPendingOpMap[pid].end()) {
+      res[pid] = fsWorker_->flushPendingOpMap[pid][inum];
+      fsWorker_->flushPendingOpMap[pid].erase(inum);
+    }
+  }
 
+  std::cout << "[DEBUG] Inside " << __func__ << "\t" << "res.size = " << res.size() << std::endl;
+  return res;
+}
+
+void FileMng::importPendingOpsForInum(cfs_ino_t inum, const std::unordered_map<pid_t, std::vector<uint64_t>> &pendingOps) {
+  std::cout << "[DEBUG] Inside " << __func__ << "\t" << "inum = " << inum << std::endl;
+  std::cout << "[DEBUG] Inside " << __func__ << "\t" << "pendingOps.size = " << pendingOps.size() << std::endl;
+  for (auto &[pid, reqList] : pendingOps) {
+    fsWorker_->flushPendingOpMap[pid][inum] = reqList;
+  }
+}
+
+// TODO: May not be needed
+// void FileMng::erasePendingOpsForInum(cfs_ino_t inum) {
+//   for (auto &[pid, inodeMap] : fsWorker_->flushPendingOpMap) {
+//     auto itr = fsWorker_->flushPendingOpMap[pid].find(inum);
+//     if (itr != fsWorker_->flushPendingOpMap[pid].end()) {
+//       fsWorker_->flushPendingOpMap[pid].erase(inum);
+//     }
+//   }
+// }
 
 bool FileMng::exportInode(cfs_ino_t inum, ExportedInode &exp) {
   // NOTE: exportInode only exports the inode and removes all state related to
@@ -422,6 +453,9 @@ bool FileMng::exportInode(cfs_ino_t inum, ExportedInode &exp) {
 
   // Exporting block buffers
   splitInodeDataBlockBufferSlot(exp.inode, exp.block_buffers);
+
+  // Export pending ops (durability) for client-retry
+  exp.pendingOps = exportPendingOpsForInum(inum);
 
   bool canReset = exp.inode->setManageWorkerUnknown(exp.exporter_wid);
   assert(canReset);
@@ -466,6 +500,9 @@ void FileMng::importInode(const ExportedInode &exp) {
 #endif
 
   addImportedInodeFdMappings(exp.inode);
+
+  // Import pending ops (durability) for client-retry
+  importPendingOpsForInum(exp.inode->i_no, exp.pendingOps);
 
   if (!exp.block_buffers.empty()) {
     installDataBlockBufferSlot(exp.inode, exp.block_buffers);

@@ -170,6 +170,10 @@ class FileMng {
   std::queue<FsReq *> syncunlinked_requests_;
 
   // Import/Export inodes
+  std::unordered_map<pid_t, std::vector<uint64_t>> exportPendingOpsForInum(cfs_ino_t inum);
+  void importPendingOpsForInum(cfs_ino_t inum, const std::unordered_map<pid_t, std::vector<uint64_t>> &pendingOps);
+  void erasePendingOpsForInum(cfs_ino_t inum);
+
   bool exportInode(cfs_ino_t inode, ExportedInode &exp);
   void importInode(const ExportedInode &exp);
   // Helper functions for import/export of file descriptor mappings

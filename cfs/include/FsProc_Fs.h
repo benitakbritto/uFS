@@ -766,6 +766,10 @@ class FsProcWorker {
 
   void providerPidToApp(pid_t appPid);
 
+  // client state of pending ops
+  std::unordered_map<pid_t, 
+    std::unordered_map<cfs_ino_t, std::vector<uint64_t>>> flushPendingOpMap;
+
  protected:
   FsProc::fsproc_wid_t wid;
   int shmBaseOffset;
@@ -773,11 +777,6 @@ class FsProcWorker {
   uint64_t loopCountBeforeCheckExit;
   std::thread *acceptHandler;
   int pinnedCPUCore{-1};
-
-  // client state of pending ops
-  std::unordered_map<pid_t, 
-    std::unordered_map<cfs_ino_t, std::vector<uint64_t>>> flushPendingOpMap;
-
 
   // fileManger will execute FS functionality (~= VFS layer)
   FileMng *fileManager;

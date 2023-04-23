@@ -235,6 +235,7 @@ struct ExportedInode {
   bool in_exporter_journal{false};
 #endif
   std::unordered_set<BlockBufferItem *> block_buffers;
+  std::unordered_map<pid_t, std::vector<uint64_t>> pendingOps;
   // TODO add more state for reassignment
 };
 

@@ -276,48 +276,50 @@ static void dumpAllocatedOpCommon(allocatedOpCommonPacked *alOp) {
 
 // TODO: Del later
 std::vector<int> fs_dump_ring_status() {
-  auto mgr = gServMngPtr->primaryServ->shmipc_mgr;
   std::vector<int> res;
-  for (int i = 0; i < RING_SIZE; i++) {
-    auto msg = IDX_TO_MSG(mgr, i);
-    /*
-    switch(msg->status) {
-      
-      case shmipc_STATUS_EMPTY: {
-        printf("[INFO]: idx = %d, status = EMPTY\n", i);
-        break;
+  for (auto &[wid, fsServ] : gServMngPtr->multiFsServMap) {
+    std::cout << "[DEBUG] This is ring for wid = " << wid << std::endl;
+    auto mgr = fsServ->shmipc_mgr;
+    for (int i = 0; i < RING_SIZE; i++) {
+      auto msg = IDX_TO_MSG(mgr, i);
+      switch(msg->status) {
+        
+        case shmipc_STATUS_EMPTY: {
+          printf("[INFO]: idx = %d, status = EMPTY\n", i);
+          break;
+        }
+        case shmipc_STATUS_RESERVED: {
+          printf("[INFO]: idx = %d, status = RESERVED\n", i);
+          break;
+        }
+        case shmipc_STATUS_READY_FOR_SERVER: {
+          printf("[INFO]: idx = %d, status = READY_FOR_SERVER\n", i);
+          break;
+        }
+        case shmipc_STATUS_IN_PROGRESS: {
+          printf("[INFO]: idx = %d, status = IN_PROGRESS\n", i);
+          break;
+        }
+        case shmipc_STATUS_READY_FOR_CLIENT: {
+          printf("[INFO]: idx = %d, status = READY_FOR_CLIENT\n", i);
+          break;
+        }
+        case shmipc_STATUS_NOTIFY_FOR_CLIENT: {
+          printf("[INFO]: idx = %d, status = NOTIFY_FOR_CLIENT\n", i);
+          break;
+        }
+        case shmipc_STATUS_SERVER_PID_FOR_CLIENT: {
+          printf("[INFO]: idx = %d, status = SERVER_PID_FOR_CLIENT\n", i);
+          break;
+        }
+        default: {
+          printf("[INFO]: idx = %d, status = UNKNOWN\n", i);
+          break;
+        }
+        
       }
-      case shmipc_STATUS_RESERVED: {
-        printf("[INFO]: idx = %d, status = RESERVED\n", i);
-        break;
-      }
-      case shmipc_STATUS_READY_FOR_SERVER: {
-        printf("[INFO]: idx = %d, status = READY_FOR_SERVER\n", i);
-        break;
-      }
-      case shmipc_STATUS_IN_PROGRESS: {
-        printf("[INFO]: idx = %d, status = IN_PROGRESS\n", i);
-        break;
-      }
-      case shmipc_STATUS_READY_FOR_CLIENT: {
-        printf("[INFO]: idx = %d, status = READY_FOR_CLIENT\n", i);
-        break;
-      }
-      case shmipc_STATUS_NOTIFY_FOR_CLIENT: {
-        printf("[INFO]: idx = %d, status = NOTIFY_FOR_CLIENT\n", i);
-        break;
-      }
-      case shmipc_STATUS_SERVER_PID_FOR_CLIENT: {
-        printf("[INFO]: idx = %d, status = SERVER_PID_FOR_CLIENT\n", i);
-        break;
-      }
-      default: {
-        printf("[INFO]: idx = %d, status = UNKNOWN\n", i);
-        break;
-      }
-      
-    }*/
-    res.push_back(msg->status);
+      res.push_back(msg->status);
+    }
   }
 
   return res;
@@ -5146,19 +5148,21 @@ void clean_up_notify_msg_from_server(bool shouldSleep) {
   uint8_t count = 0;
   shmipc_msg msg;
   off_t ringIdx = 0;
-  // TODO: This won't work with multiple servers
-  auto shmipc_mgr = gServMngPtr->primaryServ->shmipc_mgr; 
-  assert(shmipc_mgr != nullptr);
-  // go over entire ring once
-  // std::cout << "[DEBUG] I will run cleanup .. " << threadFsTid << std::endl; fflush(stdout);
-  do {
-    memset(&msg, 0, sizeof(struct shmipc_msg));
-    auto ret = shmipc_mgr_poll_notify_msg(shmipc_mgr, ringIdx, &msg);
-    if (ret != -1) {    
-      clean_up_notify_internal(shmipc_mgr, ringIdx);
-    }
-    ringIdx++;
-  } while (ringIdx < RING_SIZE);
+  // auto shmipc_mgr = gServMngPtr->primaryServ->shmipc_mgr; 
+  for (auto  &[wid, fsService] : gServMngPtr->multiFsServMap) {
+    auto shmipc_mgr = fsService->shmipc_mgr;
+    assert(shmipc_mgr != nullptr);
+    // go over entire ring once
+    // std::cout << "[DEBUG] I will run cleanup .. " << threadFsTid << std::endl; fflush(stdout);
+    do {
+      memset(&msg, 0, sizeof(struct shmipc_msg));
+      auto ret = shmipc_mgr_poll_notify_msg(shmipc_mgr, ringIdx, &msg);
+      if (ret != -1) {    
+        clean_up_notify_internal(shmipc_mgr, ringIdx);
+      }
+      ringIdx++;
+    } while (ringIdx < RING_SIZE);
+  } 
 }
 
 void *fs_malloc(size_t size) {

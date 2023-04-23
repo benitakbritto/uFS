@@ -1,0 +1,21 @@
+Read only
+Running Workload: webserver-ro threads = 1
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+[ERR] did not receive server pid
+run = {2}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+[ERR] did not receive server pid
+run = {3}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+[ERR] did not receive server pid
+run = {4}

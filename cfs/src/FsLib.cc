@@ -10,8 +10,6 @@
 #include <atomic>
 #include <iostream>
 
-
-
 #ifdef _CFS_LIB_PRINT_REQ_
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -70,8 +68,6 @@ static FsLibServiceMng *gServMngPtr = nullptr;
 std::atomic_bool gCleanedUpDone;
 std::atomic_flag gMultiFsServLock = ATOMIC_FLAG_INIT;
 std::recursive_mutex gRetryOpLock;
-// std::atomic_flag gReqRingMapLock = ATOMIC_FLAG_INIT;
-// std::atomic_flag gReqAllocatedDataMapLock = ATOMIC_FLAG_INIT;
 std::mutex gCleanUpNotifyMsgLoopLock;
 
 
@@ -110,6 +106,7 @@ void assignThreadId() {
   if (threadFsTid == 0) {
    threadFsTid = gLibSharedContext->tidIncr++; 
   }
+  gServMngPtr->retryMgr->appendNewLockToReqRingMapLockList();
 }
 
 uint64_t inline getNewRequestId() {
@@ -216,7 +213,7 @@ off_t shmipc_mgr_alloc_slot_wrapper(struct shmipc_mgr *mgr) {
   // ring buffer is full
   // TODO: Fix this
   if (ring_idx == -1) {
-    std::cout << "[DEBUG] ring_idx is -1" << std::endl;
+    // std::cout << "[DEBUG] ring_idx is -1" << std::endl;
     exit(1); // Cannot proceed
   }
 
@@ -781,20 +778,21 @@ static inline off_t shmipc_mgr_alloc_slot_dbg(struct shmipc_mgr *mgr) {
 
 /* #region RetryMgr */
 
+// TODO: Uncomment
 void RetryMgr::detectServerUnavailLoop() {
-  // std::cout << "[DEBUG] Inside " << __func__ << std::endl; fflush(stdout);
-  threadFsTid = _backgroundThreadId;
-  // std::cout << "[DEBUG] Inside " << __func__ << "threadFsTid = " << threadFsTid << std::endl; fflush(stdout);
-  while(true) {
-    // std::cout << "[DEBUG] Checking .. " << __func__ << std::endl; fflush(stdout);
-    // server is unavailable
-    if (is_server_up(gServMngPtr->fsServPid) != 1) {
-      print_server_unavailable(__func__);
-      fs_retry_pending_ops();
-    }
+  // // std::cout << "[DEBUG] Inside " << __func__ << std::endl; fflush(stdout);
+  // threadFsTid = _backgroundThreadId;
+  // // std::cout << "[DEBUG] Inside " << __func__ << "threadFsTid = " << threadFsTid << std::endl; fflush(stdout);
+  // while(true) {
+  //   // std::cout << "[DEBUG] Checking .. " << __func__ << std::endl; fflush(stdout);
+  //   // server is unavailable
+  //   if (is_server_up(gServMngPtr->fsServPid) != 1) {
+  //     print_server_unavailable(__func__);
+  //     fs_retry_pending_ops();
+  //   }
 
-    sleep(4); 
-  };
+  //   sleep(4); 
+  // };
 }
 
 int RetryMgr::get_server_pid() {
@@ -1155,7 +1153,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_PREAD: {
         ret = handle_pread_retry(requestId, buf);
         if (ret > 0) {
-          WriteLock w_lock(_reqRingMapLock);
+          auto threadId = getThreadIdFromRequestId(requestId);
+          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
+          // WriteLock w_lock(_reqRingMapLock);
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1170,7 +1170,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
         ret = handle_allocated_pread_retry(requestId);
         _notifyShmForThread[threadFsTid] = false; // restore
         if (ret > 0) {
-          WriteLock w_lock(_reqRingMapLock);
+          // WriteLock w_lock(_reqRingMapLock);
+          auto threadId = getThreadIdFromRequestId(requestId);
+          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1190,7 +1192,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_STAT: {
         ret = handle_stat_retry(requestId, statbuf);
         if (ret == 0) {
-          WriteLock w_lock(_reqRingMapLock);
+          // WriteLock w_lock(_reqRingMapLock);
+          auto threadId = getThreadIdFromRequestId(requestId);
+          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1200,7 +1204,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_FSTAT: {
         ret = handle_fstat_retry(requestId, statbuf);
         if (ret == 0) {
-          WriteLock w_lock(_reqRingMapLock);
+          // WriteLock w_lock(_reqRingMapLock);
+          auto threadId = getThreadIdFromRequestId(requestId);
+          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1210,7 +1216,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_OPEN: {
         ret = handle_open_retry(requestId);
         if (ret > 0) {
-          WriteLock w_lock(_reqRingMapLock);
+          // WriteLock w_lock(_reqRingMapLock);
+          auto threadId = getThreadIdFromRequestId(requestId);
+          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1220,7 +1228,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_CLOSE: {
         ret = handle_close_retry(requestId);
         if (ret > 0) {
-          WriteLock w_lock(_reqRingMapLock);
+          // WriteLock w_lock(_reqRingMapLock);
+          auto threadId = getThreadIdFromRequestId(requestId);
+          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1235,7 +1245,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
         ret = handle_opendir_retry(requestId, dir);
         _notifyShmForThread[threadFsTid] = false; // restore
         if (ret == 0) {
-          WriteLock w_lock(_reqRingMapLock);
+          // WriteLock w_lock(_reqRingMapLock);
+          auto threadId = getThreadIdFromRequestId(requestId);
+          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1246,7 +1258,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_FSYNC: {
         ret = handle_fsync_retry(requestId);
         if (ret > 0) {
-          WriteLock w_lock(_reqRingMapLock);
+          // WriteLock w_lock(_reqRingMapLock);
+          auto threadId = getThreadIdFromRequestId(requestId);
+          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           this->_reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -4053,7 +4067,7 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
                                             void *buf, size_t count,
                                             off_t offset, uint64_t requestId, 
                                             bool isNotifyRetry) {
-  // std::cout << "[DEBUG] Inside " << __func__ << std::endl; 
+  // std::cout << "[DEBUG] Inside " << __func__ << std::endl; fflush(stdout);
   struct shmipc_msg msg;
   struct allocatedPwriteOpPacked *apwop_p;
   off_t ring_idx;
@@ -4111,7 +4125,7 @@ static ssize_t fs_allocated_pwrite_internal(FsService *fsServ, int fd,
 
   shmipc_mgr_dealloc_slot(fsServ->shmipc_mgr, ring_idx);
   
-  // std::cout << "[DEBUG] Exiting " << __func__ << std::endl;
+  // std::cout << "[DEBUG] Exiting " << __func__ << std::endl; fflush(stdout);
   return rc;
 }
 
@@ -4171,7 +4185,7 @@ retry:
 #ifdef CFS_LIB_SAVE_API_TS
   tFsApiTs->addApiNormalDone(FsApiType::FS_WRITE, tsIdx);
 #endif
-  // std::cout << "[DEBUG] Exiting " << __func__ << std::endl;
+  // std::cout << "[DEBUG] Exiting " << __func__ << std::endl; fflush(stdout);
   return rc;
 }
 
@@ -4204,7 +4218,7 @@ retry:
   tFsApiTs->addApiNormalDone(FsApiType::FS_PWRITE, tsIdx);
 #endif
 
-  // std::cout << "[DEBUG] Exiting " << __func__ << std::endl;
+  // std::cout << "[DEBUG] Exiting " << __func__ << std::endl; fflush(stdout);
   return rc;
 }
 
@@ -5089,8 +5103,9 @@ void fs_free_pad(void *ptr) { fs_free_pad(ptr, threadFsTid); }
 
 void fs_init_thread_local_mem() { check_app_thread_mem_buf_ready(false /*isRetry*/); }
 
-// TODO: Make lock more granular
 void clean_up_notify_internal(shmipc_mgr *mgr, off_t ringIdx) {
+  std::lock_guard<std::mutex> guard(gCleanUpNotifyMsgLoopLock);
+  // std::cout << "[DEBUG] Inside " << __func__ << std::endl; fflush(stdout);
   auto notifyOpXreq = (struct NotifyMsg *) IDX_TO_XREQ(mgr, ringIdx);      
   // std::cout << "[DEBUG] notify count = " << notifyOpXreq->count << std::endl;
   for (int i = 0; i < notifyOpXreq->count; i++) {
@@ -5106,21 +5121,21 @@ void clean_up_notify_internal(shmipc_mgr *mgr, off_t ringIdx) {
   }
 
   // Refactor leftovers
-  for (auto requestId : gServMngPtr->retryMgr->getLeftoverRequestsToClean()) {
-    gServMngPtr->queueMgr->dequePendingMsg(requestId);
-    gServMngPtr->retryMgr->removeRequestFromRingMap(requestId);
-  }
-  gServMngPtr->retryMgr->clearLeftoverRequests();
-
+  // for (auto requestId : gServMngPtr->retryMgr->getLeftoverRequestsToClean()) {
+  //   gServMngPtr->queueMgr->dequePendingMsg(requestId);
+  //   gServMngPtr->retryMgr->removeRequestFromRingMap(requestId);
+  // }
+  // gServMngPtr->retryMgr->clearLeftoverRequests();
 
   shmipc_mgr_dealloc_slot(mgr, ringIdx);      
 
   // TODO: Del later
-  int count = gServMngPtr->queueMgr->getCountOfEmptySlots();
+  // int count = gServMngPtr->queueMgr->getCountOfEmptySlots();
   // std::cout << "[DEBUG] empty slots now are " << count << std::endl;
 }
 
 void clean_up_notify_msg_from_server(bool shouldSleep) {
+  // std::cout << "[DEBUG] Inside " << __func__ << std::endl; fflush(stdout);
   if (shouldSleep) {
     // std::cout << "[DEBUG] Sleeping .." << std::endl; fflush(stdout);
     usleep(100);
@@ -5135,7 +5150,6 @@ void clean_up_notify_msg_from_server(bool shouldSleep) {
   auto shmipc_mgr = gServMngPtr->primaryServ->shmipc_mgr; 
   assert(shmipc_mgr != nullptr);
   // go over entire ring once
-  std::lock_guard<std::mutex> guard(gCleanUpNotifyMsgLoopLock);
   // std::cout << "[DEBUG] I will run cleanup .. " << threadFsTid << std::endl; fflush(stdout);
   do {
     memset(&msg, 0, sizeof(struct shmipc_msg));

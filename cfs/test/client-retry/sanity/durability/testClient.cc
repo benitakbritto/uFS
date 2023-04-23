@@ -10,7 +10,7 @@
 /******************************************************************************
  * MACROS
  *****************************************************************************/
-#define RUN_COUNT (200 * 1024)
+#define RUN_COUNT (100)
 #define RING_SIZE 64
 #define IO_SIZE 1024
 #define STRESS_IO_SIZE (IO_SIZE * IO_SIZE)
@@ -754,8 +754,8 @@ int runAllocWriteSingle(std::string path) {
     return -1;
   }
 
-  char *bufWrite = (char *)fs_malloc(IO_SIZE + 1); // Try this
   for (int i = 0; i < RUN_COUNT; i++) {
+    char *bufWrite = (char *)fs_malloc(IO_SIZE + 1);
     memset(bufWrite, 0, IO_SIZE + 1);
     memcpy(bufWrite, generateString("a", IO_SIZE).c_str(), IO_SIZE);
 

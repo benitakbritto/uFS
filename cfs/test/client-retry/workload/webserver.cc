@@ -20,8 +20,10 @@
  * GLOBALS
  *****************************************************************************/
 enum TestCase {
-  READ_ONLY, // 0
-  READ_WRITE, // 1
+  READ_ONLY_SEQ, // 0
+  READ_WRITE_SEQ, // 1
+  READ_ONLY_RANDOM, // 2
+  READ_WRITE_RANDOM, // 3
 };
 
 /******************************************************************************
@@ -39,6 +41,9 @@ int runTask(int threadId, int numFilesPerDir, int readFileSize,
   int writeFileSize, int ioSize, int type);
 int runWorkload(int numThreads, int numFilesPerDir, int readFileSize, 
   int writeFileSize, int ioSize, int type);
+
+int readFileRandomOffset(int index, int fileSize, int ioSize, int threadId);
+int overwriteFileRandomOffset(int index, int fileSize, int ioSize, int threadId);
 /******************************************************************************
  * DRIVER
  *****************************************************************************/
@@ -101,6 +106,37 @@ int readFile(int index, int fileSize, int ioSize, int threadId) {
   return 0;
 }
 
+int readFileRandomOffset(int index, int fileSize, int ioSize, int threadId) {
+  int ino = getReadFileInode(index, threadId);
+  if (ino == 0) {
+    return -1;
+  }
+
+  char *buf = (char *) fs_malloc(ioSize + 1);
+  memset(buf, 0, ioSize + 1);
+
+  int iterations = (fileSize * ONE_MB) / ioSize;
+  for (int j = 0; j < iterations; j++) {
+    int offset = rand() % (fileSize - ioSize);
+    auto ret = fs_allocated_pread(ino, buf, ioSize, offset);
+    if (ret != ioSize) {
+      fprintf(stderr, "fs_allocated_read() failed. Received %ld\n", 
+        ret);
+      return -1;
+    }
+
+    // fs_syncall();
+  }
+
+  // fs_free(buf);
+
+  if (closeFile(ino) != 0) {
+    return -1;
+  }
+
+  return 0;
+}
+
 int closeFile(int ino) {
   if (fs_close(ino) != 0) {
     fprintf(stderr, "fs_close() failed\n");
@@ -136,17 +172,55 @@ int overwriteFile(int index, int fileSize, int ioSize, int threadId) {
   return 0;
 }
 
+int overwriteFileRandomOffset(int index, int fileSize, int ioSize, int threadId) {
+  int ino = getReadFileInode(index, threadId);
+
+  int iterations = (fileSize * ONE_MB) / ioSize;
+
+  char* buf = (char *) fs_malloc(ioSize + 1);
+  memset(buf, 0, ioSize + 1);
+  memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
+ 
+  for (int i = 0; i < iterations; i++) {
+    int offset = rand() % (fileSize - ioSize);
+    // std::cout << "[DEBUG] i = " << i << std::endl;
+    if (fs_allocated_pwrite(ino, buf, ioSize, offset) != ioSize) {
+      fprintf(stderr, "fs_allocated_write() failed.\n");
+      return -1;
+    } 
+  }  
+
+  if (closeFile(ino) != 0) {
+    return -1;
+  }
+
+  // fs_free(buf);
+  
+  return 0;
+}
+
 int runTask(int threadId, int numFilesPerDir, int readFileSize, 
   int writeFileSize, int ioSize, int type) {
 
   for (int i = 0; i < numFilesPerDir; i++) {
     // Read whole file in IO_SIZE chunks
-    if (readFile(i, readFileSize, ioSize, threadId) == -1) {
-      return -1;
+    if (type == TestCase::READ_ONLY_SEQ || type == TestCase:: READ_WRITE_SEQ) {
+      if (readFile(i, readFileSize, ioSize, threadId) == -1) {
+        return -1;
+      }
+    } else {
+      if (readFileRandomOffset(i, readFileSize, ioSize, threadId) == -1) {
+        return -1;
+      }
     }
-
-    if (type == TestCase::READ_WRITE) {
+    
+    // Overwrite whole file in IO_SIZE chunks
+    if (type == TestCase::READ_WRITE_SEQ) {
       if (overwriteFile(i, writeFileSize, ioSize, threadId) == -1) {
+        return -1;
+      }
+    } else if (type == TestCase::READ_WRITE_RANDOM) {
+      if (overwriteFileRandomOffset(i, writeFileSize, ioSize, threadId) == -1) {
         return -1;
       }
     }
@@ -227,7 +301,7 @@ int main(int argc, char **argv) {
         break;
       case 't':
         type = std::stoi(optarg);
-        assert(type == 0 || type == 1);
+        assert(type >= 0 && type < 4);
         break;
       case 'h':
         printUsage(argv[0]);

@@ -58,11 +58,8 @@ int64_t FileMng::checkAndFlushBufferDirtyItems() {
   // Data
   auto ret = fsImpl_->checkAndFlushDirty(fsWorker_);
   if (ret > 0) {
-    fsWorker_->notifyAllWriteOps();
-
-    // Metadata
     fsWorker_->blockingFlushBufferInternal();
-    fsWorker_->notifyAllMetadataOps();
+    fsWorker_->notifyAllPendingOps();
   }
   return ret;
 }
@@ -389,6 +386,8 @@ void FileMng::blockingStoreInode(cfs_ino_t inum) {
   fsImpl_->BlockingGetInodeHelper(inum, io_done, fsWorker_);
   return;
 }
+
+
 
 bool FileMng::exportInode(cfs_ino_t inum, ExportedInode &exp) {
   // NOTE: exportInode only exports the inode and removes all state related to

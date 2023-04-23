@@ -437,10 +437,8 @@ struct FsWorkerOpStats {
 class FsProcWorker {
  public:
   // Notify
-  void notifyAllWriteOps();
-  void notifyAllMetadataOps();
-  void notifyFileWriteOps(cfs_ino_t inodeNum);
-  void notifyFileMetadataOps(cfs_ino_t inodeNum);
+  void notifyAllPendingOps();
+  void notifyIndividualPendingOp(cfs_ino_t inodeNum);
 
   // Interval for reporting CPU usage (in us).
   static constexpr int64_t kCpuReportInterval = 1e6;  // set to 1s
@@ -778,9 +776,7 @@ class FsProcWorker {
 
   // client state of pending ops
   std::unordered_map<pid_t, 
-    std::unordered_map<cfs_ino_t, std::vector<uint64_t>>> flushPendingDataOpMap;
-    std::unordered_map<pid_t, 
-    std::unordered_map<cfs_ino_t, std::vector<uint64_t>>> flushPendingMetadataOpMap;
+    std::unordered_map<cfs_ino_t, std::vector<uint64_t>>> flushPendingOpMap;
 
 
   // fileManger will execute FS functionality (~= VFS layer)

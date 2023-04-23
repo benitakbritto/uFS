@@ -889,7 +889,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         SPDLOG_DEBUG("pwrite-err set return value to:{}",
                      cop->op.pwrite.rwOp.ret);
       } else {
-        flushPendingDataOpMap[app->getPid()][fsReq->fd].push_back(
+        flushPendingOpMap[app->getPid()][fsReq->fd].push_back(
           fsReq->getClientOp()->op.pwrite.rwOp.requestId);
       }
 
@@ -963,7 +963,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
       } else {
         opStatsAccountSingleOpDone(FsReqType::ALLOC_PWRITE,
                                    cop->op.allocpwrite.rwOp.ret);
-        flushPendingDataOpMap[app->getPid()][fsReq->fd].push_back(
+        flushPendingOpMap[app->getPid()][fsReq->fd].push_back(
           fsReq->getClientOp()->op.allocpwrite.rwOp.requestId);
       }
 
@@ -1026,7 +1026,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
 
         if (curType == FsReqType::CREATE) {
           isCreate = true;
-          flushPendingMetadataOpMap[app->getPid()][fsReq->getTargetInode()->i_no].push_back(cop->op.open.requestId);
+          flushPendingOpMap[app->getPid()][fsReq->getTargetInode()->i_no].push_back(cop->op.open.requestId);
         }
       }
       
@@ -1095,7 +1095,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         cop->op.mkdir.ret = getReturnValueForFailedReq(fsReq);
         SPDLOG_DEBUG("mkdir-err set return value to:{}", cop->op.mkdir.ret);
       } else {
-        flushPendingMetadataOpMap[app->getPid()][fsReq->getTargetInode()->i_no].push_back(cop->op.mkdir.requestId);
+        flushPendingOpMap[app->getPid()][fsReq->getTargetInode()->i_no].push_back(cop->op.mkdir.requestId);
       }
       
       runCrash(cop->op.mkdir.requestId);
@@ -1115,14 +1115,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
         std::cout << "unlink error" << std::endl;
         cop->op.unlink.ret = getReturnValueForFailedReq(fsReq);
         SPDLOG_DEBUG("unlink-err set return value to:{}", cop->op.unlink.ret);
-      } else {
-        if (fsReq->getTargetInode()) {
-          flushPendingMetadataOpMap[app->getPid()][fsReq->getTargetInode()->i_no].push_back(cop->op.unlink.requestId);
-        } else {
-          flushPendingMetadataOpMap[app->getPid()][0].push_back(cop->op.unlink.requestId);
-        }
-        
-      }
+      } 
       cop->opStatus = OP_DONE;
       copy_msg(unlink);
     }
@@ -1170,8 +1163,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
       cop->opStatus = OP_DONE;
       copy_msg(fsync);
 
-      notifyFileWriteOps(fsReq->fd); 
-      notifyFileMetadataOps(fsReq->fd);
+      notifyIndividualPendingOp(fsReq->fd);
     }
   } else if (curType == FsReqType::WSYNC) {
     SPDLOG_DEBUG("submitFsReqCompletion for wsync ret:{}");
@@ -1205,8 +1197,7 @@ int FsProcWorker::submitFsReqCompletion(FsReq *fsReq) {
       cop->opStatus = OP_DONE;
       copy_msg(syncall);
 
-      notifyAllMetadataOps();
-      notifyAllWriteOps();
+      notifyAllPendingOps();
     }
   } else if (curType == FsReqType::SYNCUNLINKED) {
     SPDLOG_DEBUG("submitFsReqCompletion for Syncunlinked");
@@ -2688,9 +2679,9 @@ void FsProcWorker::opStatsAccountSingleOpDone(FsReqType reqType, size_t bytes) {
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
 }
 
-void FsProcWorker::notifyAllWriteOps() {
+void FsProcWorker::notifyAllPendingOps() {
   // std::cout << "[DEBUG] Inside " << __func__ << std::endl;
-  for (auto &[appPid, inodeReqMap]: flushPendingDataOpMap) {
+  for (auto &[appPid, inodeReqMap]: flushPendingOpMap) {
     // put msg in ring buff
     struct shmipc_msg msg;
     off_t ring_idx;
@@ -2704,6 +2695,7 @@ void FsProcWorker::notifyAllWriteOps() {
     int index = 0;
     for (auto &[inodeNum, reqIdList]: inodeReqMap) {
       xreq->count += reqIdList.size();
+      assert(xreq->count <= 64);
       for (int i = 0; i < reqIdList.size(); i++) {
         xreq->requestIdList[index++] = reqIdList[i];
       }
@@ -2715,42 +2707,12 @@ void FsProcWorker::notifyAllWriteOps() {
   } 
 
   // cleanup
-  flushPendingDataOpMap.clear();    
+  flushPendingOpMap.clear(); 
 }
 
-void FsProcWorker::notifyAllMetadataOps() {
+void FsProcWorker::notifyIndividualPendingOp(cfs_ino_t inodeNum) {
   // std::cout << "[DEBUG] Inside " << __func__ << std::endl;
-  for (auto &[appPid, inodeReqMap]: flushPendingMetadataOpMap) {
-    // put msg in ring buff
-    struct shmipc_msg msg;
-    off_t ring_idx;
-    memset(&msg, 0, sizeof(msg));
-    ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
-    // std::cout << "[DEBUG] ring_idx = " << ring_idx << std::endl;
-
-    // fill xreq
-    struct NotifyMsg* xreq = (struct NotifyMsg *) IDX_TO_XREQ(appMap[appPid]->shmipc_mgr, ring_idx);
-    memset(xreq, 0, sizeof(*xreq));
-    int index = 0;
-    for (auto &[inodeNum, reqIdList]: inodeReqMap) {
-      xreq->count += reqIdList.size();
-      for (int i = 0; i < reqIdList.size(); i++) {
-        xreq->requestIdList[index++] = reqIdList[i];
-      }
-    }
-
-    // std::cout << "[DEBUG] xreq->count = " << xreq->count << std::endl;
-    shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, 
-        ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
-  } 
-
-  // cleanup
-  flushPendingMetadataOpMap.clear();  
-}
-
-void FsProcWorker::notifyFileWriteOps(cfs_ino_t inodeNum) {
-  // std::cout << "[DEBUG] Inside " << __func__ << std::endl;
-  for (auto &[appPid, inodeReqMap]: flushPendingDataOpMap) {
+  for (auto &[appPid, inodeReqMap]: flushPendingOpMap) {
     auto itr = inodeReqMap.find(inodeNum);
     if (itr != inodeReqMap.end()) {
       // put msg in ring buff
@@ -2775,44 +2737,9 @@ void FsProcWorker::notifyFileWriteOps(cfs_ino_t inodeNum) {
   }
 
   // cleanup
-  for (auto &[appPid, inodeReqMap]: flushPendingDataOpMap) {
-    flushPendingDataOpMap[appPid].erase(inodeNum);
+  for (auto &[appPid, inodeReqMap]: flushPendingOpMap) {
+    flushPendingOpMap[appPid].erase(inodeNum);
   }  
-}
-
-void FsProcWorker::notifyFileMetadataOps(cfs_ino_t inodeNum) {
-  // std::cout << "[DEBUG] Inside " << __func__ << std::endl;
-  for (auto &[appPid, inodeReqMap]: flushPendingMetadataOpMap) {
-    auto itr = inodeReqMap.find(inodeNum);
-    if (itr != inodeReqMap.end()) {
-      for (auto reqId: itr->second) {
-        // put msg in ring buff
-        struct shmipc_msg msg;
-        off_t ring_idx;
-        memset(&msg, 0, sizeof(msg));
-        ring_idx = shmipc_mgr_alloc_slot(appMap[appPid]->shmipc_mgr);
-        
-        // fill xreq
-        struct NotifyMsg* xreq = (struct NotifyMsg *) IDX_TO_XREQ(appMap[appPid]->shmipc_mgr, ring_idx);
-        xreq->count = (itr->second).size();
-        int i = 0;
-        for (auto listItr = itr->second.begin(); listItr != itr->second.end(); listItr++) {
-          // std::cout << "[DEBUG] req = " << *listItr << std::endl;
-          xreq->requestIdList[i++] = *listItr;
-        }
-
-        shmipc_mgr_put_msg_server_nowait(appMap[appPid]->shmipc_mgr, 
-          ring_idx, &msg, shmipc_STATUS_NOTIFY_FOR_CLIENT);
-      }
-    } else {
-      return;
-    }
-  }
-
-  // cleanup
-  for (auto &[appPid, inodeReqMap]: flushPendingMetadataOpMap) {
-    flushPendingMetadataOpMap[appPid].erase(inodeNum);
-  }
 }
 
 FsProcWorkerMaster::FsProcWorkerMaster(int w, CurBlkDev *d, int shmBaseOffset,
@@ -4221,9 +4148,8 @@ void FsProcWorker::blockingFlushBufferOnExit() {
   blockingFlushBufferInternal();
 
   // notify
-  std::cout << "[DEBUG] Sending out notify" << std::endl;
-  notifyAllMetadataOps();
-  notifyAllWriteOps();
+  // std::cout << "[DEBUG] Sending out notify" << std::endl;
+  notifyAllPendingOps();
 
   // SPDLOG_INFO("wid:{} All buffers successfully flushed to disk ~~~", getWid());
   // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;

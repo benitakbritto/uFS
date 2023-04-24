@@ -22,8 +22,10 @@
 enum TestCase {
   READ_ONLY_SEQ, // 0
   READ_WRITE_SEQ, // 1
-  READ_ONLY_RANDOM, // 2
-  READ_WRITE_RANDOM, // 3
+  READ_WRITE_SEQ_SYNC, // 2
+  READ_ONLY_RANDOM, // 3
+  READ_WRITE_RANDOM, // 4
+  READ_WRITE_RANDOM_SYNC, // 5
 };
 
 /******************************************************************************
@@ -84,11 +86,22 @@ int readFile(int index, int fileSize, int ioSize, int threadId) {
     return -1;
   }
 
+  // odd threads go to backup server
+  if (threadId % 2 == 1) {
+    // set ownership
+    int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
+    assert(ret == 0);
+
+    // check ownership
+    ret = fs_admin_inode_reassignment(0, ino, 1, -1);
+    assert(ret == 0);
+  }
+  
   char *buf = (char *) fs_malloc(ioSize + 1);
   memset(buf, 0, ioSize + 1);
 
   int iterations = (fileSize * ONE_MB) / ioSize;
-  for (int j = 0; j < iterations; j++) {
+  for (int j = 0; j < iterations; j++) {  
     auto ret = fs_allocated_pread(ino, buf, ioSize, j * ioSize);
     if (ret != ioSize) {
       fprintf(stderr, "fs_allocated_read() failed. Received %ld\n", 
@@ -97,7 +110,7 @@ int readFile(int index, int fileSize, int ioSize, int threadId) {
     }
   }
 
-  // fs_free(buf);
+  fs_free(buf);
 
   if (closeFile(ino) != 0) {
     return -1;
@@ -112,6 +125,17 @@ int readFileRandomOffset(int index, int fileSize, int ioSize, int threadId) {
     return -1;
   }
 
+  // odd threads go to backup server
+  if (threadId % 2 == 1) {
+    // set ownership
+    int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
+    assert(ret == 0);
+
+    // check ownership
+    ret = fs_admin_inode_reassignment(0, ino, 1, -1);
+    assert(ret == 0);
+  }
+
   char *buf = (char *) fs_malloc(ioSize + 1);
   memset(buf, 0, ioSize + 1);
 
@@ -124,11 +148,9 @@ int readFileRandomOffset(int index, int fileSize, int ioSize, int threadId) {
         ret);
       return -1;
     }
-
-    // fs_syncall();
   }
 
-  // fs_free(buf);
+  fs_free(buf);
 
   if (closeFile(ino) != 0) {
     return -1;
@@ -149,6 +171,17 @@ int closeFile(int ino) {
 int overwriteFile(int index, int fileSize, int ioSize, int threadId) {
   int ino = getReadFileInode(index, threadId);
 
+  // odd threads go to backup server
+  // if (threadId % 2 == 1) {
+  //   // set ownership
+  //   int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
+  //   assert(ret == 0);
+
+  //   // check ownership
+  //   ret = fs_admin_inode_reassignment(0, ino, 1, -1);
+  //   assert(ret == 0);
+  // }
+
   int iterations = (fileSize * ONE_MB) / ioSize;
 
   char* buf = (char *) fs_malloc(ioSize + 1);
@@ -158,9 +191,52 @@ int overwriteFile(int index, int fileSize, int ioSize, int threadId) {
   for (int i = 0; i < iterations; i++) {
     // std::cout << "[DEBUG] i = " << i << std::endl;
     if (fs_allocated_pwrite(ino, buf, ioSize, i * ioSize) != ioSize) {
+      
       fprintf(stderr, "fs_allocated_write() failed.\n");
       return -1;
     } 
+
+    // fs_syncall();
+  }  
+
+  if (closeFile(ino) != 0) {
+    return -1;
+  }
+
+  // fs_free(buf);
+  
+  return 0;
+}
+
+int overwriteFileSync(int index, int fileSize, int ioSize, int threadId) {
+  int ino = getReadFileInode(index, threadId);
+
+  // odd threads go to backup server
+  // if (threadId % 2 == 1) {
+  //   // set ownership
+  //   int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
+  //   assert(ret == 0);
+
+  //   // check ownership
+  //   ret = fs_admin_inode_reassignment(0, ino, 1, -1);
+  //   assert(ret == 0);
+  // }
+
+  int iterations = (fileSize * ONE_MB) / ioSize;
+
+  char* buf = (char *) fs_malloc(ioSize + 1);
+  memset(buf, 0, ioSize + 1);
+  memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
+ 
+  for (int i = 0; i < iterations; i++) {
+    // std::cout << "[DEBUG] i = " << i << std::endl;
+    if (fs_allocated_pwrite(ino, buf, ioSize, i * ioSize) != ioSize) {
+      
+      fprintf(stderr, "fs_allocated_write() failed.\n");
+      return -1;
+    } 
+
+    fs_syncall();
   }  
 
   if (closeFile(ino) != 0) {
@@ -175,13 +251,23 @@ int overwriteFile(int index, int fileSize, int ioSize, int threadId) {
 int overwriteFileRandomOffset(int index, int fileSize, int ioSize, int threadId) {
   int ino = getReadFileInode(index, threadId);
 
+  // odd threads go to backup server
+  // if (threadId % 2 == 1) {
+  //   // set ownership
+  //   int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
+  //   assert(ret == 0);
+
+  //   // check ownership
+  //   ret = fs_admin_inode_reassignment(0, ino, 1, -1);
+  //   assert(ret == 0);
+  // }
+
   int iterations = (fileSize * ONE_MB) / ioSize;
 
-  char* buf = (char *) fs_malloc(ioSize + 1);
-  memset(buf, 0, ioSize + 1);
-  memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
- 
   for (int i = 0; i < iterations; i++) {
+    char* buf = (char *) fs_malloc(ioSize + 1);
+    memset(buf, 0, ioSize + 1);
+    memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
     int offset = rand() % (fileSize - ioSize);
     // std::cout << "[DEBUG] i = " << i << std::endl;
     if (fs_allocated_pwrite(ino, buf, ioSize, offset) != ioSize) {
@@ -199,34 +285,145 @@ int overwriteFileRandomOffset(int index, int fileSize, int ioSize, int threadId)
   return 0;
 }
 
-int runTask(int threadId, int numFilesPerDir, int readFileSize, 
-  int writeFileSize, int ioSize, int type) {
+int overwriteFileRandomOffsetSync(int index, int fileSize, int ioSize, int threadId) {
+  int ino = getReadFileInode(index, threadId);
 
+  // odd threads go to backup server
+  // if (threadId % 2 == 1) {
+  //   // set ownership
+  //   int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
+  //   assert(ret == 0);
+
+  //   // check ownership
+  //   ret = fs_admin_inode_reassignment(0, ino, 1, -1);
+  //   assert(ret == 0);
+  // }
+
+  int iterations = (fileSize * ONE_MB) / ioSize;
+
+  for (int i = 0; i < iterations; i++) {
+    char* buf = (char *) fs_malloc(ioSize + 1);
+    memset(buf, 0, ioSize + 1);
+    memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
+    int offset = rand() % (fileSize - ioSize);
+    // std::cout << "[DEBUG] i = " << i << std::endl;
+    if (fs_allocated_pwrite(ino, buf, ioSize, offset) != ioSize) {
+      fprintf(stderr, "fs_allocated_write() failed.\n");
+      return -1;
+    } 
+
+    fs_syncall();
+  }  
+
+  if (closeFile(ino) != 0) {
+    return -1;
+  }
+
+  // fs_free(buf);
+  
+  return 0;
+}
+
+int runReadSeq(int threadId, int numFilesPerDir, int readFileSize, 
+  int ioSize) {
+  for (int i = 0; i < numFilesPerDir; i++) {
+    if (readFile(i, readFileSize, ioSize, threadId) == -1) {
+        return -1;
+      }
+  }
+
+  return 0;
+}
+
+int runReadRandom(int threadId, int numFilesPerDir, int readFileSize, 
+  int ioSize) {
+  for (int i = 0; i < numFilesPerDir; i++) {
+    if (readFileRandomOffset(i, readFileSize, ioSize, threadId) == -1) {
+        return -1;
+      }
+  }
+
+  return 0;
+}
+
+int runReadWriteSeq(int threadId, int numFilesPerDir, int readFileSize, 
+  int writeFileSize, int ioSize) {
   for (int i = 0; i < numFilesPerDir; i++) {
     // Read whole file in IO_SIZE chunks
-    if (type == TestCase::READ_ONLY_SEQ || type == TestCase:: READ_WRITE_SEQ) {
-      if (readFile(i, readFileSize, ioSize, threadId) == -1) {
-        return -1;
-      }
-    } else {
-      if (readFileRandomOffset(i, readFileSize, ioSize, threadId) == -1) {
-        return -1;
-      }
+    if (readFile(i, readFileSize, ioSize, threadId) == -1) {
+      return -1;
     }
     
     // Overwrite whole file in IO_SIZE chunks
-    if (type == TestCase::READ_WRITE_SEQ) {
-      if (overwriteFile(i, writeFileSize, ioSize, threadId) == -1) {
-        return -1;
-      }
-    } else if (type == TestCase::READ_WRITE_RANDOM) {
-      if (overwriteFileRandomOffset(i, writeFileSize, ioSize, threadId) == -1) {
-        return -1;
-      }
+    if (overwriteFile(i, writeFileSize, ioSize, threadId) == -1) {
+      return -1;
     }
-  
   }
+}
 
+int runReadWriteSeqSync(int threadId, int numFilesPerDir, int readFileSize, 
+  int writeFileSize, int ioSize) {
+  for (int i = 0; i < numFilesPerDir; i++) {
+    // Read whole file in IO_SIZE chunks
+    if (readFile(i, readFileSize, ioSize, threadId) == -1) {
+      return -1;
+    }
+    
+    // Overwrite whole file in IO_SIZE chunks
+    if (overwriteFileSync(i, writeFileSize, ioSize, threadId) == -1) {
+      return -1;
+    }
+  }
+}
+
+int runReadWriteRandom(int threadId, int numFilesPerDir, int readFileSize, 
+  int writeFileSize, int ioSize) {
+  for (int i = 0; i < numFilesPerDir; i++) {
+    // Read whole file in IO_SIZE chunks
+    if (readFile(i, readFileSize, ioSize, threadId) == -1) {
+      return -1;
+    }
+    
+    // Overwrite whole file in IO_SIZE chunks
+    if (overwriteFileRandomOffset(i, writeFileSize, ioSize, threadId) == -1) {
+      return -1;
+    }
+  }
+}
+
+int runReadWriteRandomSync(int threadId, int numFilesPerDir, int readFileSize, 
+  int writeFileSize, int ioSize) {
+  for (int i = 0; i < numFilesPerDir; i++) {
+    // Read whole file in IO_SIZE chunks
+    if (readFile(i, readFileSize, ioSize, threadId) == -1) {
+      return -1;
+    }
+    
+    // Overwrite whole file in IO_SIZE chunks
+    if (overwriteFileRandomOffsetSync(i, writeFileSize, ioSize, threadId) == -1) {
+      return -1;
+    }
+  }
+}
+
+int runTask(int threadId, int numFilesPerDir, int readFileSize, 
+  int writeFileSize, int ioSize, int type) {
+    
+  switch(type) {
+    case TestCase::READ_ONLY_SEQ:
+      return runReadSeq(threadId, numFilesPerDir, readFileSize, ioSize);
+    case TestCase::READ_ONLY_RANDOM:
+      return runReadRandom(threadId, numFilesPerDir, readFileSize, ioSize);
+    case TestCase::READ_WRITE_SEQ:
+      return runReadWriteSeq(threadId, numFilesPerDir, readFileSize, writeFileSize, ioSize);
+    case TestCase::READ_WRITE_SEQ_SYNC:
+      return runReadWriteSeqSync(threadId, numFilesPerDir, readFileSize, writeFileSize, ioSize);
+    case TestCase::READ_WRITE_RANDOM:
+      return runReadWriteRandom(threadId, numFilesPerDir, readFileSize, writeFileSize, ioSize);
+    case TestCase::READ_WRITE_RANDOM_SYNC:
+      return runReadWriteRandomSync(threadId, numFilesPerDir, readFileSize, writeFileSize, ioSize);
+  }
+  
   return 0;
 }
 

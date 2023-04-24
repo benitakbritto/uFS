@@ -219,7 +219,7 @@ void FileMng::ReassignmentOp::ProcessReassignmentCtx(
 // Client triggered reassignment request
 void FileMng::ReassignmentOp::ProcessInodeReassignmentReq(FileMng *mng,
                                                           FsReq *req) {
-  std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                                                          
+  // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;                                                          
   assert(req->getType() == FsReqType::INODE_REASSIGNMENT);
 
   struct inodeReassignmentOp &irop = req->copPtr->op.inodeReassignment;
@@ -243,7 +243,7 @@ void FileMng::ReassignmentOp::ProcessInodeReassignmentReq(FileMng *mng,
   // this worker is the owner
   switch (irop.type) {
     case 0:
-      std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+      // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
       // Returns 0 if this wid is the owner.
       irop.ret = 0;
       mng->fsWorker_->submitFsReqCompletion(req);

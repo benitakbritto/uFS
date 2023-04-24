@@ -2694,7 +2694,7 @@ void FsProcWorker::notifyAllPendingOps() {
     memset(xreq, 0, sizeof(*xreq));
     int index = 0;
     for (auto &[inodeNum, reqIdList]: inodeReqMap) {
-      std::cout << "[DEBUG] inode = " << inodeNum << " was flushed" << std::endl; fflush(stdout);
+      // std::cout << "[DEBUG] inode = " << inodeNum << " was flushed" << std::endl; fflush(stdout);
       xreq->count += reqIdList.size();
       assert(xreq->count <= 64);
       for (int i = 0; i < reqIdList.size(); i++) {

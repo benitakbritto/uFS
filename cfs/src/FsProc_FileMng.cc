@@ -388,7 +388,7 @@ void FileMng::blockingStoreInode(cfs_ino_t inum) {
 }
 
 std::unordered_map<pid_t, std::vector<uint64_t>> FileMng::exportPendingOpsForInum(cfs_ino_t inum) {
-  std::cout << "[DEBUG] Inside " << __func__ << "\t" << "inum = " << inum << std::endl;
+  // std::cout << "[DEBUG] Inside " << __func__ << "\t" << "inum = " << inum << std::endl;
   std::unordered_map<pid_t, std::vector<uint64_t>> res;
   for (auto &[pid, inodeMap] : fsWorker_->flushPendingOpMap) {
     auto itr = fsWorker_->flushPendingOpMap[pid].find(inum);
@@ -398,13 +398,13 @@ std::unordered_map<pid_t, std::vector<uint64_t>> FileMng::exportPendingOpsForInu
     }
   }
 
-  std::cout << "[DEBUG] Inside " << __func__ << "\t" << "res.size = " << res.size() << std::endl;
+  // std::cout << "[DEBUG] Inside " << __func__ << "\t" << "res.size = " << res.size() << std::endl;
   return res;
 }
 
 void FileMng::importPendingOpsForInum(cfs_ino_t inum, const std::unordered_map<pid_t, std::vector<uint64_t>> &pendingOps) {
-  std::cout << "[DEBUG] Inside " << __func__ << "\t" << "inum = " << inum << std::endl;
-  std::cout << "[DEBUG] Inside " << __func__ << "\t" << "pendingOps.size = " << pendingOps.size() << std::endl;
+  // std::cout << "[DEBUG] Inside " << __func__ << "\t" << "inum = " << inum << std::endl;
+  // std::cout << "[DEBUG] Inside " << __func__ << "\t" << "pendingOps.size = " << pendingOps.size() << std::endl;
   for (auto &[pid, reqList] : pendingOps) {
     fsWorker_->flushPendingOpMap[pid][inum] = reqList;
   }

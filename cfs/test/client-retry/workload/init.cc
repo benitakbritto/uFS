@@ -39,6 +39,10 @@ void printUsage(char *executableName);
  *****************************************************************************/
 
 int runInitWebserver(int numDirs, int numFilesPerDir, int fileSize) {  
+  if (fs_opendir(".") == nullptr) {
+    return -1;
+  }
+
   for (int d = 0; d < numDirs; d++) {
     std::string dirName = DIR_PREFIX + std::to_string(d);
     if (fs_mkdir(dirName.c_str(), 0755) != 0) {

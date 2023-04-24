@@ -104,9 +104,9 @@ thread_local bool notifyShm = true;
 
 void assignThreadId() {
   if (threadFsTid == 0) {
-   threadFsTid = gLibSharedContext->tidIncr++; 
-  }
-  gServMngPtr->retryMgr->appendNewLockToReqRingMapLockList();
+    threadFsTid = gLibSharedContext->tidIncr++; 
+    gServMngPtr->retryMgr->appendNewLockToReqRingMapLockList();
+  } 
 }
 
 uint64_t inline getNewRequestId() {
@@ -1155,9 +1155,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_PREAD: {
         ret = handle_pread_retry(requestId, buf);
         if (ret > 0) {
-          auto threadId = getThreadIdFromRequestId(requestId);
-          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
-          // WriteLock w_lock(_reqRingMapLock);
+          // auto threadId = getThreadIdFromRequestId(requestId);
+          // WriteLock w_lock(*_reqRingMapLockList[threadId].get());
+          WriteLock w_lock(_reqRingMapLock);
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1172,9 +1172,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
         ret = handle_allocated_pread_retry(requestId);
         _notifyShmForThread[threadFsTid] = false; // restore
         if (ret > 0) {
-          // WriteLock w_lock(_reqRingMapLock);
-          auto threadId = getThreadIdFromRequestId(requestId);
-          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
+          WriteLock w_lock(_reqRingMapLock);
+          // auto threadId = getThreadIdFromRequestId(requestId);
+          // WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1194,9 +1194,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_STAT: {
         ret = handle_stat_retry(requestId, statbuf);
         if (ret == 0) {
-          // WriteLock w_lock(_reqRingMapLock);
-          auto threadId = getThreadIdFromRequestId(requestId);
-          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
+          WriteLock w_lock(_reqRingMapLock);
+          // auto threadId = getThreadIdFromRequestId(requestId);
+          // WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1206,9 +1206,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_FSTAT: {
         ret = handle_fstat_retry(requestId, statbuf);
         if (ret == 0) {
-          // WriteLock w_lock(_reqRingMapLock);
-          auto threadId = getThreadIdFromRequestId(requestId);
-          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
+          WriteLock w_lock(_reqRingMapLock);
+          // auto threadId = getThreadIdFromRequestId(requestId);
+          // WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1218,9 +1218,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_OPEN: {
         ret = handle_open_retry(requestId);
         if (ret > 0) {
-          // WriteLock w_lock(_reqRingMapLock);
-          auto threadId = getThreadIdFromRequestId(requestId);
-          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
+          WriteLock w_lock(_reqRingMapLock);
+          // auto threadId = getThreadIdFromRequestId(requestId);
+          // WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1230,9 +1230,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_CLOSE: {
         ret = handle_close_retry(requestId);
         if (ret > 0) {
-          // WriteLock w_lock(_reqRingMapLock);
-          auto threadId = getThreadIdFromRequestId(requestId);
-          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
+          WriteLock w_lock(_reqRingMapLock);
+          // auto threadId = getThreadIdFromRequestId(requestId);
+          // WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1247,9 +1247,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
         ret = handle_opendir_retry(requestId, dir);
         _notifyShmForThread[threadFsTid] = false; // restore
         if (ret == 0) {
-          // WriteLock w_lock(_reqRingMapLock);
-          auto threadId = getThreadIdFromRequestId(requestId);
-          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
+          WriteLock w_lock(_reqRingMapLock);
+          // auto threadId = getThreadIdFromRequestId(requestId);
+          // WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           _reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1260,9 +1260,9 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
       case CFS_OP_FSYNC: {
         ret = handle_fsync_retry(requestId);
         if (ret > 0) {
-          // WriteLock w_lock(_reqRingMapLock);
-          auto threadId = getThreadIdFromRequestId(requestId);
-          WriteLock w_lock(*_reqRingMapLockList[threadId].get());
+          WriteLock w_lock(_reqRingMapLock);
+          // auto threadId = getThreadIdFromRequestId(requestId);
+          // WriteLock w_lock(*_reqRingMapLockList[threadId].get());
           this->_reqRingMap.erase(itr++);
         } else {
           itr++;
@@ -1415,9 +1415,12 @@ struct shmipc_mgr *PendingQueueMgr::getShmManager() {
 
 off_t PendingQueueMgr::shmipc_mgr_alloc_slot_pending(struct shmipc_mgr *mgr) {
   // TODO: Add config
+  int retryCount = 0;
   if (gServMngPtr->retryMgr->getPendingRequestPercentage() > 70) {
+  retry:
     fs_syncall();
     clean_up_notify_msg_from_server();
+    // getCountOfEmptySlots();
   }
 
   auto ring_idx = shmipc_mgr_alloc_slot(mgr);
@@ -1425,9 +1428,15 @@ off_t PendingQueueMgr::shmipc_mgr_alloc_slot_pending(struct shmipc_mgr *mgr) {
   // ring buffer is full
   // TODO: Fix this
   if (ring_idx == -1) {
-    std::cout << "[DEBUG] ring_idx is -1" << std::endl;
-    getCountOfEmptySlots();
-    exit(1); // Cannot proceed
+    // std::cout << "[DEBUG] ring_idx is -1" << std::endl;
+    // getCountOfEmptySlots();
+    // std::cout << "[DEBUG] going to retry" << std::endl;
+    // exit(1); // Cannot proceed
+    retryCount++;
+    if (retryCount >= 100) {
+      exit(1);
+    }
+    goto retry;
   }
 
   // printf("[DEBUG] ring_idx = %ld\n", ring_idx);

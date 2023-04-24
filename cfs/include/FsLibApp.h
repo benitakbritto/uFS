@@ -38,7 +38,7 @@ typedef std::shared_lock<Lock>  ReadLock;
 // On/Off of using app buffer, assume always use this if using allocated_X API
 // By default, enable APP BUF
 #define FS_LIB_USE_APP_BUF (1)
-#define REQUEST_ID_BASE 100000 
+#define REQUEST_ID_BASE 1000000
 
 // INVARIANT: threadFsTid == 0: thread uninitialized
 // Otherwise, threadFsTid >= 1
@@ -190,9 +190,9 @@ public:
   // }
 
   std::vector<off_t> getRingIdxsForRequest(uint64_t requestId) {    
-    // ReadLock r_lock(_reqRingMapLock);
-    auto threadId = getThreadIdFromRequestId(requestId);
-    ReadLock r_lock(*_reqRingMapLockList[threadId].get());
+    ReadLock r_lock(_reqRingMapLock);
+    // auto threadId = getThreadIdFromRequestId(requestId);
+    // ReadLock r_lock(*_reqRingMapLockList[threadId].get());
     if (_reqRingMap.count(requestId) == 0) {
       // std::cout << "[DEBUG] IMPORTANT request id does not exist in map" << std::endl; fflush(stdout);
       // _leftoverRequestToBeCleaned.insert(requestId);
@@ -204,26 +204,26 @@ public:
   }
 
   bool doesRequestIdExistInRingMap(uint64_t requestId) {
-    // ReadLock r_lock(_reqRingMapLock);
-    auto threadId = getThreadIdFromRequestId(requestId);
-    ReadLock r_lock(*_reqRingMapLockList[threadId].get());
+    ReadLock r_lock(_reqRingMapLock);
+    // auto threadId = getThreadIdFromRequestId(requestId);
+    // ReadLock r_lock(*_reqRingMapLockList[threadId].get());
     return _reqRingMap.count(requestId) != 0;
   }
 
   // Assumes requestId exists
   off_t getFirstRingIdxForRequest(uint64_t requestId) {
-    // ReadLock r_lock(_reqRingMapLock);
-    auto threadId = getThreadIdFromRequestId(requestId);
-    ReadLock r_lock(*_reqRingMapLockList[threadId].get());
+    ReadLock r_lock(_reqRingMapLock);
+    // auto threadId = getThreadIdFromRequestId(requestId);
+    // ReadLock r_lock(*_reqRingMapLockList[threadId].get());
     return _reqRingMap[requestId][0];
   }
 
   void removeRequestFromRingMap(uint64_t requestId) {
     if (_reqRingMap.count(requestId) != 0) {
       // std::cout << "[DEBUG] Deleted requestId = " << requestId << std::endl;
-      // WriteLock w_lock(_reqRingMapLock);
-      auto threadId = getThreadIdFromRequestId(requestId);
-      WriteLock w_lock(*_reqRingMapLockList[threadId].get());
+      WriteLock w_lock(_reqRingMapLock);
+      // auto threadId = getThreadIdFromRequestId(requestId);
+      // WriteLock w_lock(*_reqRingMapLockList[threadId].get());
       if (_reqRingMap.count(requestId) != 0) {
         _reqRingMap.erase(requestId);
       }
@@ -234,8 +234,8 @@ public:
   // NOTE: caller thread specific
   // TODO: Test
   uint64_t getLastRequestIdForThread() {
-    // ReadLock r_lock(_reqRingMapLock);
-    ReadLock r_lock(*_reqRingMapLockList[threadFsTid].get());
+    ReadLock r_lock(_reqRingMapLock);
+    // ReadLock r_lock(*_reqRingMapLockList[threadFsTid].get());
     auto endRequestIdItr = _reqRingMap.lower_bound((threadFsTid + 1) * REQUEST_ID_BASE);
     if ((--endRequestIdItr) == _reqRingMap.end()) {
       return 0;
@@ -248,16 +248,16 @@ public:
   // NOTE: caller thread specific
   // TODO: Test
   std::map<uint64_t, std::vector<off_t>>::iterator getStartIteratorForThread() {
-    // ReadLock r_lock(_reqRingMapLock);
-    ReadLock r_lock(*_reqRingMapLockList[threadFsTid].get());
+    ReadLock r_lock(_reqRingMapLock);
+    // ReadLock r_lock(*_reqRingMapLockList[threadFsTid].get());
     return _reqRingMap.lower_bound(threadFsTid * REQUEST_ID_BASE);
   }
 
   // NOTE: caller thread specific
   // TODO: Test
   std::map<uint64_t, std::vector<off_t>>::iterator getEndIteratorForThread() {
-    // ReadLock r_lock(_reqRingMapLock);
-    ReadLock r_lock(*_reqRingMapLockList[threadFsTid].get());
+    ReadLock r_lock(_reqRingMapLock);
+    // ReadLock r_lock(*_reqRingMapLockList[threadFsTid].get());
     return _reqRingMap.lower_bound((threadFsTid + 1) * REQUEST_ID_BASE);
   }
 
@@ -265,8 +265,8 @@ public:
   // Note: This is expensive
   // TODO: Improve on this
   std::map<uint64_t, std::vector<off_t>> getReqRingMap() {
-    // ReadLock r_lock(_reqRingMapLock);
-    ReadLock r_lock(*_reqRingMapLockList[threadFsTid].get());
+    ReadLock r_lock(_reqRingMapLock);
+    // ReadLock r_lock(*_reqRingMapLockList[threadFsTid].get());
     auto startRequestIdItr = getStartIteratorForThread();
     auto endRequestIdItr = getEndIteratorForThread();
 
@@ -279,44 +279,44 @@ public:
   }
 
   void addOffsetToRingMapForRequest(uint64_t requestId, off_t off) {
-    // WriteLock w_lock(_reqRingMapLock);
-    auto threadId = getThreadIdFromRequestId(requestId);
-    WriteLock w_lock(*_reqRingMapLockList[threadId].get());
+    WriteLock w_lock(_reqRingMapLock);
+    // auto threadId = getThreadIdFromRequestId(requestId);
+    // WriteLock w_lock(*_reqRingMapLockList[threadId].get());
     this->_reqRingMap[requestId].push_back(off);
   }
 
   // Data Map
   void removeRequestFromDataMap(uint64_t requestId) {
-    auto threadId = getThreadIdFromRequestId(requestId);
-    WriteLock w_lock(*_reqAllocDataMapLockList[threadId].get());
-    // WriteLock w_lock(_reqAllocDataMapLock);
+    // auto threadId = getThreadIdFromRequestId(requestId);
+    // WriteLock w_lock(*_reqAllocDataMapLockList[threadId].get());
+    WriteLock w_lock(_reqAllocDataMapLock);
     if (this->_reqAllocatedDataMap.count(requestId) != 0) {
       void *buf = this->_reqAllocatedDataMap[requestId];
       this->_reqAllocatedDataMap.erase(requestId);
-      fs_free(buf);
+      // fs_free(buf); // NOTE: Uncomment
       buf = nullptr;
     }
     
   }
 
   void *getRequestBufPtrFromDataMap(uint64_t requestId) {
-    // ReadLock r_lock(_reqAllocDataMapLock);
-    auto threadId = getThreadIdFromRequestId(requestId);
-    ReadLock r_lock(*_reqAllocDataMapLockList[threadId].get());
+    ReadLock r_lock(_reqAllocDataMapLock);
+    // auto threadId = getThreadIdFromRequestId(requestId);
+    // ReadLock r_lock(*_reqAllocDataMapLockList[threadId].get());
     return this->_reqAllocatedDataMap[requestId];
   }
 
   void addBufPtrToDataMapForRequest(uint64_t requestId, void *buf) {
-    // WriteLock w_lock(_reqAllocDataMapLock);
-    auto threadId = getThreadIdFromRequestId(requestId);
-    WriteLock w_lock(*_reqAllocDataMapLockList[threadId].get());
+    WriteLock w_lock(_reqAllocDataMapLock);
+    // auto threadId = getThreadIdFromRequestId(requestId);
+    // WriteLock w_lock(*_reqAllocDataMapLockList[threadId].get());
     this->_reqAllocatedDataMap[requestId] = buf;
   }
 
   bool isRequestAnAllocatedType(uint64_t requestId) {
-    // ReadLock r_lock(_reqAllocDataMapLock);
-    auto threadId = getThreadIdFromRequestId(requestId);
-    ReadLock r_lock(*_reqAllocDataMapLockList[threadId].get());
+    ReadLock r_lock(_reqAllocDataMapLock);
+    // auto threadId = getThreadIdFromRequestId(requestId);
+    // ReadLock r_lock(*_reqAllocDataMapLockList[threadId].get());
     return this->_reqAllocatedDataMap.count(requestId) != 0;
   }
 
@@ -325,7 +325,7 @@ public:
   std::thread detectServerAliveThread;
 
   int getPendingRequestPercentage() {
-    // ReadLock r_lock(_reqRingMapLock);
+    ReadLock r_lock(_reqRingMapLock);
     // int size = _reqRingMapLockList.size();
     // for (int i = 0; i < size; i++) {
     //   ReadLock r_lock(*_reqRingMapLockList[i].get());
@@ -336,8 +336,8 @@ public:
   }
 
   void appendNewLockToReqRingMapLockList() {
-    _reqRingMapLockList.emplace_back(std::make_unique<std::shared_mutex>());
-    _reqAllocDataMapLockList.emplace_back(std::make_unique<std::shared_mutex>());
+    // _reqRingMapLockList.emplace_back(std::make_unique<std::shared_mutex>());
+    // _reqAllocDataMapLockList.emplace_back(std::make_unique<std::shared_mutex>());
   }
 
 private:
@@ -347,10 +347,10 @@ private:
   // std::unordered_set<uint64_t> _leftoverRequestToBeCleaned; // create -> pending paradigm 
   std::unordered_map<uint64_t, void *> _reqAllocatedDataMap;
   int _backgroundThreadId = 10000;
-  // Lock _reqRingMapLock; // TODO: Remove
-  std::vector<std::unique_ptr<Lock>> _reqRingMapLockList;
-  std::vector<std::unique_ptr<Lock>> _reqAllocDataMapLockList;
-  // Lock _reqAllocDataMapLock; // TODO: Remove
+  Lock _reqRingMapLock; // TODO: Remove
+  // std::vector<std::unique_ptr<Lock>> _reqRingMapLockList;
+  // std::vector<std::unique_ptr<Lock>> _reqAllocDataMapLockList;
+  Lock _reqAllocDataMapLock; // TODO: Remove
 };
 
 class PendingQueueMgr {
@@ -388,6 +388,7 @@ class PendingQueueMgr {
       }
     }
 
+    std::cout << "Empty slots are = " << count << std::endl;
     return count;
   }
   

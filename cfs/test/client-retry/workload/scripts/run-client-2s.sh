@@ -1,19 +1,19 @@
 #!/bin/sh
 
 # Workload: webserver-ro seq
-# echo "Read only"
-# for thread in $(seq 1 5); do
-#     echo "Running Workload: webserver-ro threads = $thread"
-#     for run in $(seq 1 5); do
-#         echo "run = {$run}"
-#         sleep 10
-#         EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/workload/webserver
-#         $EXECUTABLE -p 1,3 -n $thread -f 2 -r 100 -i 1024 -t 0
+echo "Read only"
+for thread in $(seq 1 5); do
+    echo "Running Workload: webserver-ro threads = $thread"
+    for run in $(seq 1 5); do
+        echo "run = {$run}"
+        sleep 10
+        EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/workload/webserver
+        $EXECUTABLE -p 5,6,3 -n $thread -f 2 -r 100 -i 1024 -t 0
 
-#         # kill server
-#         sudo killall fsMain
-#     done
-# done
+        # kill server
+        sudo killall fsMain
+    done
+done
 
 # Workload: webserver-ro random
 # echo "Read only"
@@ -23,7 +23,7 @@
 #         echo "run = {$run}"
 #         sleep 10
 #         EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/workload/webserver
-#         $EXECUTABLE -p 1,3 -n $thread -f 2 -r 100 -i 1024 -t 3
+#         $EXECUTABLE -p 5,6,3 -n $thread -f 2 -r 100 -i 1024 -t 3
 
 #         # kill server
 #         sudo killall fsMain
@@ -38,7 +38,7 @@
 #         echo "run = {$run}"
 #         sleep 20
 #         EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/workload/webserver
-#         $EXECUTABLE -p 1,3 -n $thread -f 2 -r 100 -w 100 -i 1024 -t 1
+#         $EXECUTABLE -p 5,6,3 -n $thread -f 2 -r 100 -w 100 -i 1024 -t 1
 
 #         # kill server
 #         sudo killall fsMain
@@ -53,7 +53,7 @@
 #         echo "run = {$run}"
 #         sleep 20
 #         EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/workload/webserver
-#         $EXECUTABLE -p 1,3 -n $thread -f 2 -r 100 -w 100 -i 1024 -t 2
+#         $EXECUTABLE -p 5,6,3 -n $thread -f 2 -r 100 -w 100 -i 1024 -t 2
 
 #         # kill server
 #         sudo killall fsMain
@@ -69,7 +69,7 @@
 #         sleep 20
 #         echo "run = {$run} awake"
 #         EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/workload/webserver
-#         $EXECUTABLE -p 1,3 -n $thread -f 2 -r 100 -w 100 -i 1024 -t 4
+#         $EXECUTABLE -p 5,6,3 -n $thread -f 2 -r 100 -w 100 -i 1024 -t 4
 
 #         # kill server
 #         sudo killall fsMain
@@ -85,7 +85,7 @@
 #         sleep 20
 #         echo "run = {$run} awake"
 #         EXECUTABLE=/users/bbritto/workspace/uFS/cfs/build/test/client-retry/workload/webserver
-#         $EXECUTABLE -p 1,3 -n $thread -f 2 -r 100 -w 100 -i 1024 -t 5
+#         $EXECUTABLE -p 5,6,3 -n $thread -f 2 -r 100 -w 100 -i 1024 -t 5
 
 #         # kill server
 #         sudo killall fsMain

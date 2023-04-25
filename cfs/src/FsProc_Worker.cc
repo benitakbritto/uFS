@@ -1694,7 +1694,7 @@ struct clientOp *FsProcWorker::getClientOpForMsg(AppProc *app,
       break;
 #endif
     default:
-      SPDLOG_ERROR("could not unpack/copy msg for opcode:{}", copPtr->opCode);
+      // SPDLOG_ERROR("could not unpack/copy msg for opcode:{}", copPtr->opCode);
       break;
   }
 

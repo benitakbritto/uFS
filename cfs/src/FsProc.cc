@@ -923,7 +923,7 @@ void FsReq::initReqFromCop(AppProc *curApp, off_t curSlotId,
     }
 #endif
     default:
-      SPDLOG_ERROR("op not supported opcode:{}", copPtr->opCode);
+      // SPDLOG_ERROR("op not supported opcode:{}", copPtr->opCode);
       break;
   }
 

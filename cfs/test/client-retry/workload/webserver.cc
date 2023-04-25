@@ -34,7 +34,7 @@ enum TestCase {
 std::string getReadFilePath(int index, int threadId);
 std::string getWriteFilePath(int index, int threadId);
 int callOpen(std::string path);
-int getReadFileInode(int index, int threadId);
+int getReadFileInode(int index, int threadId, bool isRead = false);
 int getWriteFileInode(int index, int threadId);
 int readFile(int index, int fileSize, int ioSize, int threadId);
 int overwriteFile(int index, int fileSize, int ioSize, int threadId);
@@ -64,15 +64,23 @@ int callOpen(std::string path) {
   auto ino = fs_open(path.c_str(), O_RDWR, 0);
   if (ino == 0) {
     fprintf(stderr, "fs_open() failed for file %s\n", path.c_str());
-    return -1;
+    // return -1;
   }
 
   return ino;
 }
 
-int getReadFileInode(int index, int threadId) {
+int getReadFileInode(int index, int threadId, bool isRead) {
   std::string path = getReadFilePath(index, threadId);
-  return callOpen(path);
+  int ino = callOpen(path);
+  
+  // if (threadId != 0 && isRead && fs_admin_inode_reassignment(1, ino, 0, threadId) != 0) {
+  //   std::cout << "[DEBUG] Inode reassignment failed" << std::endl;
+  //   exit(1);
+  // }
+
+  // sleep(1);
+  return ino;
 }
 
 int getWriteFileInode(int index, int threadId) {
@@ -81,22 +89,11 @@ int getWriteFileInode(int index, int threadId) {
 }
 
 int readFile(int index, int fileSize, int ioSize, int threadId) {
-  int ino = getReadFileInode(index, threadId);
+  int ino = getReadFileInode(index, threadId, true);
   if (ino == 0) {
-    return -1;
+    // return -1;
   }
 
-  // odd threads go to backup server
-  if (threadId % 2 == 1) {
-    // set ownership
-    int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
-    assert(ret == 0);
-
-    // check ownership
-    ret = fs_admin_inode_reassignment(0, ino, 1, -1);
-    assert(ret == 0);
-  }
-  
   char *buf = (char *) fs_malloc(ioSize + 1);
   memset(buf, 0, ioSize + 1);
 
@@ -106,34 +103,23 @@ int readFile(int index, int fileSize, int ioSize, int threadId) {
     if (ret != ioSize) {
       fprintf(stderr, "fs_allocated_read() failed. Received %ld\n", 
         ret);
-      return -1;
+      // return -1;
     }
   }
 
   fs_free(buf);
 
   if (closeFile(ino) != 0) {
-    return -1;
+    // return -1;
   }
 
   return 0;
 }
 
 int readFileRandomOffset(int index, int fileSize, int ioSize, int threadId) {
-  int ino = getReadFileInode(index, threadId);
+  int ino = getReadFileInode(index, threadId, true);
   if (ino == 0) {
-    return -1;
-  }
-
-  // odd threads go to backup server
-  if (threadId % 2 == 1) {
-    // set ownership
-    int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
-    assert(ret == 0);
-
-    // check ownership
-    ret = fs_admin_inode_reassignment(0, ino, 1, -1);
-    assert(ret == 0);
+    // return -1;
   }
 
   char *buf = (char *) fs_malloc(ioSize + 1);
@@ -146,14 +132,14 @@ int readFileRandomOffset(int index, int fileSize, int ioSize, int threadId) {
     if (ret != ioSize) {
       fprintf(stderr, "fs_allocated_read() failed. Received %ld\n", 
         ret);
-      return -1;
+      // return -1;
     }
   }
 
   fs_free(buf);
 
   if (closeFile(ino) != 0) {
-    return -1;
+    // return -1;
   }
 
   return 0;
@@ -162,7 +148,7 @@ int readFileRandomOffset(int index, int fileSize, int ioSize, int threadId) {
 int closeFile(int ino) {
   if (fs_close(ino) != 0) {
     fprintf(stderr, "fs_close() failed\n");
-    return -1;
+    // return -1;
   } 
 
   return 0;
@@ -170,17 +156,6 @@ int closeFile(int ino) {
 
 int overwriteFile(int index, int fileSize, int ioSize, int threadId) {
   int ino = getReadFileInode(index, threadId);
-
-  // odd threads go to backup server
-  // if (threadId % 2 == 1) {
-  //   // set ownership
-  //   int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
-  //   assert(ret == 0);
-
-  //   // check ownership
-  //   ret = fs_admin_inode_reassignment(0, ino, 1, -1);
-  //   assert(ret == 0);
-  // }
 
   int iterations = (fileSize * ONE_MB) / ioSize;
 
@@ -193,14 +168,14 @@ int overwriteFile(int index, int fileSize, int ioSize, int threadId) {
     if (fs_allocated_pwrite(ino, buf, ioSize, i * ioSize) != ioSize) {
       
       fprintf(stderr, "fs_allocated_write() failed.\n");
-      return -1;
+      // return -1;
     } 
 
     // fs_syncall();
   }  
 
   if (closeFile(ino) != 0) {
-    return -1;
+    // return -1;
   }
 
   // fs_free(buf);
@@ -211,17 +186,6 @@ int overwriteFile(int index, int fileSize, int ioSize, int threadId) {
 int overwriteFileSync(int index, int fileSize, int ioSize, int threadId) {
   int ino = getReadFileInode(index, threadId);
 
-  // odd threads go to backup server
-  // if (threadId % 2 == 1) {
-  //   // set ownership
-  //   int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
-  //   assert(ret == 0);
-
-  //   // check ownership
-  //   ret = fs_admin_inode_reassignment(0, ino, 1, -1);
-  //   assert(ret == 0);
-  // }
-
   int iterations = (fileSize * ONE_MB) / ioSize;
 
   char* buf = (char *) fs_malloc(ioSize + 1);
@@ -233,14 +197,14 @@ int overwriteFileSync(int index, int fileSize, int ioSize, int threadId) {
     if (fs_allocated_pwrite(ino, buf, ioSize, i * ioSize) != ioSize) {
       
       fprintf(stderr, "fs_allocated_write() failed.\n");
-      return -1;
+      // return -1;
     } 
 
     fs_syncall();
   }  
 
   if (closeFile(ino) != 0) {
-    return -1;
+    // return -1;
   }
 
   // fs_free(buf);
@@ -251,33 +215,22 @@ int overwriteFileSync(int index, int fileSize, int ioSize, int threadId) {
 int overwriteFileRandomOffset(int index, int fileSize, int ioSize, int threadId) {
   int ino = getReadFileInode(index, threadId);
 
-  // odd threads go to backup server
-  // if (threadId % 2 == 1) {
-  //   // set ownership
-  //   int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
-  //   assert(ret == 0);
-
-  //   // check ownership
-  //   ret = fs_admin_inode_reassignment(0, ino, 1, -1);
-  //   assert(ret == 0);
-  // }
-
   int iterations = (fileSize * ONE_MB) / ioSize;
+  char* buf = (char *) fs_malloc(ioSize + 1);
+  memset(buf, 0, ioSize + 1);
+  memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
 
-  for (int i = 0; i < iterations; i++) {
-    char* buf = (char *) fs_malloc(ioSize + 1);
-    memset(buf, 0, ioSize + 1);
-    memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
+  for (int i = 0; i < iterations; i++) {  
     int offset = rand() % (fileSize - ioSize);
     // std::cout << "[DEBUG] i = " << i << std::endl;
     if (fs_allocated_pwrite(ino, buf, ioSize, offset) != ioSize) {
       fprintf(stderr, "fs_allocated_write() failed.\n");
-      return -1;
+      // return -1;
     } 
   }  
 
   if (closeFile(ino) != 0) {
-    return -1;
+    // return -1;
   }
 
   // fs_free(buf);
@@ -288,35 +241,24 @@ int overwriteFileRandomOffset(int index, int fileSize, int ioSize, int threadId)
 int overwriteFileRandomOffsetSync(int index, int fileSize, int ioSize, int threadId) {
   int ino = getReadFileInode(index, threadId);
 
-  // odd threads go to backup server
-  // if (threadId % 2 == 1) {
-  //   // set ownership
-  //   int ret = fs_admin_inode_reassignment(1, ino, 0, 1);
-  //   assert(ret == 0);
-
-  //   // check ownership
-  //   ret = fs_admin_inode_reassignment(0, ino, 1, -1);
-  //   assert(ret == 0);
-  // }
-
   int iterations = (fileSize * ONE_MB) / ioSize;
+  char* buf = (char *) fs_malloc(ioSize + 1);
+  memset(buf, 0, ioSize + 1);
+  memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
 
   for (int i = 0; i < iterations; i++) {
-    char* buf = (char *) fs_malloc(ioSize + 1);
-    memset(buf, 0, ioSize + 1);
-    memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
     int offset = rand() % (fileSize - ioSize);
     // std::cout << "[DEBUG] i = " << i << std::endl;
     if (fs_allocated_pwrite(ino, buf, ioSize, offset) != ioSize) {
       fprintf(stderr, "fs_allocated_write() failed.\n");
-      return -1;
+      // return -1;
     } 
 
     fs_syncall();
   }  
 
   if (closeFile(ino) != 0) {
-    return -1;
+    // return -1;
   }
 
   // fs_free(buf);
@@ -328,7 +270,7 @@ int runReadSeq(int threadId, int numFilesPerDir, int readFileSize,
   int ioSize) {
   for (int i = 0; i < numFilesPerDir; i++) {
     if (readFile(i, readFileSize, ioSize, threadId) == -1) {
-        return -1;
+        // return -1;
       }
   }
 
@@ -339,7 +281,7 @@ int runReadRandom(int threadId, int numFilesPerDir, int readFileSize,
   int ioSize) {
   for (int i = 0; i < numFilesPerDir; i++) {
     if (readFileRandomOffset(i, readFileSize, ioSize, threadId) == -1) {
-        return -1;
+        // return -1;
       }
   }
 
@@ -351,14 +293,16 @@ int runReadWriteSeq(int threadId, int numFilesPerDir, int readFileSize,
   for (int i = 0; i < numFilesPerDir; i++) {
     // Read whole file in IO_SIZE chunks
     if (readFile(i, readFileSize, ioSize, threadId) == -1) {
-      return -1;
+      // return -1;
     }
     
     // Overwrite whole file in IO_SIZE chunks
     if (overwriteFile(i, writeFileSize, ioSize, threadId) == -1) {
-      return -1;
+      // return -1;
     }
   }
+
+  return 0;
 }
 
 int runReadWriteSeqSync(int threadId, int numFilesPerDir, int readFileSize, 
@@ -366,14 +310,16 @@ int runReadWriteSeqSync(int threadId, int numFilesPerDir, int readFileSize,
   for (int i = 0; i < numFilesPerDir; i++) {
     // Read whole file in IO_SIZE chunks
     if (readFile(i, readFileSize, ioSize, threadId) == -1) {
-      return -1;
+      // return -1;
     }
     
     // Overwrite whole file in IO_SIZE chunks
     if (overwriteFileSync(i, writeFileSize, ioSize, threadId) == -1) {
-      return -1;
+      // return -1;
     }
   }
+
+  return 0;
 }
 
 int runReadWriteRandom(int threadId, int numFilesPerDir, int readFileSize, 
@@ -381,14 +327,16 @@ int runReadWriteRandom(int threadId, int numFilesPerDir, int readFileSize,
   for (int i = 0; i < numFilesPerDir; i++) {
     // Read whole file in IO_SIZE chunks
     if (readFile(i, readFileSize, ioSize, threadId) == -1) {
-      return -1;
+      // return -1;
     }
     
     // Overwrite whole file in IO_SIZE chunks
     if (overwriteFileRandomOffset(i, writeFileSize, ioSize, threadId) == -1) {
-      return -1;
+      // return -1;
     }
   }
+
+  return 0;
 }
 
 int runReadWriteRandomSync(int threadId, int numFilesPerDir, int readFileSize, 
@@ -396,19 +344,21 @@ int runReadWriteRandomSync(int threadId, int numFilesPerDir, int readFileSize,
   for (int i = 0; i < numFilesPerDir; i++) {
     // Read whole file in IO_SIZE chunks
     if (readFile(i, readFileSize, ioSize, threadId) == -1) {
-      return -1;
+      // return -1;
     }
     
     // Overwrite whole file in IO_SIZE chunks
     if (overwriteFileRandomOffsetSync(i, writeFileSize, ioSize, threadId) == -1) {
-      return -1;
+      // return -1;
     }
   }
+
+  return 0;
 }
 
 int runTask(int threadId, int numFilesPerDir, int readFileSize, 
   int writeFileSize, int ioSize, int type) {
-    
+
   switch(type) {
     case TestCase::READ_ONLY_SEQ:
       return runReadSeq(threadId, numFilesPerDir, readFileSize, ioSize);
@@ -452,7 +402,7 @@ int runWorkload(int numThreads, int numFilesPerDir, int readFileSize,
 
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   auto elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count();
-  printElapsedTime("webserver-ro", elapsedTime);
+  printElapsedTime(std::to_string(type), elapsedTime);
 
   return 0;
 }

@@ -1,0 +1,496 @@
+Read only seq
+Running Workload: webserver-ro threads = 1
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+0 : 3696342332 ns
+Running Workload: webserver-ro threads = 2
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+0 : 3796746826 ns
+Running Workload: webserver-ro threads = 3
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+0 : 3844917884 ns
+Running Workload: webserver-ro threads = 4
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+0 : 3941944454 ns
+Running Workload: webserver-ro threads = 5
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+0 : 3949871278 ns
+Read only random
+Running Workload: webserver-ro threads = 1
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+3 : 318782384 ns
+Running Workload: webserver-ro threads = 2
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+3 : 465026091 ns
+Running Workload: webserver-ro threads = 3
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+3 : 530249893 ns
+Running Workload: webserver-ro threads = 4
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+3 : 644783773 ns
+Running Workload: webserver-ro threads = 5
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+3 : 752744738 ns
+Read write seq
+Running Workload: webserver-rw threads = 1
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+1 : 6882888723 ns
+Running Workload: webserver-rw threads = 2
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+1 : 7219984122 ns
+Running Workload: webserver-rw threads = 3
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+1 : 8073658487 ns
+Running Workload: webserver-rw threads = 4
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+1 : 8506772183 ns
+Running Workload: webserver-rw threads = 5
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+1 : 10380883483 ns
+Read write seq sync
+Running Workload: webserver-rw threads = 1
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+2 : 6245580213 ns
+Running Workload: webserver-rw threads = 2
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+2 : 8986834997 ns
+Running Workload: webserver-rw threads = 3
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+2 : 11395508528 ns
+Running Workload: webserver-rw threads = 4
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+2 : 14109064214 ns
+Running Workload: webserver-rw threads = 5
+run = {1}
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+2 : 16570978578 ns
+Read write random
+Running Workload: webserver-rw threads = 1
+run = {1}
+run = {1} awake
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+4 : 6756779499 ns
+Running Workload: webserver-rw threads = 2
+run = {1}
+run = {1} awake
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+4 : 6876080527 ns
+Running Workload: webserver-rw threads = 3
+run = {1}
+run = {1} awake
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+4 : 7599611696 ns
+Running Workload: webserver-rw threads = 4
+run = {1}
+run = {1} awake
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+4 : 8501254418 ns
+Running Workload: webserver-rw threads = 5
+run = {1}
+run = {1} awake
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+4 : 14146961226 ns
+Read write random sync
+Running Workload: webserver-rw threads = 1
+run = {1}
+run = {1} awake
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+5 : 6328929923 ns
+Running Workload: webserver-rw threads = 2
+run = {1}
+run = {1} awake
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+5 : 9243809186 ns
+Running Workload: webserver-rw threads = 3
+run = {1}
+run = {1} awake
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+5 : 11825870358 ns
+Running Workload: webserver-rw threads = 4
+run = {1}
+run = {1} awake
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+5 : 14507211378 ns
+Running Workload: webserver-rw threads = 5
+run = {1}
+run = {1} awake
+MIMIC_APP_ZC - OFF
+INFO PendingQueueMgr connected to contrl shm at /shmipc_mgr_20190304
+fs_init_multi-> init for key:20190302 map key is: 0
+INFO initService connected to contrl shm at /shmipc_mgr_20190302
+fs_init_multi-> init for key:20190305 map key is: 1
+INFO initService connected to contrl shm at /shmipc_mgr_20190305
+fs_init_multi-> init for key:20190306 map key is: 2
+INFO initService connected to contrl shm at /shmipc_mgr_20190306
+fs_init_multi-> init for key:20190307 map key is: 3
+INFO initService connected to contrl shm at /shmipc_mgr_20190307
+========> attachPageCacheShm server?:0=========>
+fs_init_multi success
+[INFO] client connection successful
+5 : 17184311466 ns

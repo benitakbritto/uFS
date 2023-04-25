@@ -224,7 +224,7 @@ void FileMng::ReassignmentOp::ProcessInodeReassignmentReq(FileMng *mng,
 
   struct inodeReassignmentOp &irop = req->copPtr->op.inodeReassignment;
   if (mng->fsWorker_->getWid() != irop.curOwner) {
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     req->setError(FS_REQ_ERROR_POSIX_EACCES);
     mng->fsWorker_->submitFsReqCompletion(req);
     return;
@@ -234,7 +234,7 @@ void FileMng::ReassignmentOp::ProcessInodeReassignmentReq(FileMng *mng,
   // Existence in map does not mean it owns it (atleast right now, since primary
   // also has it in the map).
   if (minode == nullptr || minode->getManageWorkerId() != irop.curOwner) {
-    std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
+    // std::cout << "[BENITA]" << __func__ << "\t" << __LINE__ << std::endl;
     req->setError(FS_REQ_ERROR_POSIX_EPERM);
     mng->fsWorker_->submitFsReqCompletion(req);
     return;

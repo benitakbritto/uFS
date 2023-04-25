@@ -26,6 +26,7 @@ enum TestCase {
   READ_ONLY_RANDOM, // 3
   READ_WRITE_RANDOM, // 4
   READ_WRITE_RANDOM_SYNC, // 5
+  SINGLE_WRITE, // 6
 };
 
 /******************************************************************************
@@ -183,6 +184,35 @@ int overwriteFile(int index, int fileSize, int ioSize, int threadId) {
   return 0;
 }
 
+int overwriteFileSingle(int ioSize, int writeCount) {
+  int ino = getReadFileInode(0, 0);
+
+  char* buf = (char *) fs_malloc(ioSize + 1);
+  memset(buf, 0, ioSize + 1);
+  memcpy(buf, generateString("a", ioSize).c_str(), ioSize);
+ 
+  for (int i = 0; i < writeCount; i++) {
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    
+    if (fs_allocated_pwrite(ino, buf, ioSize, i * ioSize) != ioSize) {
+      fprintf(stderr, "fs_allocated_write() failed.\n");
+      // return -1;
+    } 
+
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    auto elapsedTime = std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count();
+    printElapsedTime("write singe at itr " + std::to_string(i), elapsedTime);
+  }  
+
+  if (closeFile(ino) != 0) {
+    // return -1;
+  }
+
+  fs_free(buf);
+  
+  return 0;
+}
+
 int overwriteFileSync(int index, int fileSize, int ioSize, int threadId) {
   int ino = getReadFileInode(index, threadId);
 
@@ -213,6 +243,7 @@ int overwriteFileSync(int index, int fileSize, int ioSize, int threadId) {
 }
 
 int overwriteFileRandomOffset(int index, int fileSize, int ioSize, int threadId) {
+  
   int ino = getReadFileInode(index, threadId);
 
   int iterations = (fileSize * ONE_MB) / ioSize;
@@ -372,6 +403,8 @@ int runTask(int threadId, int numFilesPerDir, int readFileSize,
       return runReadWriteRandom(threadId, numFilesPerDir, readFileSize, writeFileSize, ioSize);
     case TestCase::READ_WRITE_RANDOM_SYNC:
       return runReadWriteRandomSync(threadId, numFilesPerDir, readFileSize, writeFileSize, ioSize);
+    case TestCase::SINGLE_WRITE:
+      return overwriteFileSingle(ioSize, 64 /*writeCount*/);
   }
   
   return 0;

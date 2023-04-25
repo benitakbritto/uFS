@@ -1068,21 +1068,21 @@ int RetryMgr::handle_fdatasync_retry(uint64_t requestId) {
 // TODO: fs_rename
 int RetryMgr::fs_retry_pending_ops(void *buf, struct stat *statbuf, 
   CFS_DIR *dir) {
-  std::cout << "[DEBUG] Inside " << __func__ << " threadFsTid = " << threadFsTid <<  std::endl;
+  // std::cout << "[DEBUG] Inside " << __func__ << " threadFsTid = " << threadFsTid <<  std::endl;
   std::lock_guard<std::recursive_mutex> lk(gRetryOpLock);
 
-  std::cout << "[DEBUG] " << __func__ << ": I have the lock ..." 
-    << threadFsTid << std::endl;
+  // std::cout << "[DEBUG] " << __func__ << ": I have the lock ..." 
+    // << threadFsTid << std::endl;
   
-  std::cout << "[DEBUG] " << __func__ << ": Checking connection with server" << " threadFsTid = " << threadFsTid <<  std::endl;
+  // std::cout << "[DEBUG] " << __func__ << ": Checking connection with server" << " threadFsTid = " << threadFsTid <<  std::endl;
   auto ret = check_primary_server_availability();
   if (ret == -1) {
     print_server_unavailable(__func__);
     return -1;
   } else {
-    std::cout << "[DEBUG] " << __func__ << ": Connected to server successfully" << " threadFsTid = " << threadFsTid <<  std::endl;
+    // std::cout << "[DEBUG] " << __func__ << ": Connected to server successfully" << " threadFsTid = " << threadFsTid <<  std::endl;
     int numThreads = gLibSharedContext->tidIncr.load(); 
-    std::cout << "[DEBUG] " << __func__ << ": numThreads = " << numThreads << " threadFsTid = " << threadFsTid <<  std::endl;
+    // std::cout << "[DEBUG] " << __func__ << ": numThreads = " << numThreads << " threadFsTid = " << threadFsTid <<  std::endl;
     initNotifyShmForThread(numThreads);
 
     if (threadFsTid == _backgroundThreadId) {
@@ -1104,13 +1104,13 @@ int RetryMgr::fs_retry_pending_ops(void *buf, struct stat *statbuf,
 
 int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf, 
   CFS_DIR *dir, bool isBackground) {
-  std::cout << "[DEBUG] " << __func__ << ": threadFsTid = " << threadFsTid << std::endl;
+  // std::cout << "[DEBUG] " << __func__ << ": threadFsTid = " << threadFsTid << std::endl;
   // Clear out fsync pending
   clean_up_notify_msg_from_server(false /*sleep*/);
 
   bool foundFirstNotifyShm = false;
   uint64_t lastRequestId = getLastRequestIdForThread();
-  std::cout << "[DEBUG] " << __func__ << ": lastRequestId = " << lastRequestId << std::endl;
+  // std::cout << "[DEBUG] " << __func__ << ": lastRequestId = " << lastRequestId << std::endl;
   if (lastRequestId == 0) {
     return 0;
   }  
@@ -1120,8 +1120,8 @@ int RetryMgr::fs_retry_pending_ops_for_thread(void *buf, struct stat *statbuf,
   auto endItr = getEndIteratorForThread();
 
   for (auto itr = startItr; itr != endItr;) {
-    std::cout << "[DEBUG] " << __func__ << ": Retrying request #" << itr->first << ", threadFsTid = " << threadFsTid << std::endl;
-    std::cout << "[DEBUG] " << __func__ << ": isBackground = " << isBackground << std::endl; 
+    // std::cout << "[DEBUG] " << __func__ << ": Retrying request #" << itr->first << ", threadFsTid = " << threadFsTid << std::endl;
+    // std::cout << "[DEBUG] " << __func__ << ": isBackground = " << isBackground << std::endl; 
     auto requestId = itr->first;
 
     // background thread should skip last request as the main/worker thread will request for this
@@ -2095,12 +2095,12 @@ std::vector<int> fs_dump_pendingops() {
   std::vector<int> res;
   for (auto &[key, ringList]: gServMngPtr->retryMgr->getReqRingMap()) {
     for (auto ringIdx: ringList) {
-      // std::cout << "Req: " << key << "\t"
-      // << "ringIdx: " << ringIdx << "\t" 
-      // << "request type: ";
+      std::cout << "Req: " << key << "\t"
+      << "ringIdx: " << ringIdx << "\t" 
+      << "request type: ";
 
       auto type = unsigned(gServMngPtr->queueMgr->getMessageType(ringIdx));
-      /*
+      
       switch(type) {
         case CFS_OP_PWRITE:
           std::cout << "pwrite" << std::endl;
@@ -2124,7 +2124,7 @@ std::vector<int> fs_dump_pendingops() {
           std::cout << type << " unknown" << std::endl;
           break;
       }
-      */
+      
       res.push_back(key);
     }
   }

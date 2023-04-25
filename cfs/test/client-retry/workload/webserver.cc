@@ -27,6 +27,7 @@ enum TestCase {
   READ_WRITE_RANDOM, // 4
   READ_WRITE_RANDOM_SYNC, // 5
   SINGLE_WRITE, // 6
+  CRASH, // 7
 };
 
 /******************************************************************************
@@ -98,7 +99,8 @@ int readFile(int index, int fileSize, int ioSize, int threadId) {
   char *buf = (char *) fs_malloc(ioSize + 1);
   memset(buf, 0, ioSize + 1);
 
-  int iterations = (fileSize * ONE_MB) / ioSize;
+  // int iterations = (fileSize * ONE_MB) / ioSize;
+  int iterations = 1;
   for (int j = 0; j < iterations; j++) {  
     auto ret = fs_allocated_pread(ino, buf, ioSize, j * ioSize);
     if (ret != ioSize) {
@@ -158,7 +160,8 @@ int closeFile(int ino) {
 int overwriteFile(int index, int fileSize, int ioSize, int threadId) {
   int ino = getReadFileInode(index, threadId);
 
-  int iterations = (fileSize * ONE_MB) / ioSize;
+  // int iterations = (fileSize * ONE_MB) / ioSize;
+  int iterations = 1;
 
   char* buf = (char *) fs_malloc(ioSize + 1);
   memset(buf, 0, ioSize + 1);
@@ -387,6 +390,26 @@ int runReadWriteRandomSync(int threadId, int numFilesPerDir, int readFileSize,
   return 0;
 }
 
+int runCrashTask(int threadId, int numFilesPerDir, int readFileSize, int writeFileSize, int ioSize) {
+  for (int i = 0; i < numFilesPerDir; i++) {
+    fs_opendir("/");
+    fs_opendir((DIR_PREFIX + std::to_string(threadId)).c_str());
+    struct stat statbuf;
+    fs_stat(getReadFilePath(i, threadId).c_str(), &statbuf);
+    // if (threadId != 0) {
+    //   // reassign
+    //   fs_admin_inode_reassignment(1, getReadFileInode(i, threadId), 0, threadId);
+
+    //   // wait till reassign is complete
+    //   while (fs_admin_inode_reassignment(0, getReadFileInode(i, threadId), threadId, -1) != 0);
+    // }
+    readFile(i, readFileSize, ioSize, threadId);
+    overwriteFile(i, writeFileSize, ioSize, threadId);
+  }
+
+  return 0;
+}
+
 int runTask(int threadId, int numFilesPerDir, int readFileSize, 
   int writeFileSize, int ioSize, int type) {
 
@@ -405,6 +428,8 @@ int runTask(int threadId, int numFilesPerDir, int readFileSize,
       return runReadWriteRandomSync(threadId, numFilesPerDir, readFileSize, writeFileSize, ioSize);
     case TestCase::SINGLE_WRITE:
       return overwriteFileSingle(ioSize, 64 /*writeCount*/);
+    case TestCase::CRASH:
+      return runCrashTask(threadId, numFilesPerDir, readFileSize, writeFileSize, ioSize);
   }
   
   return 0;

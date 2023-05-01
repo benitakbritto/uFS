@@ -99,8 +99,7 @@ int readFile(int index, int fileSize, int ioSize, int threadId) {
   char *buf = (char *) fs_malloc(ioSize + 1);
   memset(buf, 0, ioSize + 1);
 
-  // int iterations = (fileSize * ONE_MB) / ioSize;
-  int iterations = 1;
+  int iterations = (fileSize * ONE_MB) / ioSize;
   for (int j = 0; j < iterations; j++) {  
     auto ret = fs_allocated_pread(ino, buf, ioSize, j * ioSize);
     if (ret != ioSize) {
@@ -160,8 +159,7 @@ int closeFile(int ino) {
 int overwriteFile(int index, int fileSize, int ioSize, int threadId) {
   int ino = getReadFileInode(index, threadId);
 
-  // int iterations = (fileSize * ONE_MB) / ioSize;
-  int iterations = 1;
+  int iterations = (fileSize * ONE_MB) / ioSize;
 
   char* buf = (char *) fs_malloc(ioSize + 1);
   memset(buf, 0, ioSize + 1);

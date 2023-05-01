@@ -68,7 +68,7 @@ int runInitWebserver(int numDirs, int numFilesPerDir, int fileSize) {
       memcpy(buf, generateString("a", IO_SIZE).c_str(), IO_SIZE);
     
       int offset = 0;
-      int chunks = (fileSize  * ONE_KB) / IO_SIZE;
+      int chunks = (fileSize  * ONE_MB) / IO_SIZE;
       for (int i = 0; i < chunks; i++) {
         if (fs_allocated_pwrite(ino, (void *) buf, IO_SIZE, i * IO_SIZE) 
           != IO_SIZE) {
